@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/primitives",
     "crates/traits",
 ]
 resolver = "2"
@@ -77,4 +78,5 @@ ark-std = { version = "^0.5.0", default-features = false }
 ark-vesta = { version = "^0.5.0" }
 
 # Local crates
+sonobe-primitives = { path = "crates/primitives", default-features = false }
 sonobe-traits = { path = "crates/traits" }
