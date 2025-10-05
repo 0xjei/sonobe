@@ -4,37 +4,32 @@ members = [
     "solidity-verifiers",
     "cli",
     "experimental-frontends",
+    "crates/traits",
 ]
 resolver = "2"
 
 
 [patch.crates-io]
-# Update ark-groth16 to latest git version
-ark-groth16 = { git = "https://github.com/arkworks-rs/groth16", rev = "b3b4a15" }
-
-# Required dependencies for latest ark-groth16
+# We depend on git versions of arkworks crates, but some of our dependencies
+# depend on crates.io versions, so we need to override them here to avoid
+# version conflicts.
 ark-ff = { git = "https://github.com/arkworks-rs/algebra" }
 ark-ec = { git = "https://github.com/arkworks-rs/algebra" }
 ark-serialize = { git = "https://github.com/arkworks-rs/algebra" }
 ark-poly = { git = "https://github.com/arkworks-rs/algebra" }
-ark-relations = { git = "https://github.com/arkworks-rs/snark" }
-ark-snark = { git = "https://github.com/arkworks-rs/snark" }
-ark-crypto-primitives = { git = "https://github.com/flyingnobita/crypto-primitives", rev = "f559264" }
-ark-r1cs-std = { git = "https://github.com/flyingnobita/r1cs-std_yelhousni", rev = "b4bab0c" }         # "perf/sw-updated" branch
 ark-std = { git = "https://github.com/arkworks-rs/std" }
-ark-poly-commit = { git = "https://github.com/arkworks-rs/poly-commit" }
-
+ark-crypto-primitives = { git = "https://github.com/winderica/crypto-primitives", rev = "af003fc" }
+ark-r1cs-std = { git = "https://github.com/winderica/r1cs-std", rev = "ae8283a" } # "sw-fix-updated" branch
 
 # Curve crates also need git versions
 ark-bn254 = { git = "https://github.com/arkworks-rs/algebra" }
 ark-grumpkin = { git = "https://github.com/arkworks-rs/algebra" }
-ark-pallas = { git = "https://github.com/arkworks-rs/algebra" }
-ark-vesta = { git = "https://github.com/arkworks-rs/algebra" }
-ark-mnt4-298 = { git = "https://github.com/arkworks-rs/algebra" }
-ark-mnt6-298 = { git = "https://github.com/arkworks-rs/algebra" }
 
-[patch."https://github.com/arkworks-rs/circom-compat"]
-ark-circom = { git = "https://github.com/dmpierre/circom-compat", rev = "0dfd773c" }
+[patch."https://github.com/arkworks-rs/crypto-primitives"]
+ark-crypto-primitives = { git = "https://github.com/winderica/crypto-primitives", rev = "af003fc" }
+
+[patch."https://github.com/arkworks-rs/r1cs-std"]
+ark-r1cs-std = { git = "https://github.com/winderica/r1cs-std", rev = "ae8283a" } # "sw-fix-updated" branch
 
 [workspace.package]
 edition = "2021"
@@ -63,7 +58,7 @@ revm = { version = "19.5.0", default-features = false }
 rust-crypto = { version = "0.2" }
 thiserror = { version = "1.0" }
 tokio = "1.44.1"
-wasmer = { version = "=6.1.0-rc.2", default-features = false }
+wasmer = { version = "6.1.0", default-features = false }
 
 # Arkworks family
 ark-bn254 = { version = "^0.5.0", default-features = false }
@@ -71,7 +66,7 @@ ark-circom = { git = "https://github.com/arkworks-rs/circom-compat", default-fea
 ark-crypto-primitives = { version = "^0.5.0", default-features = false }
 ark-ec = { version = "^0.5.0", default-features = false }
 ark-ff = { version = "^0.5.0", default-features = false }
-ark-groth16 = { version = "^0.5.0" }
+ark-groth16 = { git = "https://github.com/arkworks-rs/groth16" }
 ark-grumpkin = { version = "^0.5.0", default-features = false }
 ark-mnt4-298 = { version = "^0.5.0" }
 ark-mnt6-298 = { version = "^0.5.0" }
@@ -79,13 +74,14 @@ ark-pallas = { version = "^0.5.0" }
 ark-poly = { version = "^0.5.0", default-features = false }
 ark-poly-commit = { version = "^0.5.0" }
 ark-r1cs-std = { version = "^0.5.0", default-features = false }
-ark-relations = { version = "^0.5.0", default-features = false }
+ark-relations = { git = "https://github.com/arkworks-rs/snark", default-features = false }
 ark-serialize = { version = "^0.5.0" }
-ark-snark = { version = "^0.5.0", default-features = false }
+ark-snark = { git = "https://github.com/arkworks-rs/snark", default-features = false }
 ark-std = { version = "^0.5.0", default-features = false }
 ark-vesta = { version = "^0.5.0" }
 
 # Local crates
-experimental-frontends = { path = "experimental-frontends" }
-folding-schemes = { path = "folding-schemes" }
-solidity-verifiers = { path = "solidity-verifiers" }
+experimental-frontends = { path = "experimental-frontends", default-features = false }
+folding-schemes = { path = "folding-schemes", default-features = false }
+solidity-verifiers = { path = "solidity-verifiers", default-features = false }
+sonobe-traits = { path = "crates/traits", default-features = false }
