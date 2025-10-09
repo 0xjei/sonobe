@@ -20,17 +20,14 @@ num-integer = { workspace = true }
 rayon = { workspace = true }
 thiserror = { workspace = true }
 
-sonobe-traits = { workspace = true }
-
 [dev-dependencies]
 ark-bn254 = { workspace = true, features = ["curve", "r1cs"] }
 ark-pallas = { workspace = true, features = ["curve", "r1cs"] }
-ark-vesta = { workspace = true, features = ["r1cs"] }
 
 [features]
 default = ["parallel"]
 parallel = [
+    "ark-poly-commit/parallel",
     "ark-relations/parallel",
     "ark-r1cs-std/parallel",
-    "sonobe-traits/parallel",
 ]
