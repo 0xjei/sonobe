@@ -4,8 +4,8 @@ members = [
     "solidity-verifiers",
     "cli",
     "experimental-frontends",
-    "crates/traits",
     "crates/primitives",
+    "crates/fs",
 ]
 resolver = "2"
 
@@ -85,5 +85,4 @@ ark-vesta = { version = "^0.5.0" }
 experimental-frontends = { path = "experimental-frontends", default-features = false }
 folding-schemes = { path = "folding-schemes", default-features = false }
 solidity-verifiers = { path = "solidity-verifiers", default-features = false }
-sonobe-traits = { path = "crates/traits", default-features = false }
 sonobe-primitives = { path = "crates/primitives", default-features = false }
