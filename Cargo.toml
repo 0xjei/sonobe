@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/primitives",
+    "crates/fs",
 ]
 resolver = "2"
 
@@ -40,6 +41,7 @@ ark-vesta = { git = "https://github.com/arkworks-rs/algebra", default-features =
 
 # Local crates
 sonobe-primitives = { path = "crates/primitives", default-features = false }
+sonobe-fs = { path = "crates/fs", default-features = false }
 
 [patch.crates-io]
 # We depend on git versions of arkworks crates, but some of our dependencies
