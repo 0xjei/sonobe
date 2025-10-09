@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "crates/primitives",
-    "crates/traits",
 ]
 resolver = "2"
 
@@ -20,6 +19,8 @@ ark-r1cs-std = { git = "https://github.com/winderica/r1cs-std", rev = "ae8283a" 
 # Curve crates also need git versions
 ark-bn254 = { git = "https://github.com/arkworks-rs/algebra" }
 ark-grumpkin = { git = "https://github.com/arkworks-rs/algebra" }
+ark-pallas = { git = "https://github.com/arkworks-rs/algebra" }
+ark-vesta = { git = "https://github.com/arkworks-rs/algebra" }
 
 [patch."https://github.com/arkworks-rs/crypto-primitives"]
 ark-crypto-primitives = { git = "https://github.com/winderica/crypto-primitives", rev = "af003fc" }
@@ -79,4 +80,3 @@ ark-vesta = { version = "^0.5.0" }
 
 # Local crates
 sonobe-primitives = { path = "crates/primitives", default-features = false }
-sonobe-traits = { path = "crates/traits" }
