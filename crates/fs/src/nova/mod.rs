@@ -136,12 +136,15 @@ where
 // From [Srinath Setty](https://microsoft.com/en-us/research/people/srinath/): In Nova, soundness
 // error ≤ 2/|S|, where S is the subset of the field F from which the challenges are drawn. In this
 // case, we keep the size of S close to 2^128.
-pub struct Nova<CM, const CHALLENGE_BITS: usize = 128> {
-    _CM: PhantomData<CM>,
+pub struct AbstractNova<CM, TF, const CHALLENGE_BITS: usize = 128> {
+    _t: PhantomData<(CM, TF)>,
 }
 
-impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeDef
-    for Nova<CM, CHALLENGE_BITS>
+pub type Nova<CM, const CHALLENGE_BITS: usize = 128> =
+    AbstractNova<CM, <CM as CommitmentDef>::Scalar, CHALLENGE_BITS>;
+
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> FoldingSchemeDef
+    for AbstractNova<CM, TF, CHALLENGE_BITS>
 {
     type CM = CM;
     type RW = RW<CM>;
