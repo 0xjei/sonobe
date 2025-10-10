@@ -1,8 +1,7 @@
-use ark_ff::{BigInteger, Field, One, PrimeField, Zero};
+use ark_ff::{Field, One};
 use ark_poly::{DenseMultilinearExtension as MLE, MultilinearExtension};
 use ark_std::{
-    UniformRand, borrow::Borrow, cfg_into_iter, cfg_iter, log2, marker::PhantomData, rand::RngCore,
-    sync::Arc,
+    UniformRand, borrow::Borrow, cfg_iter, marker::PhantomData, rand::RngCore, sync::Arc,
 };
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -24,7 +23,7 @@ use sonobe_primitives::{
         Error as SumCheckError, SumCheck,
         utils::{EqPoly, VPAuxInfo, VirtualPolynomial},
     },
-    traits::{CF1, Dummy, SonobeCurve},
+    traits::Dummy,
     transcripts::Transcript,
 };
 
@@ -524,7 +523,10 @@ impl<
 mod tests {
     use ark_bn254::{Fr, G1Projective};
     use ark_ff::UniformRand;
-    use ark_std::{error::Error, test_rng};
+    use ark_std::{
+        error::Error,
+        rand::{Rng, thread_rng},
+    };
     use sonobe_primitives::{
         circuits::utils::{CircuitForTest, satisfying_assignments_for_test},
         commitments::pedersen::Pedersen,
@@ -533,31 +535,43 @@ mod tests {
     use super::*;
     use crate::tests::test_folding_scheme;
 
+    fn test_hypernova_opt<const M: usize, const N: usize>(
+        rounds: usize,
+        mut rng: impl Rng,
+    ) -> Result<(), Box<dyn Error>> {
+        test_folding_scheme::<HyperNova<Pedersen<G1Projective, true>>, M, N>(
+            8,
+            CircuitForTest {
+                x: Fr::rand(&mut rng),
+            },
+            (0..rounds)
+                .map(|_| satisfying_assignments_for_test(Fr::rand(&mut rng)))
+                .collect(),
+            &mut rng,
+        )?;
+
+        test_folding_scheme::<HyperNova<Pedersen<G1Projective, false>>, M, N>(
+            8,
+            CircuitForTest {
+                x: Fr::rand(&mut rng),
+            },
+            (0..rounds)
+                .map(|_| satisfying_assignments_for_test(Fr::rand(&mut rng)))
+                .collect(),
+            &mut rng,
+        )?;
+        Ok(())
+    }
+
     #[test]
     fn test_hypernova() -> Result<(), Box<dyn Error>> {
-        let mut rng = test_rng();
-
-        test_folding_scheme::<HyperNova<Pedersen<G1Projective, true>>, 1, 1>(
-            8,
-            CircuitForTest {
-                x: Fr::rand(&mut rng),
-            },
-            (0..10)
-                .map(|_| satisfying_assignments_for_test(Fr::rand(&mut rng)))
-                .collect(),
-            &mut rng,
-        )?;
-
-        test_folding_scheme::<HyperNova<Pedersen<G1Projective, false>>, 1, 1>(
-            8,
-            CircuitForTest {
-                x: Fr::rand(&mut rng),
-            },
-            (0..10)
-                .map(|_| satisfying_assignments_for_test(Fr::rand(&mut rng)))
-                .collect(),
-            &mut rng,
-        )?;
+        let mut rng = thread_rng();
+        test_hypernova_opt::<1, 1>(10, &mut rng)?;
+        test_hypernova_opt::<1, 3>(10, &mut rng)?;
+        test_hypernova_opt::<3, 1>(10, &mut rng)?;
+        test_hypernova_opt::<3, 3>(10, &mut rng)?;
+        test_hypernova_opt::<0, 5>(10, &mut rng)?;
+        test_hypernova_opt::<5, 0>(10, &mut rng)?;
         Ok(())
     }
 }
