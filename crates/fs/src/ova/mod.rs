@@ -13,7 +13,7 @@ use sonobe_primitives::{
     circuits::{Assignments, AssignmentsOwned},
     commitments::{CommitmentDef, CommitmentKey, CommitmentOps, GroupBasedCommitment},
     relations::{Relation, WitnessInstanceSampler},
-    traits::SonobeField,
+    traits::{CF2, SonobeField},
     transcripts::Transcript,
 };
 
@@ -135,8 +135,11 @@ pub struct AbstractOva<CM, TF, const CHALLENGE_BITS: usize = 128> {
     _t: PhantomData<(CM, TF)>,
 }
 
-pub type Ova<VC, const CHALLENGE_BITS: usize = 128> =
-    AbstractOva<VC, <VC as CommitmentDef>::Scalar, CHALLENGE_BITS>;
+pub type Ova<CM, const CHALLENGE_BITS: usize = 128> =
+    AbstractOva<CM, <CM as CommitmentDef>::Scalar, CHALLENGE_BITS>;
+
+pub type CycleFoldOva<CM, const CHALLENGE_BITS: usize = 128> =
+    AbstractOva<CM, CF2<<CM as CommitmentDef>::Commitment>, CHALLENGE_BITS>;
 
 impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> FoldingSchemeDef
     for AbstractOva<CM, TF, CHALLENGE_BITS>
@@ -279,7 +282,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
 
 #[cfg(test)]
 mod tests {
-    use ark_bn254::{Fr, G1Projective};
+    use ark_bn254::{Fq, Fr, G1Projective};
     use ark_ff::UniformRand;
     use ark_std::{error::Error, test_rng};
     use sonobe_primitives::{
@@ -290,33 +293,42 @@ mod tests {
     use super::*;
     use crate::tests::test_folding_scheme;
 
+    fn test_ova_opt<TF: SonobeField>(
+        rounds: usize,
+        mut rng: impl RngCore,
+    ) -> Result<(), Box<dyn Error>> {
+        let config = (4, 4);
+
+        test_folding_scheme::<AbstractOva<Pedersen<G1Projective, true>, TF>, 1, 1>(
+            config,
+            CircuitForTest {
+                x: Fr::rand(&mut rng),
+            },
+            (0..rounds)
+                .map(|_| satisfying_assignments_for_test(Fr::rand(&mut rng)))
+                .collect(),
+            &mut rng,
+        )?;
+
+        test_folding_scheme::<AbstractOva<Pedersen<G1Projective, false>, TF>, 1, 1>(
+            config,
+            CircuitForTest {
+                x: Fr::rand(&mut rng),
+            },
+            (0..rounds)
+                .map(|_| satisfying_assignments_for_test(Fr::rand(&mut rng)))
+                .collect(),
+            &mut rng,
+        )?;
+        Ok(())
+    }
+
     #[test]
     fn test_ova() -> Result<(), Box<dyn Error>> {
         let mut rng = test_rng();
 
-        let config = (4, 4);
-
-        test_folding_scheme::<Ova<Pedersen<G1Projective, true>>, 1, 1>(
-            config,
-            CircuitForTest {
-                x: Fr::rand(&mut rng),
-            },
-            (0..10)
-                .map(|_| satisfying_assignments_for_test(Fr::rand(&mut rng)))
-                .collect(),
-            &mut rng,
-        )?;
-
-        test_folding_scheme::<Ova<Pedersen<G1Projective, false>>, 1, 1>(
-            config,
-            CircuitForTest {
-                x: Fr::rand(&mut rng),
-            },
-            (0..10)
-                .map(|_| satisfying_assignments_for_test(Fr::rand(&mut rng)))
-                .collect(),
-            &mut rng,
-        )?;
+        test_ova_opt::<Fr>(10, &mut rng)?;
+        test_ova_opt::<Fq>(10, &mut rng)?;
         Ok(())
     }
 }
