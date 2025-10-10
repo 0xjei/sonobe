@@ -13,6 +13,7 @@ use sonobe_primitives::{
     circuits::{Assignments, AssignmentsOwned},
     commitments::{CommitmentDef, CommitmentKey, CommitmentOps, GroupBasedCommitment},
     relations::{Relation, WitnessInstanceSampler},
+    traits::SonobeField,
     transcripts::Transcript,
 };
 
@@ -130,12 +131,15 @@ where
     }
 }
 
-pub struct Ova<CM, const CHALLENGE_BITS: usize = 128> {
-    _vc: PhantomData<CM>,
+pub struct AbstractOva<CM, TF, const CHALLENGE_BITS: usize = 128> {
+    _t: PhantomData<(CM, TF)>,
 }
 
-impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeDef
-    for Ova<CM, CHALLENGE_BITS>
+pub type Ova<VC, const CHALLENGE_BITS: usize = 128> =
+    AbstractOva<VC, <VC as CommitmentDef>::Scalar, CHALLENGE_BITS>;
+
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> FoldingSchemeDef
+    for AbstractOva<CM, TF, CHALLENGE_BITS>
 {
     type CM = CM;
     type RW = RW<CM>;
@@ -143,7 +147,7 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeDef
     type IW = IW<CM::Scalar>;
     type IU = IU<CM::Scalar>;
 
-    type TranscriptField = CM::Scalar;
+    type TranscriptField = TF;
     type Arith = R1CS<CM::Scalar>;
 
     type Config = (usize, usize);
@@ -153,8 +157,8 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeDef
     type Proof<const M: usize, const N: usize> = CM::Commitment;
 }
 
-impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemePreprocessor
-    for Ova<CM, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemePreprocessor for AbstractOva<CM, TF, CHALLENGE_BITS>
 {
     fn preprocess(
         (n_constraints, n_witnesses): (usize, usize),
@@ -165,8 +169,8 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemePreproc
     }
 }
 
-impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeKeyGenerator
-    for Ova<CM, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemeKeyGenerator for AbstractOva<CM, TF, CHALLENGE_BITS>
 {
     fn generate_keys(ck: Self::PublicParam, r1cs: Self::Arith) -> Result<Self::DeciderKey, Error> {
         let ck = Arc::new(ck);
@@ -182,12 +186,12 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeKeyGene
     }
 }
 
-impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeProver<1, 1>
-    for Ova<CM, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemeProver<1, 1> for AbstractOva<CM, TF, CHALLENGE_BITS>
 {
     fn prove(
         pk: &OvaKey<Self::Arith, CM>,
-        transcript: &mut impl Transcript<CM::Scalar>,
+        transcript: &mut impl Transcript<TF>,
         Ws: &[impl Borrow<Self::RW>; 1],
         Us: &[impl Borrow<Self::RU>; 1],
         ws: &[impl Borrow<Self::IW>; 1],
@@ -242,12 +246,12 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeProver<
     }
 }
 
-impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeVerifier<1, 1>
-    for Ova<CM, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemeVerifier<1, 1> for AbstractOva<CM, TF, CHALLENGE_BITS>
 {
     fn verify(
         _vk: &(),
-        transcript: &mut impl Transcript<CM::Scalar>,
+        transcript: &mut impl Transcript<TF>,
         Us: &[impl Borrow<Self::RU>; 1],
         us: &[impl Borrow<Self::IU>; 1],
         cm: &Self::Proof<1, 1>,
