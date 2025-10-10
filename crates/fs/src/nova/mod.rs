@@ -1,3 +1,4 @@
+use ark_ec::CurveGroup;
 use ark_ff::{BigInteger, Field, One, PrimeField};
 use ark_std::{
     UniformRand,
@@ -19,7 +20,7 @@ use sonobe_primitives::{
     circuits::AssignmentsOwned,
     commitments::{CommitmentDef, CommitmentKey, CommitmentOps, GroupBasedCommitment},
     relations::{Relation, WitnessInstanceSampler},
-    traits::{CF1, SonobeCurve, SonobeField},
+    traits::{CF1, CF2, SonobeCurve, SonobeField},
     transcripts::Transcript,
 };
 use witness::{IncomingWitness as IW, RunningWitness as RW};
@@ -143,6 +144,9 @@ pub struct AbstractNova<CM, TF, const CHALLENGE_BITS: usize = 128> {
 pub type Nova<CM, const CHALLENGE_BITS: usize = 128> =
     AbstractNova<CM, <CM as CommitmentDef>::Scalar, CHALLENGE_BITS>;
 
+pub type CycleFoldNova<CM, const CHALLENGE_BITS: usize = 128> =
+    AbstractNova<CM, CF2<<CM as CommitmentDef>::Commitment>, CHALLENGE_BITS>;
+
 impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> FoldingSchemeDef
     for AbstractNova<CM, TF, CHALLENGE_BITS>
 {
@@ -152,7 +156,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> Fol
     type IW = IW<CM>;
     type IU = IU<CM>;
 
-    type TranscriptField = CM::Scalar;
+    type TranscriptField = TF;
     type Arith = R1CS<CM::Scalar>;
 
     type Config = usize;
@@ -162,8 +166,8 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> Fol
     type Proof<const M: usize, const N: usize> = CM::Commitment;
 }
 
-impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemePreprocessor
-    for Nova<CM, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemePreprocessor for AbstractNova<CM, TF, CHALLENGE_BITS>
 {
     fn preprocess(ck_len: usize, mut rng: impl RngCore) -> Result<Self::PublicParam, Error> {
         let ck = CM::generate_key(ck_len, &mut rng)?;
@@ -171,8 +175,8 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemePreproc
     }
 }
 
-impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeKeyGenerator
-    for Nova<CM, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemeKeyGenerator for AbstractNova<CM, TF, CHALLENGE_BITS>
 {
     fn generate_keys(ck: Self::PublicParam, r1cs: Self::Arith) -> Result<Self::DeciderKey, Error> {
         let ck = Arc::new(ck);
@@ -187,12 +191,12 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeKeyGene
     }
 }
 
-impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeProver<1, 1>
-    for Nova<CM, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemeProver<1, 1> for AbstractNova<CM, TF, CHALLENGE_BITS>
 {
     fn prove(
         pk: &NovaKey<Self::Arith, CM>,
-        transcript: &mut impl Transcript<CM::Scalar>,
+        transcript: &mut impl Transcript<TF>,
         Ws: &[impl Borrow<Self::RW>; 1],
         Us: &[impl Borrow<Self::RU>; 1],
         ws: &[impl Borrow<Self::IW>; 1],
@@ -249,12 +253,12 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeProver<
     }
 }
 
-impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeVerifier<1, 1>
-    for Nova<CM, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> FoldingSchemeVerifier<1, 1>
+    for AbstractNova<CM, TF, CHALLENGE_BITS>
 {
     fn verify(
         _vk: &(),
-        transcript: &mut impl Transcript<CM::Scalar>,
+        transcript: &mut impl Transcript<TF>,
         Us: &[impl Borrow<Self::RU>; 1],
         us: &[impl Borrow<Self::IU>; 1],
         cm_t: &Self::Proof<1, 1>,
@@ -280,7 +284,7 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeVerifie
 
 #[cfg(test)]
 mod tests {
-    use ark_bn254::{Fr, G1Projective};
+    use ark_bn254::{Fq, Fr, G1Projective};
     use ark_ff::UniformRand;
     use ark_std::{error::Error, test_rng};
     use sonobe_primitives::{
@@ -291,31 +295,40 @@ mod tests {
     use super::*;
     use crate::tests::test_folding_scheme;
 
+    fn test_nova_opt<TF: SonobeField>(
+        rounds: usize,
+        mut rng: impl RngCore,
+    ) -> Result<(), Box<dyn Error>> {
+        test_folding_scheme::<AbstractNova<Pedersen<G1Projective, true>, TF>, 1, 1>(
+            8,
+            CircuitForTest {
+                x: Fr::rand(&mut rng),
+            },
+            (0..rounds)
+                .map(|_| satisfying_assignments_for_test(Fr::rand(&mut rng)))
+                .collect(),
+            &mut rng,
+        )?;
+
+        test_folding_scheme::<AbstractNova<Pedersen<G1Projective, false>, TF>, 1, 1>(
+            8,
+            CircuitForTest {
+                x: Fr::rand(&mut rng),
+            },
+            (0..rounds)
+                .map(|_| satisfying_assignments_for_test(Fr::rand(&mut rng)))
+                .collect(),
+            &mut rng,
+        )?;
+        Ok(())
+    }
+
     #[test]
     fn test_nova() -> Result<(), Box<dyn Error>> {
         let mut rng = test_rng();
 
-        test_folding_scheme::<Nova<Pedersen<G1Projective, true>>, 1, 1>(
-            8,
-            CircuitForTest {
-                x: Fr::rand(&mut rng),
-            },
-            (0..10)
-                .map(|_| satisfying_assignments_for_test(Fr::rand(&mut rng)))
-                .collect(),
-            &mut rng,
-        )?;
-
-        test_folding_scheme::<Nova<Pedersen<G1Projective, false>>, 1, 1>(
-            8,
-            CircuitForTest {
-                x: Fr::rand(&mut rng),
-            },
-            (0..10)
-                .map(|_| satisfying_assignments_for_test(Fr::rand(&mut rng)))
-                .collect(),
-            &mut rng,
-        )?;
+        test_nova_opt::<Fr>(10, &mut rng)?;
+        test_nova_opt::<Fq>(10, &mut rng)?;
         Ok(())
     }
 }
