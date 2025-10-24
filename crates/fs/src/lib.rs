@@ -1,13 +1,14 @@
+use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar};
 use ark_relations::gr1cs::SynthesisError;
-use ark_std::{fmt::Debug, rand::RngCore};
+use ark_std::{borrow::Borrow, fmt::Debug, rand::RngCore};
 use sonobe_primitives::{
     arithmetizations::Arith,
     circuits::AssignmentsOwned,
-    commitments::CommitmentDef,
+    commitments::{CommitmentDef, CommitmentDefGadget},
     relations::{Relation, WitnessInstanceSampler},
     sumcheck::Error as SumCheckError,
     traits::SonobeField,
-    transcripts::Transcript,
+    transcripts::{Transcript, TranscriptGadget},
 };
 use thiserror::Error;
 
@@ -50,110 +51,6 @@ impl<VC: CommitmentDef> FoldingInstance<VC> for Vec<VC::Scalar> {
     }
 }
 
-// pub trait WitnessOps<F: PrimeField>: PartialEq + Clone + Debug {
-//     /// The in-circuit representation of the witness.
-//     type Var: AllocVar<Self, F> + WitnessVarOps<F>;
-
-//     /// Returns the openings (i.e., the values being committed to and the
-//     /// randomness) contained in the witness.
-//     fn get_openings(&self) -> Vec<(&[F], F)>;
-// }
-
-// pub trait WitnessVarOps<F: PrimeField> {
-//     /// Returns the openings (i.e., the values being committed to and the
-//     /// randomness) contained in the witness.
-//     fn get_openings(&self) -> Vec<(&[FpVar<F>], FpVar<F>)>;
-// }
-
-// pub trait CommittedInstanceOps<F: PrimeField>: Inputize<F> + PartialEq + Clone + Debug {
-//     type C: Curve;
-
-//     /// The in-circuit representation of the committed instance.
-//     type Var: AllocVar<Self, F> + CommittedInstanceVarOps<F>;
-//     /// `hash` implements the committed instance hash compatible with the
-//     /// in-circuit implementation from `CommittedInstanceVarOps::hash`.
-//     ///
-//     /// Returns `H(i, z_0, z_i, U_i)`, where `i` can be `i` but also `i+1`, and
-//     /// `U_i` is the committed instance `self`.
-//     fn hash<T: Transcript<F>>(&self, sponge: &T, i: F, z_0: &[F], z_i: &[F]) -> F
-//     where
-//         Self: Sized + Absorb,
-//         F: Absorb,
-//     {
-//         let mut sponge = sponge.clone();
-//         sponge.absorb(&i);
-//         sponge.absorb(&z_0);
-//         sponge.absorb(&z_i);
-//         sponge.absorb(&self);
-//         sponge.squeeze_field_elements(1)[0]
-//     }
-
-//     /// Returns the commitments contained in the committed instance.
-//     fn get_commitments(&self) -> Vec<Self::C>;
-
-//     /// Returns `true` if the committed instance is an incoming instance, and
-//     /// `false` if it is a running instance.
-//     fn is_incoming(&self) -> bool;
-
-//     /// Checks if the committed instance is an incoming instance.
-//     fn check_incoming(&self) -> Result<(), Error> {
-//         self.is_incoming()
-//             .then_some(())
-//             .ok_or(Error::NotIncomingCommittedInstance)
-//     }
-// }
-
-// pub trait CommittedInstanceVarOps<F: PrimeField> {
-//     type PointVar;
-//     /// `hash` implements the in-circuit committed instance hash compatible with
-//     /// the native implementation from `CommittedInstanceOps::hash`.
-//     /// Returns `H(i, z_0, z_i, U_i)`, where `i` can be `i` but also `i+1`, and
-//     /// `U_i` is the committed instance `self`.
-//     ///
-//     /// Additionally it returns the in-circuit representation of the committed
-//     /// instance `self` as a vector of field elements, so they can be reused in
-//     /// other gadgets avoiding recalculating (reconstraining) them.
-//     #[allow(clippy::type_complexity)]
-//     fn hash<T: Transcript<F>>(
-//         &self,
-//         sponge: &impl TranscriptVar<F, T>,
-//         i: &FpVar<F>,
-//         z_0: &[FpVar<F>],
-//         z_i: &[FpVar<F>],
-//     ) -> Result<(FpVar<F>, Vec<FpVar<F>>), SynthesisError>
-//     where
-//         Self: AbsorbGadget<F>,
-//     {
-//         let mut sponge = sponge.clone();
-//         let vec = self.to_sponge_field_elements()?;
-//         sponge.absorb(&i)?;
-//         sponge.absorb(&z_0)?;
-//         sponge.absorb(&z_i)?;
-//         sponge.absorb(&vec)?;
-//         Ok((
-//             // `unwrap` is safe because the sponge is guaranteed to return a single element
-//             sponge.squeeze_field_elements(1)?.pop().unwrap(),
-//             vec,
-//         ))
-//     }
-
-//     /// Returns the commitments contained in the committed instance.
-//     fn get_commitments(&self) -> Vec<Self::PointVar>;
-
-//     /// Returns the public inputs contained in the committed instance.
-//     fn get_public_inputs(&self) -> &[FpVar<F>];
-
-//     /// Generates constraints to enforce that the committed instance is an
-//     /// incoming instance.
-//     fn enforce_incoming(&self) -> Result<(), SynthesisError>;
-
-//     /// Generates constraints to enforce that the committed instance `self` is
-//     /// partially equal to another committed instance `other`.
-//     /// Here, only field elements are compared, while commitments (points) are
-//     /// not.
-//     fn enforce_partial_equal(&self, other: &Self) -> Result<(), SynthesisError>;
-// }
-
 pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
     type VC: CommitmentDef<Scalar: SonobeField>;
     type RW: FoldingWitness<Self::VC>;
@@ -175,6 +72,7 @@ pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
             Source = AssignmentsOwned<<Self::VC as CommitmentDef>::Scalar>,
             Error = Error,
         >;
+    type Challenge;
     type Proof;
 
     /// The preprocessing method is a randomized algorithm that takes as input
@@ -207,18 +105,18 @@ pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
     fn prove(
         pk: &Self::ProverKey,
         transcript: &mut impl Transcript<Self::TranscriptField>,
-        Ws: &[Self::RW; M],
-        Us: &[Self::RU; M],
-        ws: &[Self::IW; N],
-        us: &[Self::IU; N],
+        Ws: &[impl Borrow<Self::RW>; M],
+        Us: &[impl Borrow<Self::RU>; M],
+        ws: &[impl Borrow<Self::IW>; N],
+        us: &[impl Borrow<Self::IU>; N],
         rng: impl RngCore,
-    ) -> Result<(Self::RW, Self::RU, Self::Proof), Error>;
+    ) -> Result<(Self::RW, Self::RU, Self::Proof, Self::Challenge), Error>;
 
     fn verify(
         vk: &Self::VerifierKey,
         transcript: &mut impl Transcript<Self::TranscriptField>,
-        Us: &[Self::RU; M],
-        us: &[Self::IU; N],
+        Us: &[impl Borrow<Self::RU>; M],
+        us: &[impl Borrow<Self::IU>; N],
         proof: &Self::Proof,
     ) -> Result<Self::RU, Error>;
 
@@ -229,6 +127,65 @@ pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
     fn decide_incoming(dk: &Self::DeciderKey, w: &Self::IW, u: &Self::IU) -> Result<(), Error> {
         Relation::<Self::IW, Self::IU>::check_relation(dk, w, u)
     }
+}
+
+pub trait FoldingWitnessVar<VC: CommitmentDefGadget> {
+    type Native: FoldingWitness<VC::Widget>;
+}
+
+pub trait FoldingInstanceVar<VC: CommitmentDefGadget> {
+    type Native: FoldingInstance<VC::Widget>;
+}
+
+impl<VC: CommitmentDefGadget> FoldingWitnessVar<VC> for Vec<VC::ScalarVar> {
+    type Native = Vec<<VC::Widget as CommitmentDef>::Scalar>;
+}
+
+impl<VC: CommitmentDefGadget> FoldingInstanceVar<VC> for Vec<VC::ScalarVar> {
+    type Native = Vec<<VC::Widget as CommitmentDef>::Scalar>;
+}
+
+pub trait FoldingSchemePartialGadget<const M: usize = 1, const N: usize = 1> {
+    type Native: FoldingScheme<M, N>;
+
+    type VC: CommitmentDefGadget;
+    type RW: FoldingWitnessVar<Self::VC, Native = <Self::Native as FoldingScheme<M, N>>::RW>;
+    type RU: FoldingInstanceVar<Self::VC, Native = <Self::Native as FoldingScheme<M, N>>::RU>;
+    // + AllocVar<<Self::Native as FoldingScheme<M, N>>::RU, Self::TranscriptField>;
+    type IW: FoldingWitnessVar<Self::VC, Native = <Self::Native as FoldingScheme<M, N>>::IW>;
+    type IU: FoldingInstanceVar<Self::VC, Native = <Self::Native as FoldingScheme<M, N>>::IU>;
+    // + AllocVar<<Self::Native as FoldingScheme<M, N>>::RU, Self::TranscriptField>;
+
+    type TranscriptField: SonobeField;
+
+    type VerifierKey;
+
+    type Challenge;
+
+    type Proof;
+
+    type Hint;
+
+    fn verify_hinted(
+        vk: &Self::VerifierKey,
+        transcript: &mut impl TranscriptGadget<Self::TranscriptField>,
+        Us: &[Self::RU; M],
+        us: &[Self::IU; N],
+        proof: &Self::Proof,
+        hint: Self::Hint,
+    ) -> Result<(Self::RU, Self::Challenge), SynthesisError>;
+}
+
+pub trait FoldingSchemeFullGadget<const M: usize = 1, const N: usize = 1>:
+    FoldingSchemePartialGadget<M, N>
+{
+    fn verify(
+        vk: &Self::VerifierKey,
+        transcript: &mut impl TranscriptGadget<Self::TranscriptField>,
+        Us: &[Self::RU; M],
+        us: &[Self::IU; N],
+        proof: &Self::Proof,
+    ) -> Result<Self::RU, SynthesisError>;
 }
 
 #[cfg(test)]
@@ -250,7 +207,8 @@ mod tests {
         mut rng: impl Rng,
     ) -> Result<(), Box<dyn Error>>
     where
-        FS: FoldingScheme<M, N, Arith: From<ConstraintSystem<<FS::VC as CommitmentDef>::Scalar>>>,
+        FS: FoldingScheme<M, N>,
+        FS::Arith: From<ConstraintSystem<<FS::VC as CommitmentDef>::Scalar>>,
     {
         let pp = FS::preprocess(config, &mut rng)?;
 
@@ -289,7 +247,7 @@ mod tests {
             let ws = ws.try_into().unwrap();
             let us = us.try_into().unwrap();
 
-            let (WW, UU, pi) = FS::prove(&pk, &mut transcript_p, &Ws, &Us, &ws, &us, &mut rng)?;
+            let (WW, UU, pi, _) = FS::prove(&pk, &mut transcript_p, &Ws, &Us, &ws, &us, &mut rng)?;
             FS::decide_running(&dk, &WW, &UU)?;
             assert_eq!(FS::verify(&vk, &mut transcript_v, &Us, &us, &pi)?, UU);
 
