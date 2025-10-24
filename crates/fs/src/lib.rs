@@ -31,18 +31,21 @@ pub trait FoldingWitness<VC: CommitmentDef>: Debug + Sync {
     fn openings_ref(&self) -> Vec<(&[VC::Scalar], &VC::Randomness)>;
 }
 
-impl<VC: CommitmentDef> FoldingWitness<VC> for Vec<VC::Scalar> {
-    fn openings_ref(&self) -> Vec<(&[VC::Scalar], &VC::Randomness)> {
-        vec![]
-    }
-}
-
 pub trait FoldingInstance<VC: CommitmentDef>: Debug + PartialEq + Sync {
     /// Returns the commitments contained in the committed instance.
     fn commitments(&self) -> Vec<&VC::Commitment>;
 }
 
-impl<VC: CommitmentDef> FoldingInstance<VC> for Vec<VC::Scalar> {
+pub type PlainWitness<VC> = Vec<<VC as CommitmentDef>::Scalar>;
+pub type PlainInstance<VC> = Vec<<VC as CommitmentDef>::Scalar>;
+
+impl<VC: CommitmentDef> FoldingWitness<VC> for PlainWitness<VC> {
+    fn openings_ref(&self) -> Vec<(&[VC::Scalar], &VC::Randomness)> {
+        vec![]
+    }
+}
+
+impl<VC: CommitmentDef> FoldingInstance<VC> for PlainInstance<VC> {
     fn commitments(&self) -> Vec<&VC::Commitment> {
         vec![]
     }
