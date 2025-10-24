@@ -1,26 +1,35 @@
 use ark_ff::One;
+use ark_r1cs_std::{GR1CSVar, alloc::AllocVar, boolean::Boolean, groups::CurveVar};
+use ark_relations::gr1cs::SynthesisError;
 use ark_std::{
     UniformRand, borrow::Borrow, cfg_iter, marker::PhantomData, ops::Mul, rand::RngCore, sync::Arc,
 };
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use sonobe_primitives::{
-    algebra::ops::bits::FromBits,
+    algebra::ops::bits::{FromBits, FromBitsGadget},
     arithmetizations::{
         Arith, ArithConfig, ArithRelation,
         r1cs::{R1CS, RelaxedInstance, RelaxedWitness},
     },
     circuits::{Assignments, AssignmentsOwned},
-    commitments::{CommitmentDef, CommitmentKey, CommitmentOps, GroupBasedCommitment},
+    commitments::{
+        CommitmentDef, CommitmentDefGadget, CommitmentKey, CommitmentOps, GroupBasedCommitment,
+    },
     relations::{Relation, WitnessInstanceSampler},
     traits::{CF2, SonobeField},
-    transcripts::Transcript,
+    transcripts::{Transcript, TranscriptGadget},
 };
 
-use self::{instance::RunningInstance as RU, witness::RunningWitness as RW};
+use self::{
+    instance::{RunningInstance as RU, circuits::RunningInstanceVar as RUVar},
+    witness::RunningWitness as RW,
+};
 use crate::{
-    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeKeyGenerator, FoldingSchemePreprocessor,
-    FoldingSchemeProver, FoldingSchemeVerifier, PlainInstance as IU, PlainWitness as IW,
+    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeDefGadget, FoldingSchemeFullVerifierGadget,
+    FoldingSchemeKeyGenerator, FoldingSchemePartialVerifierGadget, FoldingSchemePreprocessor,
+    FoldingSchemeProver, FoldingSchemeVerifier, PlainInstance as IU, PlainInstanceVar as IUVar,
+    PlainWitness as IW,
 };
 
 pub mod instance;
@@ -276,6 +285,102 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
                 .zip(&u[..])
                 .map(|(a, b)| rho * b + a)
                 .collect(),
+        })
+    }
+}
+
+pub struct AbstractOvaGadget<CM, const CHALLENGE_BITS: usize = 128> {
+    _t: PhantomData<CM>,
+}
+
+impl<CM, const CHALLENGE_BITS: usize> FoldingSchemeDefGadget
+    for AbstractOvaGadget<CM, CHALLENGE_BITS>
+where
+    CM: CommitmentDefGadget<Widget: GroupBasedCommitment>,
+{
+    type Widget = AbstractOva<CM::Widget, CM::ConstraintField, CHALLENGE_BITS>;
+
+    type CM = CM;
+    type RU = RUVar<CM>;
+    type IU = IUVar<CM::ScalarVar>;
+    type VerifierKey = ();
+    type Challenge = [Boolean<CM::ConstraintField>; CHALLENGE_BITS];
+    type Proof<const M: usize, const N: usize> = CM::CommitmentVar;
+}
+
+impl<CM, const CHALLENGE_BITS: usize> FoldingSchemePartialVerifierGadget<1, 1>
+    for AbstractOvaGadget<CM, CHALLENGE_BITS>
+where
+    CM: CommitmentDefGadget<Widget: GroupBasedCommitment>,
+{
+    fn verify_hinted(
+        _vk: &Self::VerifierKey,
+        transcript: &mut impl TranscriptGadget<CM::ConstraintField>,
+        [U]: [&Self::RU; 1],
+        [u]: [&Self::IU; 1],
+        proof: &Self::Proof<1, 1>,
+    ) -> Result<(Self::RU, Self::Challenge), SynthesisError> {
+        let rho_bits = {
+            transcript.add(&U)?;
+            transcript.add(&u)?;
+            transcript.add(proof)?;
+            transcript.challenge_bits(CHALLENGE_BITS)?
+        };
+        let rho = CM::ScalarVar::from_bits_le(&rho_bits)?;
+
+        Ok((
+            Self::RU {
+                u: (U.u.clone() + &rho)
+                    .try_into()
+                    .map_err(|_| SynthesisError::Unsatisfiable)?,
+                cm: CM::CommitmentVar::new_witness(U.cm.cs().or(proof.cs()).or(rho.cs()), || {
+                    Ok(U.cm.value().unwrap_or_default()
+                        + proof.value().unwrap_or_default() * rho.value().unwrap_or_default())
+                })?,
+                x: U.x
+                    .iter()
+                    .zip(&u[..])
+                    .map(|(a, b)| (b.clone() * &rho + a).try_into())
+                    .collect::<Result<_, _>>()
+                    .map_err(|_| SynthesisError::Unsatisfiable)?,
+            },
+            rho_bits.try_into().unwrap(),
+        ))
+    }
+}
+
+impl<CM, const CHALLENGE_BITS: usize> FoldingSchemeFullVerifierGadget<1, 1>
+    for AbstractOvaGadget<CM, CHALLENGE_BITS>
+where
+    CM: CommitmentDefGadget<Widget: GroupBasedCommitment>,
+    CM::CommitmentVar: CurveVar<<CM::Widget as CommitmentDef>::Commitment, CM::ConstraintField>,
+{
+    fn verify(
+        _vk: &Self::VerifierKey,
+        transcript: &mut impl TranscriptGadget<CM::ConstraintField>,
+        [U]: [&Self::RU; 1],
+        [u]: [&Self::IU; 1],
+        proof: &Self::Proof<1, 1>,
+    ) -> Result<Self::RU, SynthesisError> {
+        let rho_bits = {
+            transcript.add(&U)?;
+            transcript.add(&u)?;
+            transcript.add(proof)?;
+            transcript.challenge_bits(CHALLENGE_BITS)?
+        };
+        let rho = CM::ScalarVar::from_bits_le(&rho_bits)?;
+
+        Ok(Self::RU {
+            u: (U.u.clone() + &rho)
+                .try_into()
+                .map_err(|_| SynthesisError::Unsatisfiable)?,
+            cm: proof.scalar_mul_le(rho_bits.iter())? + &U.cm,
+            x: U.x
+                .iter()
+                .zip(&u[..])
+                .map(|(a, b)| (b.clone() * &rho + a).try_into())
+                .collect::<Result<_, _>>()
+                .map_err(|_| SynthesisError::Unsatisfiable)?,
         })
     }
 }
