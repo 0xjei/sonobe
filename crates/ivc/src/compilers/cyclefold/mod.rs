@@ -13,6 +13,8 @@ use sonobe_primitives::{circuits::FCircuit, commitments::CommitmentDef};
 
 use crate::IVC;
 
+mod circuits;
+
 pub struct CycleFoldBasedIVC<FS1, FS2> {
     _fs1: PhantomData<FS1>,
     _fs2: PhantomData<FS2>,
@@ -30,7 +32,7 @@ where
         1,
         VC: CommitmentDef<Scalar = <FS1 as FoldingScheme<1, 1>>::TranscriptField>,
     >,
-    FS2: FoldingScheme<1, 1>
+    FS2: FoldingScheme<1, 1>,
 {
     type Field = <FS1::VC as CommitmentDef>::Scalar;
 
@@ -71,12 +73,12 @@ where
         (pk_fs1, dk_fs1, pk_fs2, dk_fs2, pk): &Self::ProverKey<FC>,
         step_circuit: &FC,
         i: usize,
-        initial_state: &[FC::Field],
-        current_state: &[FC::Field],
+        initial_state: &FC::State,
+        current_state: &FC::State,
         external_inputs: FC::ExternalInputs,
         (W, U, w, u, cfW, cfU): &Self::Proof,
         mut rng: impl RngCore,
-    ) -> Result<(Vec<FC::Field>, Self::Proof), crate::Error> {
+    ) -> Result<(FC::State, FC::ExternalOutputs, Self::Proof), crate::Error> {
         let poseidon = PoseidonSponge::new_with_pp_hash(&pk.poseidon_config, pk.pp_hash);
         let sponge = poseidon.separate_domain("sponge".as_ref());
         let mut transcript = poseidon.separate_domain("transcript".as_ref());
@@ -96,8 +98,8 @@ where
     fn verify<FC: FCircuit<Field = Self::Field>>(
         vk: &Self::VerifierKey<FC>,
         i: usize,
-        initial_state: &[FC::Field],
-        current_state: &[FC::Field],
+        initial_state: &FC::State,
+        current_state: &FC::State,
         proof: &Self::Proof,
     ) -> Result<(), crate::Error> {
         todo!()
