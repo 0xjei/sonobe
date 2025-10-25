@@ -1,5 +1,11 @@
-use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar};
-use ark_relations::gr1cs::SynthesisError;
+use std::ops::{Deref, DerefMut};
+
+use ark_ff::{Field, PrimeField};
+use ark_r1cs_std::{
+    alloc::{AllocVar, AllocationMode},
+    fields::fp::FpVar,
+};
+use ark_relations::gr1cs::{Namespace, SynthesisError};
 use ark_std::{borrow::Borrow, fmt::Debug, rand::RngCore};
 use sonobe_primitives::{
     arithmetizations::Arith,
@@ -7,7 +13,7 @@ use sonobe_primitives::{
     commitments::{CommitmentDef, CommitmentDefGadget},
     relations::{Relation, WitnessInstanceSampler},
     traits::SonobeField,
-    transcripts::{Transcript, TranscriptGadget},
+    transcripts::{Absorbable, AbsorbableVar, Transcript, TranscriptGadget},
 };
 use thiserror::Error;
 
@@ -36,8 +42,44 @@ pub trait FoldingInstance<VC: CommitmentDef>: Debug + PartialEq + Sync {
     fn commitments(&self) -> Vec<&VC::Commitment>;
 }
 
-pub type PlainWitness<VC> = Vec<<VC as CommitmentDef>::Scalar>;
-pub type PlainInstance<VC> = Vec<<VC as CommitmentDef>::Scalar>;
+#[derive(Debug, PartialEq)]
+pub struct WrappedVec<V>(Vec<V>);
+
+impl<V> Deref for WrappedVec<V> {
+    type Target = Vec<V>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<V> DerefMut for WrappedVec<V> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<V> From<Vec<V>> for WrappedVec<V> {
+    fn from(v: Vec<V>) -> Self {
+        Self(v)
+    }
+}
+
+impl<V: Absorbable> Absorbable for WrappedVec<V> {
+    fn absorb_into<F: PrimeField>(&self, dest: &mut Vec<F>) {
+        self.0.absorb_into(dest)
+    }
+}
+
+impl<F: PrimeField, V: AbsorbableVar<F>> AbsorbableVar<F> for WrappedVec<V> {
+    fn absorb_into(&self, dest: &mut Vec<FpVar<F>>) -> Result<(), SynthesisError> {
+        self.0.absorb_into(dest)
+    }
+}
+
+pub type PlainWitness<VC> = WrappedVec<<VC as CommitmentDef>::Scalar>;
+
+pub type PlainInstance<VC> = WrappedVec<<VC as CommitmentDef>::Scalar>;
 
 impl<VC: CommitmentDef> FoldingWitness<VC> for PlainWitness<VC> {
     fn openings_ref(&self) -> Vec<(&[VC::Scalar], &VC::Randomness)> {
@@ -129,20 +171,39 @@ pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
     }
 }
 
-pub trait FoldingWitnessVar<VC: CommitmentDefGadget> {
+pub trait FoldingWitnessVar<VC: CommitmentDefGadget>:
+    AllocVar<Self::Native, VC::ConstraintField>
+{
     type Native: FoldingWitness<VC::Widget>;
 }
 
-pub trait FoldingInstanceVar<VC: CommitmentDefGadget> {
+pub trait FoldingInstanceVar<VC: CommitmentDefGadget>:
+    AllocVar<Self::Native, VC::ConstraintField>
+{
     type Native: FoldingInstance<VC::Widget>;
 }
 
-impl<VC: CommitmentDefGadget> FoldingWitnessVar<VC> for Vec<VC::ScalarVar> {
-    type Native = Vec<<VC::Widget as CommitmentDef>::Scalar>;
+pub type PlainWitnessVar<VC> = WrappedVec<<VC as CommitmentDefGadget>::ScalarVar>;
+pub type PlainInstanceVar<VC> = WrappedVec<<VC as CommitmentDefGadget>::ScalarVar>;
+
+impl<VC: CommitmentDefGadget> FoldingWitnessVar<VC> for PlainWitnessVar<VC> {
+    type Native = PlainWitness<VC::Widget>;
 }
 
-impl<VC: CommitmentDefGadget> FoldingInstanceVar<VC> for Vec<VC::ScalarVar> {
-    type Native = Vec<<VC::Widget as CommitmentDef>::Scalar>;
+impl<VC: CommitmentDefGadget> FoldingInstanceVar<VC> for PlainInstanceVar<VC> {
+    type Native = PlainInstance<VC::Widget>;
+}
+
+impl<X: AllocVar<Y, F>, Y, F: Field> AllocVar<WrappedVec<Y>, F> for WrappedVec<X> {
+    fn new_variable<T: Borrow<WrappedVec<Y>>>(
+        cs: impl Into<Namespace<F>>,
+        f: impl FnOnce() -> Result<T, SynthesisError>,
+        mode: AllocationMode,
+    ) -> Result<Self, SynthesisError> {
+        let v = f()?;
+        let v = v.borrow();
+        Vec::new_variable(cs, || Ok(&v[..]), mode).map(|v| Self(v))
+    }
 }
 
 pub trait FoldingSchemePartialGadget<const M: usize = 1, const N: usize = 1> {
