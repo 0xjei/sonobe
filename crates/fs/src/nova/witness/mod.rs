@@ -2,6 +2,8 @@ use sonobe_primitives::{arithmetizations::ArithConfig, commitments::CommitmentDe
 
 use crate::FoldingWitness;
 
+pub mod circuits;
+
 #[derive(Debug, PartialEq)]
 pub struct RunningWitness<CM: CommitmentDef> {
     pub e: Vec<CM::Scalar>,
