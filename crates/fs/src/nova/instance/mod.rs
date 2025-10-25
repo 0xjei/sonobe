@@ -6,6 +6,8 @@ use sonobe_primitives::{
 
 use crate::FoldingInstance;
 
+pub mod circuits;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RunningInstance<CM: CommitmentDef> {
     pub cm_e: CM::Commitment,
