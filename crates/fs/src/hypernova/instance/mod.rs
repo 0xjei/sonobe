@@ -1,12 +1,17 @@
 use ark_ff::PrimeField;
 use sonobe_primitives::{
-    arithmetizations::{ArithConfig, ccs::{CCSConfig, CCSVariant}},
+    arithmetizations::{
+        ArithConfig,
+        ccs::{CCSConfig, CCSVariant},
+    },
     commitments::CommitmentDef,
     traits::Dummy,
     transcripts::Absorbable,
 };
 
 use crate::FoldingInstance;
+
+pub mod circuits;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LCCCSInstance<CM: CommitmentDef> {
