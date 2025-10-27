@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use ark_ff::{Field, PrimeField};
 use ark_r1cs_std::fields::fp::FpVar;
 use ark_relations::gr1cs::{
@@ -22,6 +24,8 @@ pub trait FCircuit {
     type Field: PrimeField;
     type ExternalInputs;
 
+    fn dummy_external_inputs(&self) -> Self::ExternalInputs;
+
     /// returns the number of elements in the state of the FCircuit, which corresponds to the
     /// FCircuit inputs.
     fn state_len(&self) -> usize;
@@ -32,7 +36,7 @@ pub trait FCircuit {
         // can hold a state if needed to store data to generate the constraints.
         &self,
         cs: ConstraintSystemRef<Self::Field>,
-        i: usize,
+        i: FpVar<Self::Field>,
         z_i: Vec<FpVar<Self::Field>>,
         external_inputs: Self::ExternalInputs, // inputs that are not part of the state
     ) -> Result<Vec<FpVar<Self::Field>>, SynthesisError>;
@@ -155,11 +159,16 @@ impl<F: Field, C: ConstraintSynthesizer<F>> ConstraintSystemBuilder<F, C> {
     }
 }
 
-pub trait ConstraintSystemExt<F: Field>: Sized {
-    type Error;
-    type Arith;
+pub trait ConstraintSystemExt<F> {
+    fn assignments(&self) -> Result<Assignments<F, Vec<F>>, SynthesisError>;
+}
 
-    fn constraints(&self) -> Result<Self::Arith, Self::Error>;
+impl<F: Field> ConstraintSystemExt<F> for ConstraintSystem<F> {
+    fn assignments(&self) -> Result<Assignments<F, Vec<F>>, SynthesisError> {
+        let witness = self.witness_assignment()?.to_vec();
+        // skip the first element which is '1'
+        let instance = self.instance_assignment()?[1..].to_vec();
 
-    fn assignments(&self) -> Result<Assignments<F, Vec<F>>, Self::Error>;
+        Ok((F::one(), instance, witness).into())
+    }
 }
