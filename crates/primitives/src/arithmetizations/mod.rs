@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use ark_relations::gr1cs::SynthesisError;
 use thiserror::Error;
 
@@ -14,13 +16,13 @@ pub enum Error {
     UnsatisfiedAssignments(String),
     #[error("Failed to extract constraints from the constraint system: {0}")]
     ConstraintExtractionFailure(String),
-    #[error("Synthesis error: {0}")]
+    #[error(transparent)]
     SynthesisError(#[from] SynthesisError),
 }
 
-/// [`Arith`] is a trait about constraint systems (R1CS, CCS, etc.), where we
-/// define methods for getting information about the constraint system.
-pub trait Arith: Clone {
+pub trait ArithConfig: Clone + Debug + PartialEq {
+    fn empty() -> Self;
+
     /// Returns the degree of the constraint system
     fn degree(&self) -> usize;
 
@@ -36,6 +38,46 @@ pub trait Arith: Clone {
 
     /// Returns the number of witnesses / secret inputs in the constraint system
     fn n_witnesses(&self) -> usize;
+
+    fn set_n_public_inputs(&mut self, l: usize);
+}
+
+/// [`Arith`] is a trait about constraint systems (R1CS, CCS, etc.), where we
+/// define methods for getting information about the constraint system.
+pub trait Arith: Clone {
+    type Config: ArithConfig;
+
+    fn config(&self) -> &Self::Config;
+
+    fn config_mut(&mut self) -> &mut Self::Config;
+
+    fn empty() -> Self;
+
+    /// Returns the degree of the constraint system
+    fn degree(&self) -> usize {
+        self.config().degree()
+    }
+
+    /// Returns the number of constraints in the constraint system
+    fn n_constraints(&self) -> usize {
+        self.config().n_constraints()
+    }
+
+    /// Returns the number of variables in the constraint system
+    fn n_variables(&self) -> usize {
+        self.config().n_variables()
+    }
+
+    /// Returns the number of public inputs / public IO / instances / statements
+    /// in the constraint system
+    fn n_public_inputs(&self) -> usize {
+        self.config().n_public_inputs()
+    }
+
+    /// Returns the number of witnesses / secret inputs in the constraint system
+    fn n_witnesses(&self) -> usize {
+        self.config().n_witnesses()
+    }
 }
 
 /// `ArithRelation` *treats a constraint system as a relation* between a witness

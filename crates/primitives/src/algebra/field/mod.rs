@@ -4,21 +4,19 @@ use ark_relations::gr1cs::SynthesisError;
 use ark_std::{any::TypeId, mem::transmute_copy};
 
 use crate::{
-    traits::{Inputize, InputizeNonNative},
+    algebra::{field::emulated::EmulatedFieldVar, Val},
+    traits::{Inputize, InputizeEmulated},
     transcripts::{Absorbable, AbsorbableGadget},
 };
 
-// pub mod nonnative;
-pub mod nonnative2;
+pub mod emulated;
 
 /// `Field` trait is a wrapper around `PrimeField` that also includes the
 /// necessary bounds for the field to be used conveniently in folding schemes.
 pub trait SonobeField:
-    PrimeField<BasePrimeField = Self> + Absorbable<Self> + Inputize<Self>
+    PrimeField<BasePrimeField = Self> + Absorbable + Inputize<Self> + Val<Var: FieldVar<Self, Self>>
 {
     const BITS_PER_LIMB: usize;
-    /// The in-circuit variable type for this field.
-    type Var: FieldVar<Self, Self>;
 }
 
 impl<P: FpConfig<N>, const N: usize> SonobeField for Fp<P, N> {
@@ -41,11 +39,17 @@ impl<P: FpConfig<N>, const N: usize> SonobeField for Fp<P, N> {
     // TODO: either make it a global const, or compute an optimal value
     // based on the modulus size.
     const BITS_PER_LIMB: usize = 55; // TODO: make this configurable
-    type Var = FpVar<Self>;
 }
 
-impl<F: PrimeField, P: FpConfig<N>, const N: usize> Absorbable<F> for Fp<P, N> {
-    fn absorb_into(&self, dest: &mut Vec<F>) {
+impl<P: FpConfig<N>, const N: usize> Val for Fp<P, N> {
+    type ConstraintField = Self;
+    type Var = FpVar<Self>;
+
+    type EmulatedVar<F: SonobeField> = EmulatedFieldVar<F, Self, true>;
+}
+
+impl<P: FpConfig<N>, const N: usize> Absorbable for Fp<P, N> {
+    fn absorb_into<F: PrimeField>(&self, dest: &mut Vec<F>) {
         if TypeId::of::<F>() == TypeId::of::<Self>() {
             // Safe because `F` and `Self` have the same type
             // TODO (@winderica): specialization when???
@@ -67,7 +71,7 @@ impl<F: PrimeField, P: FpConfig<N>, const N: usize> Absorbable<F> for Fp<P, N> {
     }
 }
 
-impl<F: PrimeField> AbsorbableGadget<FpVar<F>> for FpVar<F> {
+impl<F: PrimeField> AbsorbableGadget<F> for FpVar<F> {
     fn absorb_into(&self, dest: &mut Vec<FpVar<F>>) -> Result<(), SynthesisError> {
         dest.push(self.clone());
         Ok(())
@@ -82,10 +86,10 @@ impl<P: FpConfig<N>, const N: usize> Inputize<Self> for Fp<P, N> {
     }
 }
 
-impl<F: SonobeField, P: SonobeField> InputizeNonNative<F> for P {
+impl<F: SonobeField, P: SonobeField> InputizeEmulated<F> for P {
     /// Returns the internal representation in the same order as how the value
     /// is allocated in `NonNativeUintVar::new_input`.
-    fn inputize_nonnative(&self) -> Vec<F> {
+    fn inputize_emulated(&self) -> Vec<F> {
         self.into_bigint()
             .to_bits_le()
             .chunks(F::BITS_PER_LIMB)
