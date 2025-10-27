@@ -1,31 +1,18 @@
-use ark_ec::{
-    short_weierstrass::{Projective, SWCurveConfig},
-    CurveGroup,
-};
-use ark_ff::{AdditiveGroup, PrimeField};
 use ark_r1cs_std::{
-    boolean::Boolean,
-    convert::ToBitsGadget,
-    eq::EqGadget,
-    fields::{fp::FpVar, FieldVar},
-    groups::{
-        curves::short_weierstrass::{non_zero_affine::NonZeroAffineVar, ProjectiveVar},
-        CurveVar,
-    },
-    GR1CSVar,
+    boolean::Boolean, convert::ToBitsGadget, eq::EqGadget, fields::fp::FpVar, groups::CurveVar,
 };
 use ark_relations::gr1cs::SynthesisError;
 use ark_std::{iter::repeat_with, marker::PhantomData, rand::RngCore, UniformRand};
 
 use super::{Error, VectorCommitment};
-use crate::traits::CF1;
 use crate::{
-    algebra::field::nonnative2::NonNativeFieldVar,
-    commitments::{Null, VectorCommitmentGadget},
-    traits::{SonobeCurve, CF2},
+    algebra::{field::emulated::EmulatedFieldVar, group::emulated::EmulatedAffineVar},
+    commitments::{GroupBasedVectorCommitment, VectorCommitmentGadget},
+    traits::{CF1, CF2, SonobeCurve},
+    utils::null::Null,
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Pedersen<C: SonobeCurve, const H: bool> {
     _c: PhantomData<C>,
 }
@@ -43,6 +30,8 @@ impl<C: SonobeCurve, const H: bool> Pedersen<C, H> {
 
 impl<C: SonobeCurve> VectorCommitment for Pedersen<C, false> {
     const IS_HIDING: bool = false;
+
+    type Gadget = PedersenGadget<C, false>;
 
     type Key = Vec<C::Affine>;
     type Scalar = C::ScalarField;
@@ -77,6 +66,8 @@ impl<C: SonobeCurve> VectorCommitment for Pedersen<C, false> {
 impl<C: SonobeCurve> VectorCommitment for Pedersen<C, true> {
     const IS_HIDING: bool = true;
 
+    type Gadget = PedersenGadget<C, true>;
+
     type Key = (Vec<C::Affine>, C);
     type Scalar = C::ScalarField;
     type Commitment = C;
@@ -108,6 +99,15 @@ impl<C: SonobeCurve> VectorCommitment for Pedersen<C, true> {
     }
 }
 
+impl<C: SonobeCurve> GroupBasedVectorCommitment for Pedersen<C, false> {
+    type EmulatedGadget = PedersenEmulatedGadget<C, false>;
+}
+
+impl<C: SonobeCurve> GroupBasedVectorCommitment for Pedersen<C, true> {
+    type EmulatedGadget = PedersenEmulatedGadget<C, true>;
+}
+
+#[derive(Clone)]
 pub struct PedersenGadget<C: SonobeCurve, const H: bool> {
     _c: PhantomData<C>,
 }
@@ -228,9 +228,9 @@ impl<C: SonobeCurve> VectorCommitmentGadget for PedersenGadget<C, false> {
 
     type KeyVar = Vec<C::Var>;
 
-    type ScalarVar = NonNativeFieldVar<CF2<C>, CF1<C>, true>;
+    type ScalarVar = EmulatedFieldVar<CF2<C>, CF1<C>, true>;
 
-    type IntermediateScalarVar = NonNativeFieldVar<CF2<C>, CF1<C>, false>;
+    type IntermediateScalarVar = EmulatedFieldVar<CF2<C>, CF1<C>, false>;
 
     type CommitmentVar = C::Var;
 
@@ -258,13 +258,13 @@ impl<C: SonobeCurve> VectorCommitmentGadget for PedersenGadget<C, true> {
 
     type KeyVar = (Vec<C::Var>, C::Var);
 
-    type ScalarVar = NonNativeFieldVar<CF2<C>, CF1<C>, true>;
+    type ScalarVar = EmulatedFieldVar<CF2<C>, CF1<C>, true>;
 
-    type IntermediateScalarVar = NonNativeFieldVar<CF2<C>, CF1<C>, false>;
+    type IntermediateScalarVar = EmulatedFieldVar<CF2<C>, CF1<C>, false>;
 
     type CommitmentVar = C::Var;
 
-    type RandomnessVar = NonNativeFieldVar<CF2<C>, CF1<C>, true>;
+    type RandomnessVar = EmulatedFieldVar<CF2<C>, CF1<C>, true>;
 
     fn open(
         (g, h): &Self::KeyVar,
@@ -283,14 +283,69 @@ impl<C: SonobeCurve> VectorCommitmentGadget for PedersenGadget<C, true> {
     }
 }
 
+#[derive(Clone)]
+pub struct PedersenEmulatedGadget<C: SonobeCurve, const H: bool> {
+    _c: PhantomData<C>,
+}
+
+impl<C: SonobeCurve> VectorCommitmentGadget for PedersenEmulatedGadget<C, false> {
+    type Native = Pedersen<C, false>;
+    type ConstraintField = CF1<C>;
+
+    type KeyVar = Vec<EmulatedAffineVar<CF1<C>, C>>;
+
+    type ScalarVar = FpVar<CF1<C>>;
+
+    type IntermediateScalarVar = FpVar<CF1<C>>;
+
+    type CommitmentVar = EmulatedAffineVar<CF1<C>, C>;
+
+    type RandomnessVar = Null;
+
+    fn open(
+        ck: &Self::KeyVar,
+        v: &[Self::ScalarVar],
+        _r: &Self::RandomnessVar,
+        cm: &Self::CommitmentVar,
+    ) -> Result<(), SynthesisError> {
+        unimplemented!()
+    }
+}
+
+impl<C: SonobeCurve> VectorCommitmentGadget for PedersenEmulatedGadget<C, true> {
+    type Native = Pedersen<C, true>;
+    type ConstraintField = CF1<C>;
+
+    type KeyVar = (
+        Vec<EmulatedAffineVar<CF1<C>, C>>,
+        EmulatedAffineVar<CF1<C>, C>,
+    );
+
+    type ScalarVar = FpVar<CF1<C>>;
+
+    type IntermediateScalarVar = FpVar<CF1<C>>;
+
+    type CommitmentVar = EmulatedAffineVar<CF1<C>, C>;
+
+    type RandomnessVar = FpVar<CF1<C>>;
+
+    fn open(
+        (g, h): &Self::KeyVar,
+        v: &[Self::ScalarVar],
+        r: &Self::RandomnessVar,
+        cm: &Self::CommitmentVar,
+    ) -> Result<(), SynthesisError> {
+        unimplemented!()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use ark_bn254::G1Projective;
     use ark_std::{error::Error, rand::Rng, test_rng};
 
-    use crate::commitments::tests::test_commitment_correctness;
-
     use super::*;
+    use crate::commitments::tests::test_commitment_correctness;
 
     #[test]
     fn test_pedersen_commitment() -> Result<(), Box<dyn Error>> {
