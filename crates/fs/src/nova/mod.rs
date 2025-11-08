@@ -1,5 +1,4 @@
-use ark_ec::CurveGroup;
-use ark_ff::{BigInteger, Field, One, PrimeField};
+use ark_ff::{BigInteger, One, PrimeField};
 use ark_std::{
     UniformRand,
     borrow::Borrow,
@@ -9,7 +8,6 @@ use ark_std::{
     rand::{RngCore, rngs::mock::StepRng},
     sync::Arc,
 };
-use instance::{IncomingInstance as IU, RunningInstance as RU};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use sonobe_primitives::{
@@ -20,15 +18,17 @@ use sonobe_primitives::{
     circuits::AssignmentsOwned,
     commitments::{CommitmentDef, CommitmentKey, CommitmentOps, GroupBasedCommitment},
     relations::{Relation, WitnessInstanceSampler},
-    traits::{CF1, CF2, SonobeCurve, SonobeField},
+    traits::{CF2, SonobeField},
     transcripts::Transcript,
 };
-use witness::{IncomingWitness as IW, RunningWitness as RW};
 
+use self::{
+    instance::{IncomingInstance as IU, RunningInstance as RU},
+    witness::{IncomingWitness as IW, RunningWitness as RW},
+};
 use crate::{
-    DeciderKey, Error, FoldingSchemeDecider, FoldingSchemeDef, FoldingSchemeKeyGenerator,
-    FoldingSchemePreprocessor, FoldingSchemeProver, FoldingSchemeVerifier, PlainInstance as PU,
-    PlainWitness as PW,
+    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeKeyGenerator, FoldingSchemePreprocessor,
+    FoldingSchemeProver, FoldingSchemeVerifier, PlainInstance as PU, PlainWitness as PW,
 };
 
 pub mod instance;
@@ -223,6 +223,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
 impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
     FoldingSchemeProver<1, 1> for AbstractNova<CM, TF, CHALLENGE_BITS>
 {
+    #[allow(non_snake_case)]
     fn prove(
         pk: &NovaKey<Self::Arith, CM>,
         transcript: &mut impl Transcript<TF>,
@@ -285,6 +286,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
 impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
     FoldingSchemeVerifier<1, 1> for AbstractNova<CM, TF, CHALLENGE_BITS>
 {
+    #[allow(non_snake_case)]
     fn verify(
         _vk: &(),
         transcript: &mut impl Transcript<TF>,
@@ -372,6 +374,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
 impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
     FoldingSchemeProver<1, 1> for AbstractNova2<CM, TF, CHALLENGE_BITS>
 {
+    #[allow(non_snake_case)]
     fn prove(
         pk: &NovaKey<Self::Arith, CM>,
         transcript: &mut impl Transcript<TF>,
@@ -444,6 +447,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
 impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
     FoldingSchemeVerifier<1, 1> for AbstractNova2<CM, TF, CHALLENGE_BITS>
 {
+    #[allow(non_snake_case)]
     fn verify(
         _vk: &(),
         transcript: &mut impl Transcript<TF>,

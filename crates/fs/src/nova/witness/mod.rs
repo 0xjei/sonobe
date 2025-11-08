@@ -4,7 +4,7 @@ use crate::FoldingWitness;
 
 pub mod circuits;
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RunningWitness<CM: CommitmentDef> {
     pub e: Vec<CM::Scalar>,
     pub r_e: CM::Randomness,
@@ -31,7 +31,7 @@ impl<CM: CommitmentDef, Cfg: ArithConfig> Dummy<&Cfg> for RunningWitness<CM> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IncomingWitness<CM: CommitmentDef> {
     pub w: Vec<CM::Scalar>,
     pub r_w: CM::Randomness,
