@@ -24,8 +24,8 @@
 //! - `instances/`: Instance types.
 //! - `witnesses/`: Witness types.
 
-pub mod nova;
 pub mod definitions;
+pub mod nova;
 
 pub use self::definitions::{
     FoldingSchemeDef, FoldingSchemeDefGadget,
