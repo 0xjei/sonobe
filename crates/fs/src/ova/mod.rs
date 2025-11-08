@@ -26,10 +26,7 @@ use self::{
     witness::RunningWitness as RW,
 };
 use crate::{
-    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeDefGadget, FoldingSchemeFullVerifierGadget,
-    FoldingSchemeKeyGenerator, FoldingSchemePartialVerifierGadget, FoldingSchemePreprocessor,
-    FoldingSchemeProver, FoldingSchemeVerifier, PlainInstance as IU, PlainInstanceVar as IUVar,
-    PlainWitness as IW,
+    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeDefGadget, FoldingSchemeFullVerifierGadget, FoldingSchemeKeyGenerator, FoldingSchemePartialVerifierGadget, FoldingSchemePreprocessor, FoldingSchemeProver, FoldingSchemeVerifier, GroupBasedFoldingSchemePrimaryDef, GroupBasedFoldingSchemeSecondaryDef, PlainInstance as IU, PlainInstanceVar as IUVar, PlainWitness as IW
 };
 
 pub mod instance;
@@ -201,6 +198,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
 impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
     FoldingSchemeProver<1, 1> for AbstractOva<CM, TF, CHALLENGE_BITS>
 {
+    #[allow(non_snake_case)]
     fn prove(
         pk: &OvaKey<Self::Arith, CM>,
         transcript: &mut impl Transcript<TF>,
@@ -246,7 +244,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
             },
             RU {
                 u: U.u + rho,
-                cm: U.cm + cm.mul(rho),
+                cm: U.cm + cm * rho,
                 x: cfg_iter!(U.x)
                     .zip(&u[..])
                     .map(|(a, b)| rho * b + a)
@@ -261,6 +259,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
 impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
     FoldingSchemeVerifier<1, 1> for AbstractOva<CM, TF, CHALLENGE_BITS>
 {
+    #[allow(non_snake_case)]
     fn verify(
         _vk: &(),
         transcript: &mut impl Transcript<TF>,
@@ -280,7 +279,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
 
         Ok(RU {
             u: U.u + rho,
-            cm: U.cm + cm.mul(rho),
+            cm: U.cm + *cm * rho,
             x: cfg_iter!(U.x)
                 .zip(&u[..])
                 .map(|(a, b)| rho * b + a)
@@ -313,6 +312,7 @@ impl<CM, const CHALLENGE_BITS: usize> FoldingSchemePartialVerifierGadget<1, 1>
 where
     CM: CommitmentDefGadget<Widget: GroupBasedCommitment>,
 {
+    #[allow(non_snake_case)]
     fn verify_hinted(
         _vk: &Self::VerifierKey,
         transcript: &mut impl TranscriptGadget<CM::ConstraintField>,
@@ -355,6 +355,7 @@ where
     CM: CommitmentDefGadget<Widget: GroupBasedCommitment>,
     CM::CommitmentVar: CurveVar<<CM::Widget as CommitmentDef>::Commitment, CM::ConstraintField>,
 {
+    #[allow(non_snake_case)]
     fn verify(
         _vk: &Self::VerifierKey,
         transcript: &mut impl TranscriptGadget<CM::ConstraintField>,
@@ -383,6 +384,18 @@ where
                 .map_err(|_| SynthesisError::Unsatisfiable)?,
         })
     }
+}
+
+impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> GroupBasedFoldingSchemePrimaryDef
+    for AbstractOva<CM, CM::Scalar, CHALLENGE_BITS>
+{
+    type Gadget = AbstractOvaGadget<CM::Gadget2, CHALLENGE_BITS>;
+}
+
+impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> GroupBasedFoldingSchemeSecondaryDef
+    for AbstractOva<CM, CF2<CM::Commitment>, CHALLENGE_BITS>
+{
+    type Gadget = AbstractOvaGadget<CM::Gadget1, CHALLENGE_BITS>;
 }
 
 #[cfg(test)]
