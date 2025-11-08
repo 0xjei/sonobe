@@ -1,10 +1,12 @@
-use ark_r1cs_std::alloc::{AllocVar, AllocationMode};
-use ark_relations::gr1cs::{Namespace, SynthesisError};
+use ark_r1cs_std::{
+    GR1CSVar,
+    alloc::{AllocVar, AllocationMode},
+};
+use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::borrow::Borrow;
-use sonobe_primitives::commitments::{CommitmentDef, CommitmentDefGadget};
+use sonobe_primitives::commitments::CommitmentDefGadget;
 
 use super::{IncomingWitness, RunningWitness};
-use crate::FoldingWitnessVar;
 
 #[derive(Debug, PartialEq)]
 pub struct RunningWitnessVar<CM: CommitmentDefGadget> {
@@ -34,6 +36,27 @@ impl<CM: CommitmentDefGadget> AllocVar<RunningWitness<CM::Widget>, CM::Constrain
     }
 }
 
+impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for RunningWitnessVar<CM> {
+    type Value = RunningWitness<CM::Widget>;
+
+    fn cs(&self) -> ConstraintSystemRef<CM::ConstraintField> {
+        self.e
+            .cs()
+            .or(self.r_e.cs())
+            .or(self.w.cs())
+            .or(self.r_w.cs())
+    }
+
+    fn value(&self) -> Result<Self::Value, SynthesisError> {
+        Ok(RunningWitness {
+            e: self.e.value()?,
+            r_e: self.r_e.value()?,
+            w: self.w.value()?,
+            r_w: self.r_w.value()?,
+        })
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct IncomingWitnessVar<CM: CommitmentDefGadget> {
     pub w: Vec<CM::ScalarVar>,
@@ -54,6 +77,21 @@ impl<CM: CommitmentDefGadget> AllocVar<IncomingWitness<CM::Widget>, CM::Constrai
         Ok(Self {
             w: AllocVar::new_variable(cs.clone(), || Ok(&w[..]), mode)?,
             r_w: AllocVar::new_variable(cs.clone(), || Ok(r_w), mode)?,
+        })
+    }
+}
+
+impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for IncomingWitnessVar<CM> {
+    type Value = IncomingWitness<CM::Widget>;
+
+    fn cs(&self) -> ConstraintSystemRef<CM::ConstraintField> {
+        self.w.cs().or(self.r_w.cs())
+    }
+
+    fn value(&self) -> Result<Self::Value, SynthesisError> {
+        Ok(IncomingWitness {
+            w: self.w.value()?,
+            r_w: self.r_w.value()?,
         })
     }
 }
