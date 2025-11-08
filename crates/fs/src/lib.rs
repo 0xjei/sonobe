@@ -11,7 +11,7 @@ use ark_r1cs_std::{
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::{borrow::Borrow, fmt::Debug, rand::RngCore};
 use sonobe_primitives::{
-    arithmetizations::Arith,
+    arithmetizations::{Arith, ArithConfig},
     circuits::AssignmentsOwned,
     commitments::{CommitmentDef, CommitmentDefGadget},
     relations::{Relation, WitnessInstanceSampler},
@@ -22,11 +22,11 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum Error {
-    #[error("Arithmetization error: {0}")]
+    #[error(transparent)]
     ArithError(#[from] sonobe_primitives::arithmetizations::Error),
-    #[error("Commitment error: {0}")]
+    #[error(transparent)]
     CommitmentError(#[from] sonobe_primitives::commitments::Error),
-    #[error("Synthesis error: {0}")]
+    #[error(transparent)]
     SynthesisError(#[from] SynthesisError),
     #[error("Unsupported use case: {0}")]
     Unsupported(String),
@@ -35,42 +35,28 @@ pub enum Error {
 }
 
 pub trait FoldingWitness<VC: CommitmentDef>: Debug {
+    const N_OPENINGS: usize;
+
     /// Returns the reference to all openings contained in the witness, each
     /// being a tuple of the values being committed to and the randomness.
-    fn openings_ref(&self) -> Vec<(&[VC::Scalar], &VC::Randomness)>;
+    fn openings(&self) -> Vec<(&[VC::Scalar], &VC::Randomness)>;
 }
 
-pub trait FoldingInstance<VC: CommitmentDef>: Clone + Debug + PartialEq {
+pub trait FoldingInstance<VC: CommitmentDef>: Clone + Debug + PartialEq + Absorbable {
+    const N_COMMITMENTS: usize;
+
     /// Returns the commitments contained in the committed instance.
     fn commitments(&self) -> Vec<&VC::Commitment>;
 
     fn public_inputs(&self) -> &[VC::Scalar];
+
+    fn public_inputs_mut(&mut self) -> &mut [VC::Scalar];
 }
 
-pub type PlainWitness<VC> = WrappedVec<<VC as CommitmentDef>::Scalar>;
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PlainWitness<V>(pub Vec<V>);
 
-pub type PlainInstance<VC> = WrappedVec<<VC as CommitmentDef>::Scalar>;
-
-impl<VC: CommitmentDef> FoldingWitness<VC> for PlainWitness<VC> {
-    fn openings_ref(&self) -> Vec<(&[VC::Scalar], &VC::Randomness)> {
-        vec![]
-    }
-}
-
-impl<VC: CommitmentDef> FoldingInstance<VC> for PlainInstance<VC> {
-    fn commitments(&self) -> Vec<&VC::Commitment> {
-        vec![]
-    }
-
-    fn public_inputs(&self) -> &[<VC as CommitmentDef>::Scalar] {
-        self
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct WrappedVec<V>(Vec<V>);
-
-impl<V> Deref for WrappedVec<V> {
+impl<V> Deref for PlainWitness<V> {
     type Target = Vec<V>;
 
     fn deref(&self) -> &Self::Target {
@@ -78,32 +64,32 @@ impl<V> Deref for WrappedVec<V> {
     }
 }
 
-impl<V> DerefMut for WrappedVec<V> {
+impl<V> DerefMut for PlainWitness<V> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-impl<V> From<Vec<V>> for WrappedVec<V> {
+impl<V> From<Vec<V>> for PlainWitness<V> {
     fn from(v: Vec<V>) -> Self {
         Self(v)
     }
 }
 
-impl<V: Absorbable> Absorbable for WrappedVec<V> {
+impl<V: Absorbable> Absorbable for PlainWitness<V> {
     fn absorb_into<F: PrimeField>(&self, dest: &mut Vec<F>) {
         self.0.absorb_into(dest)
     }
 }
 
-impl<F: PrimeField, V: AbsorbableVar<F>> AbsorbableVar<F> for WrappedVec<V> {
+impl<F: PrimeField, V: AbsorbableVar<F>> AbsorbableVar<F> for PlainWitness<V> {
     fn absorb_into(&self, dest: &mut Vec<FpVar<F>>) -> Result<(), SynthesisError> {
         self.0.absorb_into(dest)
     }
 }
 
-impl<X: AllocVar<Y, F>, Y, F: Field> AllocVar<WrappedVec<Y>, F> for WrappedVec<X> {
-    fn new_variable<T: Borrow<WrappedVec<Y>>>(
+impl<X: AllocVar<Y, F>, Y, F: Field> AllocVar<PlainWitness<Y>, F> for PlainWitness<X> {
+    fn new_variable<T: Borrow<PlainWitness<Y>>>(
         cs: impl Into<Namespace<F>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
         mode: AllocationMode,
@@ -113,7 +99,7 @@ impl<X: AllocVar<Y, F>, Y, F: Field> AllocVar<WrappedVec<Y>, F> for WrappedVec<X
     }
 }
 
-impl<F: PrimeField, X: CondSelectGadget<F>> CondSelectGadget<F> for WrappedVec<X> {
+impl<F: PrimeField, X: CondSelectGadget<F>> CondSelectGadget<F> for PlainWitness<X> {
     fn conditionally_select(
         cond: &Boolean<F>,
         true_value: &Self,
@@ -122,7 +108,7 @@ impl<F: PrimeField, X: CondSelectGadget<F>> CondSelectGadget<F> for WrappedVec<X
         if true_value.len() != false_value.len() {
             return Err(SynthesisError::Unsatisfiable);
         }
-        Ok(WrappedVec(
+        Ok(Self(
             true_value
                 .0
                 .iter()
@@ -133,22 +119,147 @@ impl<F: PrimeField, X: CondSelectGadget<F>> CondSelectGadget<F> for WrappedVec<X
     }
 }
 
-impl<F: Field, V: GR1CSVar<F>> GR1CSVar<F> for WrappedVec<V> {
-    type Value = WrappedVec<V::Value>;
+impl<F: Field, V: GR1CSVar<F>> GR1CSVar<F> for PlainWitness<V> {
+    type Value = PlainWitness<V::Value>;
 
     fn cs(&self) -> ConstraintSystemRef<F> {
         self.0.cs()
     }
 
     fn value(&self) -> Result<Self::Value, SynthesisError> {
-        self.0.value().map(WrappedVec)
+        self.0.value().map(PlainWitness)
     }
 }
+
+impl<V: Default + Clone, A: ArithConfig> Dummy<&A> for PlainWitness<V> {
+    fn dummy(cfg: &A) -> Self {
+        vec![V::default(); cfg.n_witnesses()].into()
+    }
+}
+
+impl<VC: CommitmentDef> FoldingWitness<VC> for PlainWitness<VC::Scalar> {
+    const N_OPENINGS: usize = 0;
+
+    fn openings(&self) -> Vec<(&[VC::Scalar], &VC::Randomness)> {
+        vec![]
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PlainInstance<V>(pub Vec<V>);
+
+impl<V> Deref for PlainInstance<V> {
+    type Target = Vec<V>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<V> DerefMut for PlainInstance<V> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<V> From<Vec<V>> for PlainInstance<V> {
+    fn from(v: Vec<V>) -> Self {
+        Self(v)
+    }
+}
+
+impl<V: Absorbable> Absorbable for PlainInstance<V> {
+    fn absorb_into<F: PrimeField>(&self, dest: &mut Vec<F>) {
+        self.0.absorb_into(dest)
+    }
+}
+
+impl<F: PrimeField, V: AbsorbableVar<F>> AbsorbableVar<F> for PlainInstance<V> {
+    fn absorb_into(&self, dest: &mut Vec<FpVar<F>>) -> Result<(), SynthesisError> {
+        self.0.absorb_into(dest)
+    }
+}
+
+impl<X: AllocVar<Y, F>, Y, F: Field> AllocVar<PlainInstance<Y>, F> for PlainInstance<X> {
+    fn new_variable<T: Borrow<PlainInstance<Y>>>(
+        cs: impl Into<Namespace<F>>,
+        f: impl FnOnce() -> Result<T, SynthesisError>,
+        mode: AllocationMode,
+    ) -> Result<Self, SynthesisError> {
+        let v = f()?;
+        Vec::new_variable(cs, || Ok(&v.borrow()[..]), mode).map(|v| Self(v))
+    }
+}
+
+impl<F: PrimeField, X: CondSelectGadget<F>> CondSelectGadget<F> for PlainInstance<X> {
+    fn conditionally_select(
+        cond: &Boolean<F>,
+        true_value: &Self,
+        false_value: &Self,
+    ) -> Result<Self, SynthesisError> {
+        if true_value.len() != false_value.len() {
+            return Err(SynthesisError::Unsatisfiable);
+        }
+        Ok(Self(
+            true_value
+                .0
+                .iter()
+                .zip(false_value.0.iter())
+                .map(|(t, f)| cond.select(t, f))
+                .collect::<Result<_, _>>()?,
+        ))
+    }
+}
+
+impl<F: Field, V: GR1CSVar<F>> GR1CSVar<F> for PlainInstance<V> {
+    type Value = PlainInstance<V::Value>;
+
+    fn cs(&self) -> ConstraintSystemRef<F> {
+        self.0.cs()
+    }
+
+    fn value(&self) -> Result<Self::Value, SynthesisError> {
+        self.0.value().map(PlainInstance)
+    }
+}
+
+impl<V: Default + Clone, A: ArithConfig> Dummy<&A> for PlainInstance<V> {
+    fn dummy(cfg: &A) -> Self {
+        vec![V::default(); cfg.n_public_inputs()].into()
+    }
+}
+
+impl<VC: CommitmentDef> FoldingWitness<VC> for PlainInstance<VC::Scalar> {
+    const N_OPENINGS: usize = 0;
+
+    fn openings(&self) -> Vec<(&[VC::Scalar], &VC::Randomness)> {
+        vec![]
+    }
+}
+
+impl<VC: CommitmentDef> FoldingInstance<VC> for PlainInstance<VC::Scalar> {
+    const N_COMMITMENTS: usize = 0;
+
+    fn commitments(&self) -> Vec<&VC::Commitment> {
+        vec![]
+    }
+
+    fn public_inputs(&self) -> &[VC::Scalar] {
+        self
+    }
+
+    fn public_inputs_mut(&mut self) -> &mut [VC::Scalar] {
+        self
+    }
+}
+
+pub trait DeciderKey {}
+
 pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
     type VC: CommitmentDef<Scalar: SonobeField>;
-    type RW: FoldingWitness<Self::VC>;
+    type RW: FoldingWitness<Self::VC> + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
     type RU: FoldingInstance<Self::VC> + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
-    type IW: FoldingWitness<Self::VC>;
+    type IW: FoldingWitness<Self::VC> + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
     type IU: FoldingInstance<Self::VC> + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
     type TranscriptField: SonobeField;
     type Arith: Arith;
@@ -156,7 +267,8 @@ pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
     type PublicParam;
     type ProverKey;
     type VerifierKey;
-    type DeciderKey: Relation<Self::RW, Self::RU, Error = Error>
+    type DeciderKey: Clone
+        + Relation<Self::RW, Self::RU, Error = Error>
         + Relation<Self::IW, Self::IU, Error = Error>
         + WitnessInstanceSampler<Self::RW, Self::RU, Source = (), Error = Error>
         + WitnessInstanceSampler<
@@ -195,6 +307,7 @@ pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
     /// Here, the randomness source is controlled by `transcript`. The returned
     /// intermediate randomness is useful for the construction of CycleFold
     /// circuits in our CycleFold-based folding-to-IVC compiler.
+    #[allow(non_snake_case)]
     fn prove(
         pk: &Self::ProverKey,
         transcript: &mut impl Transcript<Self::TranscriptField>,
@@ -205,6 +318,7 @@ pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
         rng: impl RngCore,
     ) -> Result<(Self::RW, Self::RU, Self::Proof, Self::Challenge), Error>;
 
+    #[allow(non_snake_case)]
     fn verify(
         vk: &Self::VerifierKey,
         transcript: &mut impl Transcript<Self::TranscriptField>,
@@ -213,6 +327,7 @@ pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
         proof: &Self::Proof,
     ) -> Result<Self::RU, Error>;
 
+    #[allow(non_snake_case)]
     fn decide_running(dk: &Self::DeciderKey, W: &Self::RW, U: &Self::RU) -> Result<(), Error> {
         Relation::<Self::RW, Self::RU>::check_relation(dk, W, U)
     }
@@ -244,10 +359,16 @@ pub trait FoldingInstanceVar<VC: CommitmentDefGadget>:
     fn commitments(&self) -> Vec<&VC::CommitmentVar>;
 
     fn public_inputs(&self) -> &Vec<VC::ScalarVar>;
+
+    fn new_witness_with_public_inputs(
+        cs: impl Into<Namespace<VC::ConstraintField>>,
+        u: &Self::Value,
+        x: Vec<VC::ScalarVar>,
+    ) -> Result<Self, SynthesisError>;
 }
 
-pub type PlainWitnessVar<VC> = WrappedVec<<VC as CommitmentDefGadget>::ScalarVar>;
-pub type PlainInstanceVar<VC> = WrappedVec<<VC as CommitmentDefGadget>::ScalarVar>;
+pub type PlainWitnessVar<VC> = PlainWitness<<VC as CommitmentDefGadget>::ScalarVar>;
+pub type PlainInstanceVar<VC> = PlainInstance<<VC as CommitmentDefGadget>::ScalarVar>;
 
 impl<VC: CommitmentDefGadget> FoldingInstanceVar<VC> for PlainInstanceVar<VC> {
     fn commitments(&self) -> Vec<&VC::CommitmentVar> {
@@ -257,12 +378,20 @@ impl<VC: CommitmentDefGadget> FoldingInstanceVar<VC> for PlainInstanceVar<VC> {
     fn public_inputs(&self) -> &Vec<VC::ScalarVar> {
         self
     }
+
+    fn new_witness_with_public_inputs(
+        _cs: impl Into<Namespace<VC::ConstraintField>>,
+        _u: &Self::Value,
+        x: Vec<VC::ScalarVar>,
+    ) -> Result<Self, SynthesisError> {
+        Ok(Self(x))
+    }
 }
 
 pub trait FoldingSchemePartialGadget<const M: usize = 1, const N: usize = 1> {
-    type Native: FoldingScheme<M, N, VC = <Self::VC as CommitmentDefGadget>::Widget>;
+    type Native: FoldingScheme<M, N>;
 
-    type VC: CommitmentDefGadget;
+    type VC: CommitmentDefGadget<Widget = <Self::Native as FoldingScheme<M, N>>::VC>;
     type RW: FoldingWitnessVar<Self::VC, Value = <Self::Native as FoldingScheme<M, N>>::RW>;
     type RU: FoldingInstanceVar<Self::VC, Value = <Self::Native as FoldingScheme<M, N>>::RU>;
     type IW: FoldingWitnessVar<Self::VC, Value = <Self::Native as FoldingScheme<M, N>>::IW>;
@@ -280,24 +409,20 @@ pub trait FoldingSchemePartialGadget<const M: usize = 1, const N: usize = 1> {
             Value = <Self::Native as FoldingScheme<M, N>>::Proof,
         >;
 
-    type Hint: AllocVar<
-            <Self::Hint as GR1CSVar<<Self::VC as CommitmentDefGadget>::ConstraintField>>::Value,
-            <Self::VC as CommitmentDefGadget>::ConstraintField,
-        > + GR1CSVar<<Self::VC as CommitmentDefGadget>::ConstraintField, Value: Default>;
-
+    #[allow(non_snake_case)]
     fn verify_hinted(
         vk: &Self::VerifierKey,
         transcript: &mut impl TranscriptGadget<<Self::VC as CommitmentDefGadget>::ConstraintField>,
         Us: &[impl Borrow<Self::RU>; M],
         us: &[impl Borrow<Self::IU>; N],
         proof: &Self::Proof,
-        hint: Self::Hint,
     ) -> Result<(Self::RU, Self::Challenge), SynthesisError>;
 }
 
 pub trait FoldingSchemeFullGadget<const M: usize = 1, const N: usize = 1>:
     FoldingSchemePartialGadget<M, N>
 {
+    #[allow(non_snake_case)]
     fn verify(
         vk: &Self::VerifierKey,
         transcript: &mut impl TranscriptGadget<<Self::VC as CommitmentDefGadget>::ConstraintField>,
@@ -311,22 +436,25 @@ pub trait FoldingSchemeFullGadget<const M: usize = 1, const N: usize = 1>:
 mod tests {
     use ark_crypto_primitives::sponge::poseidon::PoseidonSponge;
     use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystem};
-    use ark_std::{error::Error, rand::Rng};
+    use ark_std::{error::Error, rand::Rng, sync::Arc};
     use sonobe_primitives::{
         circuits::{ArithExtractor, AssignmentsOwned},
-        transcripts::poseidon::poseidon_canonical_config,
+        transcripts::{
+            griffin::{GriffinParams, sponge::GriffinSponge},
+            poseidon::poseidon_canonical_config,
+        },
     };
 
     use super::*;
 
-    pub fn test_folding_scheme<FS, const M: usize, const N: usize>(
+    #[allow(non_snake_case)]
+    pub fn test_folding_scheme<FS: FoldingScheme<M, N>, const M: usize, const N: usize>(
         config: FS::Config,
         circuit: impl ConstraintSynthesizer<<FS::VC as CommitmentDef>::Scalar>,
         assignments_vec: Vec<AssignmentsOwned<<FS::VC as CommitmentDef>::Scalar>>,
         mut rng: impl Rng,
     ) -> Result<(), Box<dyn Error>>
     where
-        FS: FoldingScheme<M, N>,
         FS::Arith: From<ConstraintSystem<<FS::VC as CommitmentDef>::Scalar>>,
     {
         let pp = FS::preprocess(config, &mut rng)?;
@@ -347,8 +475,10 @@ mod tests {
         let mut Ws = Ws.try_into().unwrap();
         let mut Us = Us.try_into().unwrap();
 
-        let mut transcript_p = PoseidonSponge::new(&poseidon_canonical_config());
-        let mut transcript_v = PoseidonSponge::new(&poseidon_canonical_config());
+        let config = Arc::new(GriffinParams::new(16, 5, 9));
+
+        let mut transcript_p = GriffinSponge::new(&config);
+        let mut transcript_v = GriffinSponge::new(&config);
 
         for assignments in assignments_vec {
             let mut ws = vec![];
