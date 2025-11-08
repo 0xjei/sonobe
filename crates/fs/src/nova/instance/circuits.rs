@@ -7,13 +7,10 @@ use ark_r1cs_std::{
 };
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::borrow::Borrow;
-use sonobe_primitives::{
-    commitments::{CommitmentDef, CommitmentDefGadget},
-    transcripts::{Absorbable, AbsorbableVar},
-};
+use sonobe_primitives::{commitments::CommitmentDefGadget, transcripts::AbsorbableVar};
 
 use super::{IncomingInstance, RunningInstance};
-use crate::{FoldingInstance, FoldingInstanceVar};
+use crate::FoldingInstanceVar;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct RunningInstanceVar<CM: CommitmentDefGadget> {
