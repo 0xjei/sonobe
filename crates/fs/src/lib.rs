@@ -11,7 +11,6 @@ use ark_r1cs_std::{
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::{borrow::Borrow, fmt::Debug, rand::RngCore};
 use sonobe_primitives::{
-    algebra::group::emulated::EmulatedAffineVar,
     arithmetizations::{Arith, ArithConfig},
     circuits::AssignmentsOwned,
     commitments::{CommitmentDef, CommitmentDefGadget, GroupBasedCommitment},
