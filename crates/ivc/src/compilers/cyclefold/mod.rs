@@ -1,14 +1,9 @@
-use ark_crypto_primitives::sponge::poseidon::{PoseidonConfig, PoseidonSponge};
-use ark_ec::{CurveGroup, PrimeGroup};
 use ark_ff::{PrimeField, Zero};
-use ark_r1cs_std::{eq::EqGadget, fields::fp::FpVar};
-use ark_relations::gr1cs::{
-    ConstraintSynthesizer, ConstraintSystem, ConstraintSystemRef, SynthesisError, SynthesisMode,
-};
+use ark_relations::gr1cs::{ConstraintSystem, SynthesisError, SynthesisMode};
 use ark_std::{borrow::Borrow, marker::PhantomData, rand::RngCore, sync::Arc};
 use sonobe_fs::{
-    FoldingInstance, FoldingInstanceVar, FoldingScheme, FoldingSchemeFullGadget,
-    FoldingSchemePartialGadget, GroupBasedFoldingSchemePrimary, GroupBasedFoldingSchemeSecondary,
+    FoldingInstance, FoldingScheme, FoldingSchemeFullGadget, FoldingSchemePartialGadget,
+    GroupBasedFoldingSchemePrimary, GroupBasedFoldingSchemeSecondary,
 };
 use sonobe_primitives::{
     algebra::field::emulated::EmulatedFieldVar,
@@ -30,7 +25,7 @@ use crate::{
 
 pub mod circuits;
 
-pub trait FoldingSchemeCycleFoldGadget<const M: usize, const N: usize>:
+pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
     GroupBasedFoldingSchemePrimary<M, N>
 {
     type CFConfig: CycleFoldConfig<C = <Self::VC as CommitmentDef>::Commitment>;
@@ -107,7 +102,7 @@ pub struct CycleFoldBasedIVC<FS1, FS2> {
 
 impl<FS1, FS2> IVC for CycleFoldBasedIVC<FS1, FS2>
 where
-    FS1: FoldingSchemeCycleFoldGadget<
+    FS1: FoldingSchemeCycleFoldExt<
             1,
             1,
             Arith: From<ConstraintSystem<CF1<<FS1::VC as CommitmentDef>::Commitment>>>,
@@ -255,7 +250,7 @@ where
                 FS1::prove(pk1, &mut transcript, &[W], &[U], &[w], &[u], &mut rng)?;
 
             let cf_configs = FS1::to_cyclefold_configs(&[U], &[u], &proof, challenge);
-            for cfg in cf_configs {
+            for (i, cfg) in cf_configs.iter().enumerate() {
                 let cs = AssignmentsExtractor::new();
                 cs.execute_fn(|cs| cfg.verify_point_rlc(cs))?;
 
@@ -265,8 +260,8 @@ where
                 (cf_WW, cf_UU, cf_proof, _) = FS2::prove(
                     pk2,
                     &mut transcript,
-                    &[cf_W],
-                    &[cf_U],
+                    &[if i == 0 { cf_W } else { &cf_WW }],
+                    &[if i == 0 { cf_U } else { &cf_UU }],
                     &[&cf_w],
                     &[&cf_u],
                     &mut rng,
