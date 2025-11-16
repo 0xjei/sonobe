@@ -27,6 +27,7 @@ use crate::{
     compilers::cyclefold::circuits::{AugmentedCircuit, CycleFoldCircuit},
 };
 
+pub mod adapters;
 pub mod circuits;
 
 /// [`FoldingSchemeCycleFoldExt`] is the extension trait that a folding scheme
