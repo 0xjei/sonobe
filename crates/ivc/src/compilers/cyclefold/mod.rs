@@ -1,15 +1,17 @@
 use ark_crypto_primitives::sponge::poseidon::{PoseidonConfig, PoseidonSponge};
+use ark_ec::{CurveGroup, PrimeGroup};
 use ark_ff::{PrimeField, Zero};
 use ark_r1cs_std::{eq::EqGadget, fields::fp::FpVar};
 use ark_relations::gr1cs::{
     ConstraintSynthesizer, ConstraintSystem, ConstraintSystemRef, SynthesisError, SynthesisMode,
 };
-use ark_std::{marker::PhantomData, rand::RngCore, sync::Arc};
+use ark_std::{borrow::Borrow, marker::PhantomData, rand::RngCore, sync::Arc};
 use sonobe_fs::{
     FoldingInstance, FoldingInstanceVar, FoldingScheme, FoldingSchemeFullGadget,
-    FoldingSchemePartialGadget,
+    FoldingSchemePartialGadget, GroupBasedFoldingSchemePrimary, GroupBasedFoldingSchemeSecondary,
 };
 use sonobe_primitives::{
+    algebra::field::emulated::EmulatedFieldVar,
     arithmetizations::{Arith, ArithConfig},
     circuits::{ArithExtractor, AssignmentsExtractor, ConstraintSystemExt, FCircuit},
     commitments::{CommitmentDef, CommitmentDefGadget},
@@ -29,30 +31,36 @@ use crate::{
 pub mod circuits;
 
 pub trait FoldingSchemeCycleFoldGadget<const M: usize, const N: usize>:
-    FoldingSchemePartialGadget<M, N>
+    GroupBasedFoldingSchemePrimary<M, N>
 {
-    type CFConfig: CycleFoldConfig<
-        C = <<Self::Native as FoldingScheme<M, N>>::VC as CommitmentDef>::Commitment,
-    >;
-
-    type CFScalarVar;
+    type CFConfig: CycleFoldConfig<C = <Self::VC as CommitmentDef>::Commitment>;
 
     const N_CYCLEFOLDS: usize;
 
     fn to_cyclefold_configs(
-        U: &<Self::Native as FoldingScheme<M, N>>::RU,
-        u: &<Self::Native as FoldingScheme<M, N>>::IU,
-        proof: &<Self::Native as FoldingScheme<M, N>>::Proof,
-        rho: <Self::Native as FoldingScheme<M, N>>::Challenge,
+        Us: &[impl Borrow<Self::RU>; M],
+        us: &[impl Borrow<Self::IU>; N],
+        proof: &Self::Proof,
+        rho: Self::Challenge,
     ) -> Vec<Self::CFConfig>;
 
     fn to_cyclefold_inputs(
-        U: Self::RU,
-        u: Self::IU,
-        UU: Self::RU,
-        proof: Self::Proof,
-        rho: Self::Challenge,
-    ) -> Result<Vec<Vec<Self::CFScalarVar>>, SynthesisError>;
+        Us: [<Self::Gadget as FoldingSchemePartialGadget<M, N>>::RU; M],
+        us: [<Self::Gadget as FoldingSchemePartialGadget<M, N>>::IU; N],
+        UU: <Self::Gadget as FoldingSchemePartialGadget<M, N>>::RU,
+        proof: <Self::Gadget as FoldingSchemePartialGadget<M, N>>::Proof,
+        rho: <Self::Gadget as FoldingSchemePartialGadget<M, N>>::Challenge,
+    ) -> Result<
+        Vec<
+            Vec<
+                EmulatedFieldVar<
+                    <Self::VC as CommitmentDef>::Scalar,
+                    CF2<<Self::VC as CommitmentDef>::Commitment>,
+                >,
+            >,
+        >,
+        SynthesisError,
+    >;
 }
 
 pub struct ProverKey<F: PrimeField, FS1: FoldingScheme<1, 1>, FS2: FoldingScheme<1, 1>>(
@@ -93,76 +101,59 @@ impl<F: PrimeField, FS1: FoldingScheme<1, 1>, FS2: FoldingScheme<1, 1>>
     }
 }
 
-pub struct CycleFoldBasedIVC<C1, C2, FS1, FS2> {
-    _d: PhantomData<(C1, C2, FS1, FS2)>,
+pub struct CycleFoldBasedIVC<FS1, FS2> {
+    _d: PhantomData<(FS1, FS2)>,
 }
 
-impl<C1: SonobeCurve, C2: SonobeCurve, FS1, FS2> IVC for CycleFoldBasedIVC<C1, C2, FS1, FS2>
+impl<FS1, FS2> IVC for CycleFoldBasedIVC<FS1, FS2>
 where
-    C1: SonobeCurve<BaseField = C2::ScalarField, ScalarField = C2::BaseField>,
     FS1: FoldingSchemeCycleFoldGadget<
             1,
             1,
-            VC: CommitmentDefGadget<
-                ConstraintField = C1::ScalarField,
-                ScalarVar = FpVar<C1::ScalarField>,
+            Arith: From<ConstraintSystem<CF1<<FS1::VC as CommitmentDef>::Commitment>>>,
+            Gadget: FoldingSchemePartialGadget<1, 1, VerifierKey = ()>,
+            VC: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS2::VC as CommitmentDef>::Scalar>,
             >,
-            CFScalarVar = <FS2::VC as CommitmentDefGadget>::ScalarVar,
-            Native: FoldingScheme<
-                1,
-                1,
-                Arith: Arith + From<ConstraintSystem<C2::BaseField>>,
-                TranscriptField = C1::ScalarField,
-                VC: CommitmentDef<Scalar = C1::ScalarField, Commitment = C1>,
-            >,
-            VerifierKey = (),
         >,
-    FS2: FoldingSchemeFullGadget<
+    FS2: GroupBasedFoldingSchemeSecondary<
             1,
             1,
-            Native: FoldingScheme<
-                1,
-                1,
-                Arith: Arith + From<ConstraintSystem<C2::ScalarField>>,
-                TranscriptField = C1::ScalarField,
-                VC: CommitmentDef<Scalar = C2::ScalarField, Commitment = C2>,
+            Arith: From<ConstraintSystem<CF1<<FS2::VC as CommitmentDef>::Commitment>>>,
+            Gadget: FoldingSchemeFullGadget<1, 1, VerifierKey = ()>,
+            VC: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS1::VC as CommitmentDef>::Scalar>,
             >,
-            VerifierKey = (),
-            VC: CommitmentDefGadget<ConstraintField = C1::ScalarField>,
         >,
 {
-    type Field = C1::ScalarField;
+    type Field = <FS1::VC as CommitmentDef>::Scalar;
 
-    type Config = (
-        <FS1::Native as FoldingScheme<1, 1>>::Config,
-        <FS2::Native as FoldingScheme<1, 1>>::Config,
-        Arc<GriffinParams<Self::Field>>,
-    );
+    type Config = (FS1::Config, FS2::Config, Arc<GriffinParams<Self::Field>>);
 
     type PublicParam = (
-        <FS1::Native as FoldingScheme<1, 1>>::PublicParam,
-        <FS2::Native as FoldingScheme<1, 1>>::PublicParam,
+        FS1::PublicParam,
+        FS2::PublicParam,
         Arc<GriffinParams<Self::Field>>,
     );
 
-    type ProverKey = ProverKey<Self::Field, FS1::Native, FS2::Native>;
+    type ProverKey = ProverKey<Self::Field, FS1, FS2>;
 
     type VerifierKey = (
-        <FS1::Native as FoldingScheme<1, 1>>::DeciderKey,
-        <FS2::Native as FoldingScheme<1, 1>>::DeciderKey,
+        FS1::DeciderKey,
+        FS2::DeciderKey,
         Arc<GriffinParams<Self::Field>>,
         Self::Field,
     );
 
-    type Proof = Proof<FS1::Native, FS2::Native>;
+    type Proof = Proof<FS1, FS2>;
 
     fn preprocess(
         (cfg1, cfg2, griffin_config): Self::Config,
         mut rng: impl RngCore,
     ) -> Result<Self::PublicParam, Error> {
         Ok((
-            FS1::Native::preprocess(cfg1, &mut rng)?,
-            FS2::Native::preprocess(cfg2, &mut rng)?,
+            FS1::preprocess(cfg1, &mut rng)?,
+            FS2::preprocess(cfg2, &mut rng)?,
             griffin_config,
         ))
     }
@@ -171,21 +162,21 @@ where
         (pp1, pp2, griffin_config): Self::PublicParam,
         step_circuit: &FC,
     ) -> Result<(Self::ProverKey, Self::VerifierKey), Error> {
-        let mut arith2 = <FS2::Native as FoldingScheme<1, 1>>::Arith::default();
+        let mut arith2 = FS2::Arith::default();
 
         loop {
             let cyclefold_circuit = CycleFoldCircuit::<FS1::CFConfig>::default();
 
             let cs = ArithExtractor::new();
             cs.execute_synthesizer(cyclefold_circuit)?;
-            let new_arith2 = cs.arith::<<FS2::Native as FoldingScheme<1, 1>>::Arith>()?;
+            let new_arith2 = cs.arith::<FS2::Arith>()?;
             if new_arith2.config() == arith2.config() {
                 break;
             }
             arith2 = new_arith2;
         }
 
-        let mut arith1 = <FS1::Native as FoldingScheme<1, 1>>::Arith::default();
+        let mut arith1 = FS1::Arith::default();
 
         loop {
             let augmented_circuit = AugmentedCircuit::<FS1, FS2, _> {
@@ -197,7 +188,7 @@ where
 
             let cs = ArithExtractor::new();
             cs.execute_synthesizer(augmented_circuit)?;
-            let new_arith1 = cs.arith::<<FS1::Native as FoldingScheme<1, 1>>::Arith>()?;
+            let new_arith1 = cs.arith::<FS1::Arith>()?;
             if new_arith1.config() == arith1.config() {
                 break;
             }
@@ -207,8 +198,8 @@ where
         let arith1_config = arith1.config().clone();
         let arith2_config = arith2.config().clone();
 
-        let (pk1, _, dk1) = FS1::Native::generate_keys(pp1, arith1)?;
-        let (pk2, _, dk2) = FS2::Native::generate_keys(pp2, arith2)?;
+        let (pk1, _, dk1) = FS1::generate_keys(pp1, arith1)?;
+        let (pk2, _, dk2) = FS2::generate_keys(pp2, arith2)?;
 
         let pp_hash = Zero::zero(); // TODO
 
@@ -261,17 +252,17 @@ where
 
             let challenge;
             (WW, UU, proof, challenge) =
-                FS1::Native::prove(pk1, &mut transcript, &[W], &[U], &[w], &[u], &mut rng)?;
+                FS1::prove(pk1, &mut transcript, &[W], &[U], &[w], &[u], &mut rng)?;
 
-            let cf_configs = FS1::to_cyclefold_configs(&U, &u, &proof, challenge);
+            let cf_configs = FS1::to_cyclefold_configs(&[U], &[u], &proof, challenge);
             for cfg in cf_configs {
                 let cs = AssignmentsExtractor::new();
-                cs.execute_fn(|cs| CycleFoldCircuit::default().fold_points(cs, cfg))?;
+                cs.execute_fn(|cs| cfg.verify_point_rlc(cs))?;
 
                 let (cf_w, cf_u) = dk2.sample(cs.assignments()?, &mut rng)?;
 
                 let cf_proof;
-                (cf_WW, cf_UU, cf_proof, _) = FS2::Native::prove(
+                (cf_WW, cf_UU, cf_proof, _) = FS2::prove(
                     pk2,
                     &mut transcript,
                     &[cf_W],
@@ -340,9 +331,9 @@ where
             return Err(Error::IVCVerificationFail);
         }
 
-        FS1::Native::decide_running(&dk1, &W, &U)?;
-        FS1::Native::decide_incoming(&dk1, &w, &u)?;
-        FS2::Native::decide_running(&dk2, &cf_W, &cf_U)?;
+        FS1::decide_running(&dk1, &W, &U)?;
+        FS1::decide_incoming(&dk1, &w, &u)?;
+        FS2::decide_running(&dk2, &cf_W, &cf_U)?;
 
         Ok(())
     }

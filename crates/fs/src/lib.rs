@@ -11,11 +11,12 @@ use ark_r1cs_std::{
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::{borrow::Borrow, fmt::Debug, rand::RngCore};
 use sonobe_primitives::{
+    algebra::group::emulated::EmulatedAffineVar,
     arithmetizations::{Arith, ArithConfig},
     circuits::AssignmentsOwned,
-    commitments::{CommitmentDef, CommitmentDefGadget},
+    commitments::{CommitmentDef, CommitmentDefGadget, GroupBasedCommitment},
     relations::{Relation, WitnessInstanceSampler},
-    traits::{Dummy, SonobeField},
+    traits::{CF2, Dummy, SonobeField},
     transcripts::{Absorbable, AbsorbableVar, Transcript, TranscriptGadget},
 };
 use thiserror::Error;
@@ -388,6 +389,38 @@ impl<VC: CommitmentDefGadget> FoldingInstanceVar<VC> for PlainInstanceVar<VC> {
     }
 }
 
+pub trait GroupBasedFoldingSchemePrimary<const M: usize = 1, const N: usize = 1>:
+    FoldingScheme<
+    M,
+    N,
+    VC: GroupBasedCommitment,
+    TranscriptField = <<Self as FoldingScheme<M, N>>::VC as CommitmentDef>::Scalar,
+>
+{
+    type Gadget: FoldingSchemePartialGadget<
+        M,
+        N,
+        Native = Self,
+        VC = <Self::VC as GroupBasedCommitment>::Gadget2,
+    >;
+}
+
+pub trait GroupBasedFoldingSchemeSecondary<const M: usize = 1, const N: usize = 1>:
+    FoldingScheme<
+    M,
+    N,
+    VC: GroupBasedCommitment,
+    TranscriptField = CF2<<<Self as FoldingScheme<M, N>>::VC as CommitmentDef>::Commitment>,
+>
+{
+    type Gadget: FoldingSchemeFullGadget<
+        M,
+        N,
+        Native = Self,
+        VC = <Self::VC as GroupBasedCommitment>::Gadget1,
+    >;
+}
+
 pub trait FoldingSchemePartialGadget<const M: usize = 1, const N: usize = 1> {
     type Native: FoldingScheme<M, N>;
 
@@ -413,8 +446,8 @@ pub trait FoldingSchemePartialGadget<const M: usize = 1, const N: usize = 1> {
     fn verify_hinted(
         vk: &Self::VerifierKey,
         transcript: &mut impl TranscriptGadget<<Self::VC as CommitmentDefGadget>::ConstraintField>,
-        Us: &[impl Borrow<Self::RU>; M],
-        us: &[impl Borrow<Self::IU>; N],
+        Us: [&Self::RU; M],
+        us: [&Self::IU; N],
         proof: &Self::Proof,
     ) -> Result<(Self::RU, Self::Challenge), SynthesisError>;
 }
@@ -426,8 +459,8 @@ pub trait FoldingSchemeFullGadget<const M: usize = 1, const N: usize = 1>:
     fn verify(
         vk: &Self::VerifierKey,
         transcript: &mut impl TranscriptGadget<<Self::VC as CommitmentDefGadget>::ConstraintField>,
-        Us: &[impl Borrow<Self::RU>; M],
-        us: &[impl Borrow<Self::IU>; N],
+        Us: [&Self::RU; M],
+        us: [&Self::IU; N],
         proof: &Self::Proof,
     ) -> Result<Self::RU, SynthesisError>;
 }
