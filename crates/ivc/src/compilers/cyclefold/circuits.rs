@@ -3,18 +3,15 @@ use ark_r1cs_std::{
     GR1CSVar,
     alloc::AllocVar,
     boolean::Boolean,
-    convert::ToConstraintFieldGadget,
     eq::EqGadget,
     fields::{FieldVar, fp::FpVar},
     groups::CurveVar,
 };
-use ark_relations::gr1cs::{
-    ConstraintSynthesizer, ConstraintSystem, ConstraintSystemRef, SynthesisError,
-};
-use ark_std::{marker::PhantomData, rand::RngCore, sync::Arc};
+use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
+use ark_std::{marker::PhantomData, sync::Arc};
 use sonobe_fs::{
-    FoldingInstance, FoldingInstanceVar, FoldingScheme, FoldingSchemeFullGadget,
-    FoldingSchemePartialGadget, GroupBasedFoldingSchemePrimary, GroupBasedFoldingSchemeSecondary,
+    FoldingInstanceVar, FoldingSchemeFullGadget, FoldingSchemePartialGadget,
+    GroupBasedFoldingSchemePrimary, GroupBasedFoldingSchemeSecondary,
 };
 use sonobe_primitives::{
     algebra::Val,
@@ -29,7 +26,7 @@ use sonobe_primitives::{
     },
 };
 
-use crate::compilers::cyclefold::FoldingSchemeCycleFoldGadget;
+use crate::compilers::cyclefold::FoldingSchemeCycleFoldExt;
 
 pub struct AugmentedCircuit<
     'a,
@@ -45,22 +42,22 @@ pub struct AugmentedCircuit<
 
 impl<'a, FS1, FS2, FC> AugmentedCircuit<'a, FS1, FS2, FC>
 where
-    FS1: FoldingSchemeCycleFoldGadget<
-        1,
-        1,
-        Gadget: FoldingSchemePartialGadget<1, 1, VerifierKey = ()>,
-        VC: CommitmentDef<
-            Commitment: SonobeCurve<BaseField = <FS2::VC as CommitmentDef>::Scalar>,
+    FS1: FoldingSchemeCycleFoldExt<
+            1,
+            1,
+            Gadget: FoldingSchemePartialGadget<1, 1, VerifierKey = ()>,
+            VC: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS2::VC as CommitmentDef>::Scalar>,
+            >,
         >,
-    >,
     FS2: GroupBasedFoldingSchemeSecondary<
-        1,
-        1,
-        Gadget: FoldingSchemeFullGadget<1, 1, VerifierKey = ()>,
-        VC: CommitmentDef<
-            Commitment: SonobeCurve<BaseField = <FS1::VC as CommitmentDef>::Scalar>,
+            1,
+            1,
+            Gadget: FoldingSchemeFullGadget<1, 1, VerifierKey = ()>,
+            VC: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS1::VC as CommitmentDef>::Scalar>,
+            >,
         >,
-    >,
     FC: FCircuit<Field = <FS1::VC as CommitmentDef>::Scalar>,
 {
     pub fn compute_next_state(
@@ -125,11 +122,9 @@ where
         }
         let actual_cf_UU = is_basecase.select(&cf_U_dummy, &cf_UU)?;
 
-        let (next_state, external_outputs) = self.step_circuit.generate_step_constraints(
-            i,
-            current_state,
-            external_inputs,
-        )?;
+        let (next_state, external_outputs) =
+            self.step_circuit
+                .generate_step_constraints(i, current_state, external_inputs)?;
 
         let uu_x = sponge
             .clone()
@@ -162,20 +157,20 @@ where
 
 impl<'a, FS1, FS2, FC> ConstraintSynthesizer<FC::Field> for AugmentedCircuit<'a, FS1, FS2, FC>
 where
-    FS1: FoldingSchemeCycleFoldGadget<
-        1,
-        1,
-        Gadget: FoldingSchemePartialGadget<1, 1, VerifierKey = ()>,
-        VC: CommitmentDef<
-            Commitment: SonobeCurve<BaseField = <FS2::VC as CommitmentDef>::Scalar>,
+    FS1: FoldingSchemeCycleFoldExt<
+            1,
+            1,
+            Gadget: FoldingSchemePartialGadget<1, 1, VerifierKey = ()>,
+            VC: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS2::VC as CommitmentDef>::Scalar>,
+            >,
         >,
-    >,
     FS2: GroupBasedFoldingSchemeSecondary<
-        1,
-        1,
-        Gadget: FoldingSchemeFullGadget<1, 1, VerifierKey = ()>,
-        VC: CommitmentDef<Commitment: SonobeCurve<BaseField = FC::Field>>,
-    >,
+            1,
+            1,
+            Gadget: FoldingSchemeFullGadget<1, 1, VerifierKey = ()>,
+            VC: CommitmentDef<Commitment: SonobeCurve<BaseField = FC::Field>>,
+        >,
     FC: FCircuit<Field = <FS1::VC as CommitmentDef>::Scalar>,
 {
     fn generate_constraints(
@@ -265,7 +260,7 @@ pub trait CycleFoldConfig: Sized + Default {
     }
 
     fn verify_point_rlc(&self, cs: ConstraintSystemRef<CF2<Self::C>>)
-        -> Result<(), SynthesisError>;
+    -> Result<(), SynthesisError>;
 }
 
 #[derive(Debug, Clone, Default)]
