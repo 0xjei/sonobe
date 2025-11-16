@@ -1,5 +1,13 @@
-use ark_ff::{Field, One};
+use ark_ff::{Field, One, PrimeField};
 use ark_poly::{DenseMultilinearExtension as MLE, MultilinearExtension};
+use ark_r1cs_std::{
+    GR1CSVar,
+    alloc::{AllocVar, AllocationMode},
+    eq::EqGadget,
+    fields::{FieldVar, fp::FpVar},
+    prelude::Boolean,
+};
+use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::{
     UniformRand, borrow::Borrow, cfg_iter, marker::PhantomData, rand::RngCore, sync::Arc,
 };
@@ -8,7 +16,7 @@ use rayon::prelude::*;
 use sonobe_primitives::{
     algebra::ops::{
         bits::FromBits,
-        pow::Pow,
+        pow::{Pow, PowGadget},
         rlc::{ScalarRLC, SliceRLC},
     },
     arithmetizations::{
@@ -21,19 +29,25 @@ use sonobe_primitives::{
     relations::{Relation, WitnessInstanceSampler},
     sumcheck::{
         Error as SumCheckError, SumCheck,
-        utils::{EqPoly, VPAuxInfo, VirtualPolynomial},
+        circuits::SumCheckGadget,
+        utils::{EqPoly, EqPolyGadget, VPAuxInfo, VirtualPolynomial},
     },
     traits::Dummy,
-    transcripts::Transcript,
+    transcripts::{Transcript, TranscriptGadget},
 };
 
 use self::{
-    instance::{CCCSInstance as IU, LCCCSInstance as RU},
+    instance::{
+        CCCSInstance as IU, LCCCSInstance as RU,
+        circuits::{CCCSInstanceVar as IUVar, LCCCSInstanceVar as RUVar},
+    },
     witness::{CCCSWitness as IW, LCCCSWitness as RW},
 };
 use crate::{
-    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeKeyGenerator, FoldingSchemePreprocessor,
-    FoldingSchemeProver, FoldingSchemeVerifier, PlainInstance as PU, PlainWitness as PW,
+    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeDefGadget, FoldingSchemeKeyGenerator,
+    FoldingSchemePartialVerifierGadget, FoldingSchemePreprocessor, FoldingSchemeProver,
+    FoldingSchemeVerifier, GroupBasedFoldingSchemePrimaryDef, PlainInstance as PU,
+    PlainWitness as PW,
 };
 
 pub mod instance;
@@ -830,6 +844,213 @@ impl<
                 .slice_rlc(&rho_powers),
         })
     }
+}
+
+#[derive(Clone)]
+pub struct NIMFSProofVar<F: PrimeField, const M: usize, const N: usize> {
+    pub sc_proof: Vec<Vec<FpVar<F>>>,
+    pub sigmas: Vec<FpVar<F>>,
+    pub thetas: Vec<FpVar<F>>,
+}
+
+impl<F: PrimeField, const M: usize, const N: usize> AllocVar<NIMFSProof<F, M, N>, F>
+    for NIMFSProofVar<F, M, N>
+{
+    fn new_variable<T: Borrow<NIMFSProof<F, M, N>>>(
+        cs: impl Into<Namespace<F>>,
+        f: impl FnOnce() -> Result<T, SynthesisError>,
+        mode: AllocationMode,
+    ) -> Result<Self, SynthesisError> {
+        let ns = cs.into();
+        let cs = ns.cs();
+
+        let proof = f()?.borrow().clone();
+
+        Ok(NIMFSProofVar {
+            sc_proof: proof
+                .sc_proof
+                .iter()
+                .map(|v| Vec::new_variable(cs.clone(), || Ok(&v[..]), mode))
+                .collect::<Result<Vec<Vec<_>>, SynthesisError>>()?,
+            sigmas: Vec::new_variable(cs.clone(), || Ok(&proof.sigmas[..]), mode)?,
+            thetas: Vec::new_variable(cs.clone(), || Ok(&proof.thetas[..]), mode)?,
+        })
+    }
+}
+
+impl<F: PrimeField, const M: usize, const N: usize> GR1CSVar<F> for NIMFSProofVar<F, M, N> {
+    type Value = NIMFSProof<F, M, N>;
+
+    fn cs(&self) -> ConstraintSystemRef<F> {
+        self.sc_proof
+            .iter()
+            .fold(ConstraintSystemRef::None, |cs, v| cs.or(v.cs()))
+            .or(self.sigmas.cs())
+            .or(self.thetas.cs())
+    }
+
+    fn value(&self) -> Result<Self::Value, SynthesisError> {
+        Ok(NIMFSProof {
+            sc_proof: self
+                .sc_proof
+                .iter()
+                .map(|v| v.value())
+                .collect::<Result<Vec<Vec<F>>, SynthesisError>>()?,
+            sigmas: self.sigmas.value()?,
+            thetas: self.thetas.value()?,
+        })
+    }
+}
+
+pub struct HyperNovaGadget<CM, V: CCSVariant = R1CSConfig, const CHALLENGE_BITS: usize = 128> {
+    _t: PhantomData<(CM, V)>,
+}
+
+impl<CM: GroupBasedCommitment, V: CCSVariant, const CHALLENGE_BITS: usize> FoldingSchemeDefGadget
+    for HyperNovaGadget<CM, V, CHALLENGE_BITS>
+{
+    type Widget = HyperNova<CM, V, CHALLENGE_BITS>;
+
+    type CM = CM::Gadget2;
+    type RU = RUVar<CM::Gadget2>;
+    type IU = IUVar<CM::Gadget2>;
+    type VerifierKey = ();
+    type Challenge = [Boolean<CM::Scalar>; CHALLENGE_BITS];
+    type Proof<const M: usize, const N: usize> = NIMFSProofVar<CM::Scalar, M, N>;
+}
+
+impl<
+    CM: GroupBasedCommitment,
+    V: CCSVariant,
+    const M: usize,
+    const N: usize,
+    const CHALLENGE_BITS: usize,
+> FoldingSchemePartialVerifierGadget<M, N> for HyperNovaGadget<CM, V, CHALLENGE_BITS>
+{
+    #[allow(non_snake_case)]
+    fn verify_hinted(
+        _vk: &Self::VerifierKey,
+        transcript: &mut impl TranscriptGadget<CM::Scalar>,
+        Us: [&Self::RU; M],
+        us: [&Self::IU; N],
+        proof: &Self::Proof<M, N>,
+    ) -> Result<(Self::RU, Self::Challenge), SynthesisError> {
+        let d = V::degree();
+        let s = proof.sc_proof.len();
+        let t = V::n_matrices();
+        let S = &V::multisets_vec();
+        let c = &V::coefficients_vec::<CM::Scalar>();
+
+        // absorb instances to transcript
+        transcript.add(&Us[..])?;
+        transcript.add(&us[..])?;
+
+        // Step 1: Get some challenges
+        let gamma = transcript.challenge_field_element()?;
+        let beta = transcript.challenge_field_elements(s)?;
+
+        let gamma_powers = gamma.powers(M * t + N);
+
+        let vp_aux_info = VPAuxInfo {
+            max_degree: d + 1,
+            num_variables: s,
+        };
+
+        // Step 3: Start verifying the sumcheck
+        // First, compute the expected sumcheck sum: \sum gamma^j v_j
+        let mut sum_v_j_gamma = FpVar::zero();
+        for (i, U) in Us.iter().enumerate() {
+            for j in 0..U.v.len() {
+                sum_v_j_gamma += &U.v[j] * &gamma_powers[i * t + j];
+            }
+        }
+
+        // Verify the interactive part of the sumcheck
+        // Step 2: Dig into the sumcheck claim and extract the randomness used
+        let (expected_eval, r_x_prime) =
+            SumCheckGadget::verify(sum_v_j_gamma, &proof.sc_proof, &vp_aux_info, transcript)?;
+
+        // Step 5: Finish verifying sumcheck (verify the claim c)
+        let c = {
+            let e2 = EqPolyGadget::fix_xy_eval(&beta, &r_x_prime);
+            proof
+                .sigmas
+                .chunks(t)
+                .zip(Us)
+                .flat_map(|(sigmas, u)| {
+                    let e_lcccs = EqPolyGadget::fix_xy_eval(&u.r_x, &r_x_prime);
+                    sigmas.iter().map(move |sigma_j| &e_lcccs * sigma_j)
+                })
+                .chain(proof.thetas.chunks(t).map(|thetas| {
+                    &e2 * S
+                        .iter()
+                        .zip(c)
+                        .map(|(S_i, &c_i)| {
+                            let mut prod = FpVar::one();
+                            for &j in S_i {
+                                prod *= &thetas[j];
+                            }
+                            prod * c_i
+                        })
+                        .sum::<FpVar<_>>()
+                }))
+                .zip(gamma_powers.iter())
+                .map(|(val, gamma_i)| val * gamma_i)
+                .sum::<FpVar<_>>()
+        };
+
+        // check that the g(r_x') from the sumcheck proof is equal to the computed c from sigmas&thetas
+        c.enforce_equal(&expected_eval)?;
+
+        // Step 6: Get the folding challenge
+        let rho_bits = transcript.challenge_bits(CHALLENGE_BITS)?;
+        let rho = Boolean::le_bits_to_fp(&rho_bits)?;
+
+        let rho_powers = rho.powers(M + N);
+
+        Ok((
+            Self::RU {
+                cm: {
+                    let cms = Us
+                        .iter()
+                        .map(|u| &u.cm)
+                        .chain(us.iter().map(|u| &u.cm))
+                        .collect::<Vec<_>>();
+
+                    AllocVar::new_witness(cms.cs().or(rho_powers.cs()), || {
+                        let cms = cms.value().unwrap_or(vec![Default::default(); M + N]);
+                        let rho_powers = rho_powers
+                            .value()
+                            .unwrap_or(vec![Default::default(); M + N]);
+                        Ok(cms.into_iter().scalar_rlc(&rho_powers))
+                    })?
+                },
+                u: Us
+                    .iter()
+                    .map(|u| u.u.clone())
+                    .chain(vec![FpVar::one(); N])
+                    .scalar_rlc(&rho_powers),
+                x: Us
+                    .iter()
+                    .map(|u| &u.x[..])
+                    .chain(us.iter().map(|u| &u.x[..]))
+                    .slice_rlc(&rho_powers),
+                r_x: r_x_prime,
+                v: proof
+                    .sigmas
+                    .chunks(t)
+                    .chain(proof.thetas.chunks(t))
+                    .slice_rlc(&rho_powers),
+            },
+            rho_bits.try_into().unwrap(),
+        ))
+    }
+}
+
+impl<CM: GroupBasedCommitment, V: CCSVariant, const CHALLENGE_BITS: usize>
+    GroupBasedFoldingSchemePrimaryDef for HyperNova<CM, V, CHALLENGE_BITS>
+{
+    type Gadget = HyperNovaGadget<CM, V, CHALLENGE_BITS>;
 }
 
 #[cfg(test)]
