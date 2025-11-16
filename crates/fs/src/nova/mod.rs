@@ -1,4 +1,6 @@
 use ark_ff::{BigInteger, One, PrimeField};
+use ark_r1cs_std::{GR1CSVar, alloc::AllocVar, boolean::Boolean, groups::CurveVar};
+use ark_relations::gr1cs::SynthesisError;
 use ark_std::{
     UniformRand,
     borrow::Borrow,
@@ -11,24 +13,32 @@ use ark_std::{
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use sonobe_primitives::{
+    algebra::ops::bits::FromBitsGadget,
     arithmetizations::{
         Arith, ArithConfig, ArithRelation,
         r1cs::{R1CS, RelaxedInstance, RelaxedWitness},
     },
     circuits::AssignmentsOwned,
-    commitments::{CommitmentDef, CommitmentKey, CommitmentOps, GroupBasedCommitment},
+    commitments::{
+        CommitmentDef, CommitmentDefGadget, CommitmentKey, CommitmentOps, GroupBasedCommitment,
+    },
     relations::{Relation, WitnessInstanceSampler},
     traits::{CF2, SonobeField},
-    transcripts::Transcript,
+    transcripts::{Transcript, TranscriptGadget},
 };
 
 use self::{
-    instance::{IncomingInstance as IU, RunningInstance as RU},
+    instance::{
+        IncomingInstance as IU, RunningInstance as RU,
+        circuits::{IncomingInstanceVar as IUVar, RunningInstanceVar as RUVar},
+    },
     witness::{IncomingWitness as IW, RunningWitness as RW},
 };
 use crate::{
-    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeKeyGenerator, FoldingSchemePreprocessor,
-    FoldingSchemeProver, FoldingSchemeVerifier, PlainInstance as PU, PlainWitness as PW,
+    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeDefGadget, FoldingSchemeFullVerifierGadget,
+    FoldingSchemeKeyGenerator, FoldingSchemePartialVerifierGadget, FoldingSchemePreprocessor,
+    FoldingSchemeProver, FoldingSchemeVerifier, GroupBasedFoldingSchemePrimaryDef,
+    GroupBasedFoldingSchemeSecondaryDef, PlainInstance as PU, PlainWitness as PW,
 };
 
 pub mod instance;
@@ -317,14 +327,15 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
 // From [Srinath Setty](https://microsoft.com/en-us/research/people/srinath/): In Nova, soundness
 // error ≤ 2/|S|, where S is the subset of the field F from which the challenges are drawn. In this
 // case, we keep the size of S close to 2^128.
-pub struct AbstractNova2<CM, TF, const CHALLENGE_BITS: usize = 128> {
+// TODO: experimental design
+struct AbstractNova2<CM, TF, const CHALLENGE_BITS: usize = 128> {
     _t: PhantomData<(CM, TF)>,
 }
 
-pub type Nova2<CM, const CHALLENGE_BITS: usize = 128> =
+type Nova2<CM, const CHALLENGE_BITS: usize = 128> =
     AbstractNova2<CM, <CM as CommitmentDef>::Scalar, CHALLENGE_BITS>;
 
-pub type CycleFoldNova2<CM, const CHALLENGE_BITS: usize = 128> =
+type CycleFoldNova2<CM, const CHALLENGE_BITS: usize = 128> =
     AbstractNova2<CM, CF2<<CM as CommitmentDef>::Commitment>, CHALLENGE_BITS>;
 
 impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> FoldingSchemeDef
@@ -382,7 +393,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
         Us: &[impl Borrow<Self::RU>; 1],
         ws: &[impl Borrow<Self::IW>; 1],
         us: &[impl Borrow<Self::IU>; 1],
-        mut rng: impl RngCore,
+        rng: impl RngCore,
     ) -> Result<(Self::RW, Self::RU, Self::Proof<1, 1>, Self::Challenge), Error> {
         let (W, U) = (Ws[0].borrow(), Us[0].borrow());
         let (w, u) = (ws[0].borrow(), us[0].borrow());
@@ -477,6 +488,127 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
                 .collect(),
         })
     }
+}
+
+pub struct AbstractNovaGadget<CM, const CHALLENGE_BITS: usize = 128> {
+    _vc: PhantomData<CM>,
+}
+
+impl<CM, const CHALLENGE_BITS: usize> FoldingSchemeDefGadget
+    for AbstractNovaGadget<CM, CHALLENGE_BITS>
+where
+    CM: CommitmentDefGadget<Widget: GroupBasedCommitment>,
+{
+    type Widget = AbstractNova<CM::Widget, CM::ConstraintField, CHALLENGE_BITS>;
+
+    type CM = CM;
+    type RU = RUVar<CM>;
+    type IU = IUVar<CM>;
+    type VerifierKey = ();
+    type Challenge = [Boolean<CM::ConstraintField>; CHALLENGE_BITS];
+    type Proof<const M: usize, const N: usize> = CM::CommitmentVar;
+}
+
+impl<CM, const CHALLENGE_BITS: usize> FoldingSchemePartialVerifierGadget<1, 1>
+    for AbstractNovaGadget<CM, CHALLENGE_BITS>
+where
+    CM: CommitmentDefGadget<Widget: GroupBasedCommitment>,
+{
+    #[allow(non_snake_case)]
+    fn verify_hinted(
+        _vk: &Self::VerifierKey,
+        transcript: &mut impl TranscriptGadget<CM::ConstraintField>,
+        [U]: [&Self::RU; 1],
+        [u]: [&Self::IU; 1],
+        proof: &Self::Proof<1, 1>,
+    ) -> Result<(Self::RU, Self::Challenge), SynthesisError> {
+        let rho_bits = {
+            transcript.add(&U)?;
+            transcript.add(&u)?;
+            transcript.add(proof)?;
+            transcript.challenge_bits(CHALLENGE_BITS)?
+        };
+        let rho = CM::ScalarVar::from_bits_le(&rho_bits)?;
+
+        Ok((
+            Self::RU {
+                u: (U.u.clone() + &rho)
+                    .try_into()
+                    .map_err(|_| SynthesisError::Unsatisfiable)?,
+                cm_e: CM::CommitmentVar::new_witness(
+                    U.cm_e.cs().or(proof.cs()).or(rho.cs()),
+                    || {
+                        Ok(U.cm_e.value().unwrap_or_default()
+                            + proof.value().unwrap_or_default() * rho.value().unwrap_or_default())
+                    },
+                )?,
+                cm_w: CM::CommitmentVar::new_witness(
+                    U.cm_w.cs().or(u.cm_w.cs()).or(rho.cs()),
+                    || {
+                        Ok(U.cm_w.value().unwrap_or_default()
+                            + u.cm_w.value().unwrap_or_default() * rho.value().unwrap_or_default())
+                    },
+                )?,
+                x: U.x
+                    .iter()
+                    .zip(&u.x)
+                    .map(|(a, b)| (b.clone() * &rho + a).try_into())
+                    .collect::<Result<_, _>>()
+                    .map_err(|_| SynthesisError::Unsatisfiable)?,
+            },
+            rho_bits.try_into().unwrap(),
+        ))
+    }
+}
+
+impl<CM, const CHALLENGE_BITS: usize> FoldingSchemeFullVerifierGadget<1, 1>
+    for AbstractNovaGadget<CM, CHALLENGE_BITS>
+where
+    CM: CommitmentDefGadget<Widget: GroupBasedCommitment>,
+    CM::CommitmentVar: CurveVar<<CM::Widget as CommitmentDef>::Commitment, CM::ConstraintField>,
+{
+    #[allow(non_snake_case)]
+    fn verify(
+        _vk: &Self::VerifierKey,
+        transcript: &mut impl TranscriptGadget<CM::ConstraintField>,
+        [U]: [&Self::RU; 1],
+        [u]: [&Self::IU; 1],
+        proof: &Self::Proof<1, 1>,
+    ) -> Result<Self::RU, SynthesisError> {
+        let rho_bits = {
+            transcript.add(&U)?;
+            transcript.add(&u)?;
+            transcript.add(proof)?;
+            transcript.challenge_bits(CHALLENGE_BITS)?
+        };
+        let rho = CM::ScalarVar::from_bits_le(&rho_bits)?;
+
+        Ok(Self::RU {
+            u: (U.u.clone() + &rho)
+                .try_into()
+                .map_err(|_| SynthesisError::Unsatisfiable)?,
+            cm_e: proof.scalar_mul_le(rho_bits.iter())? + &U.cm_e,
+            cm_w: u.cm_w.scalar_mul_le(rho_bits.iter())? + &U.cm_w,
+            x: U.x
+                .iter()
+                .zip(&u.x)
+                .map(|(a, b)| (b.clone() * &rho + a).try_into())
+                .collect::<Result<_, _>>()
+                .map_err(|_| SynthesisError::Unsatisfiable)?,
+        })
+    }
+}
+
+impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> GroupBasedFoldingSchemePrimaryDef
+    for AbstractNova<CM, CM::Scalar, CHALLENGE_BITS>
+{
+    type Gadget = AbstractNovaGadget<CM::Gadget2, CHALLENGE_BITS>;
+}
+
+impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> GroupBasedFoldingSchemeSecondaryDef
+    for AbstractNova<CM, CF2<CM::Commitment>, CHALLENGE_BITS>
+{
+    type Gadget = AbstractNovaGadget<CM::Gadget1, CHALLENGE_BITS>;
 }
 
 #[cfg(test)]
