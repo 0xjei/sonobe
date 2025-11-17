@@ -1,4 +1,3 @@
-use std::ops::{Deref, DerefMut};
 
 use ark_ff::{Field, PrimeField};
 use ark_r1cs_std::{
@@ -9,7 +8,12 @@ use ark_r1cs_std::{
     select::CondSelectGadget,
 };
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
-use ark_std::{borrow::Borrow, fmt::Debug, rand::RngCore};
+use ark_std::{
+    borrow::Borrow,
+    fmt::Debug,
+    ops::{Deref, DerefMut},
+    rand::RngCore,
+};
 use sonobe_primitives::{
     arithmetizations::{Arith, ArithConfig},
     circuits::AssignmentsOwned,
@@ -472,7 +476,7 @@ mod tests {
     use sonobe_primitives::{
         circuits::{ArithExtractor, AssignmentsOwned},
         transcripts::{
-            griffin::{GriffinParams, sponge::GriffinSponge},
+            griffin::{sponge::GriffinSponge, GriffinParams},
             poseidon::poseidon_canonical_config,
         },
     };
