@@ -14,7 +14,10 @@ pub mod emulated;
 /// `Field` trait is a wrapper around `PrimeField` that also includes the
 /// necessary bounds for the field to be used conveniently in folding schemes.
 pub trait SonobeField:
-    PrimeField<BasePrimeField = Self> + Absorbable + Inputize<Self> + Val<Var: FieldVar<Self, Self>>
+    PrimeField<BasePrimeField = Self>
+    + Absorbable
+    + Inputize<Self>
+    + Val<Var: FieldVar<Self, Self>, EmulatedVar<Self> = EmulatedFieldVar<Self, Self>>
 {
     const BITS_PER_LIMB: usize;
 }
@@ -45,7 +48,7 @@ impl<P: FpConfig<N>, const N: usize> Val for Fp<P, N> {
     type ConstraintField = Self;
     type Var = FpVar<Self>;
 
-    type EmulatedVar<F: SonobeField> = EmulatedFieldVar<F, Self, true>;
+    type EmulatedVar<F: SonobeField> = EmulatedFieldVar<F, Self>;
 }
 
 impl<P: FpConfig<N>, const N: usize> Absorbable for Fp<P, N> {

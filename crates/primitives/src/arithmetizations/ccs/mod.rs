@@ -1,19 +1,20 @@
 use ark_ff::Field;
 use ark_poly::DenseMultilinearExtension;
 use ark_relations::gr1cs::{ConstraintSystem, Matrix};
-use ark_std::{borrow::Borrow, cfg_into_iter, cfg_iter, fmt::Debug, log2, marker::PhantomData};
+use ark_std::{borrow::Borrow, cfg_into_iter, cfg_iter, fmt::Debug, marker::PhantomData};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
 use super::{r1cs::R1CS, Arith, ArithRelation, Error};
 use crate::{
+    algebra::ops::poly::MLEHelper,
     arithmetizations::{r1cs::R1CSConfig, ArithConfig},
     circuits::Assignments,
 };
 
 pub mod circuits;
 
-pub trait CCSVariant: Clone + Debug + PartialEq + Sync {
+pub trait CCSVariant: Clone + Debug + PartialEq + Default + Sync {
     fn n_matrices() -> usize;
 
     fn degree() -> usize;
@@ -24,7 +25,7 @@ pub trait CCSVariant: Clone + Debug + PartialEq + Sync {
 }
 
 #[allow(non_snake_case)]
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct CCSConfig<V: CCSVariant> {
     _v: PhantomData<V>,
     /// m: number of rows in M_i (such that M_i \in F^{m, n})
@@ -36,16 +37,6 @@ pub struct CCSConfig<V: CCSVariant> {
 }
 
 impl<V: CCSVariant> ArithConfig for CCSConfig<V> {
-    #[inline]
-    fn empty() -> Self {
-        Self {
-            _v: PhantomData,
-            m: 0,
-            n: 0,
-            l: 0,
-        }
-    }
-
     #[inline]
     fn degree(&self) -> usize {
         V::degree()
@@ -169,29 +160,30 @@ impl<F: Field, V: CCSVariant> CCS<F, V> {
         &self,
         z: Assignments<F, impl AsRef<[F]> + Sync>,
     ) -> Vec<DenseMultilinearExtension<F>> {
-        let s = log2(self.n_constraints()) as usize;
         (0..V::n_matrices())
-            .map(|i| DenseMultilinearExtension {
-                num_vars: s,
-                evaluations: cfg_iter!(self.M[i])
-                    .map(|row| row.iter().map(|(val, col)| z[*col] * val).sum())
-                    .chain(vec![F::zero(); (1 << s) - self.n_constraints()])
-                    .collect(),
+            .map(|i| {
+                DenseMultilinearExtension::from_evaluations(
+                    &cfg_iter!(self.M[i])
+                        .map(|row| row.iter().map(|(val, col)| z[*col] * val).sum())
+                        .collect::<Vec<_>>(),
+                )
             })
             .collect()
     }
 }
 
-impl<F: Field, V: CCSVariant> Arith for CCS<F, V> {
-    type Config = CCSConfig<V>;
-
+impl<F: Field, V: CCSVariant> Default for CCS<F, V> {
     #[inline]
-    fn empty() -> Self {
+    fn default() -> Self {
         Self {
-            cfg: CCSConfig::empty(),
+            cfg: CCSConfig::default(),
             M: vec![vec![]; V::n_matrices()],
         }
     }
+}
+
+impl<F: Field, V: CCSVariant> Arith for CCS<F, V> {
+    type Config = CCSConfig<V>;
 
     #[inline]
     fn config(&self) -> &Self::Config {
