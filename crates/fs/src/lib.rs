@@ -25,6 +25,7 @@
 //! - `witnesses/`: Witness types.
 
 pub mod definitions;
+pub mod mova;
 pub mod nova;
 pub mod ova;
 
