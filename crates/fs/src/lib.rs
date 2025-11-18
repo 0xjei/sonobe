@@ -1,4 +1,3 @@
-
 use ark_ff::{Field, PrimeField};
 use ark_r1cs_std::{
     GR1CSVar,
@@ -260,7 +259,15 @@ impl<VC: CommitmentDef> FoldingInstance<VC> for PlainInstance<VC::Scalar> {
     }
 }
 
-pub trait DeciderKey {}
+pub trait DeciderKey {
+    type ProverKey;
+    type VerifierKey;
+    type ArithConfig: ArithConfig;
+
+    fn to_pk(&self) -> &Self::ProverKey;
+    fn to_vk(&self) -> &Self::VerifierKey;
+    fn to_arith_config(&self) -> &Self::ArithConfig;
+}
 
 pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
     type VC: CommitmentDef<Scalar: SonobeField>;
@@ -269,12 +276,11 @@ pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
     type IW: FoldingWitness<Self::VC> + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
     type IU: FoldingInstance<Self::VC> + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
     type TranscriptField: SonobeField;
-    type Arith: Arith;
+    type Arith: Arith<Config = <Self::DeciderKey as DeciderKey>::ArithConfig>;
     type Config;
     type PublicParam;
-    type ProverKey;
-    type VerifierKey;
-    type DeciderKey: Clone
+    type DeciderKey: DeciderKey
+        + Clone
         + Relation<Self::RW, Self::RU, Error = Error>
         + Relation<Self::IW, Self::IU, Error = Error>
         + WitnessInstanceSampler<Self::RW, Self::RU, Source = (), Error = Error>
@@ -300,10 +306,7 @@ pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
     /// The key generation method is a deterministic algorithm that takes as
     /// input the public parameters `pp` and the constraint system `arith`, and
     /// outputs a prover key and a verifier key.
-    fn generate_keys(
-        pp: Self::PublicParam,
-        arith: Self::Arith,
-    ) -> Result<(Self::ProverKey, Self::VerifierKey, Self::DeciderKey), Error>;
+    fn generate_keys(pp: Self::PublicParam, arith: Self::Arith) -> Result<Self::DeciderKey, Error>;
 
     /// The proof generation method is a deterministic algorithm that takes as
     /// input the prover key `pk`, the transcript `transcript` between the
@@ -316,7 +319,7 @@ pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
     /// circuits in our CycleFold-based folding-to-IVC compiler.
     #[allow(non_snake_case)]
     fn prove(
-        pk: &Self::ProverKey,
+        pk: &<Self::DeciderKey as DeciderKey>::ProverKey,
         transcript: &mut impl Transcript<Self::TranscriptField>,
         Ws: &[impl Borrow<Self::RW>; M],
         Us: &[impl Borrow<Self::RU>; M],
@@ -327,7 +330,7 @@ pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
 
     #[allow(non_snake_case)]
     fn verify(
-        vk: &Self::VerifierKey,
+        vk: &<Self::DeciderKey as DeciderKey>::VerifierKey,
         transcript: &mut impl Transcript<Self::TranscriptField>,
         Us: &[impl Borrow<Self::RU>; M],
         us: &[impl Borrow<Self::IU>; N],
@@ -397,34 +400,34 @@ impl<VC: CommitmentDefGadget> FoldingInstanceVar<VC> for PlainInstanceVar<VC> {
 
 pub trait GroupBasedFoldingSchemePrimary<const M: usize = 1, const N: usize = 1>:
     FoldingScheme<
-    M,
-    N,
-    VC: GroupBasedCommitment,
-    TranscriptField = <<Self as FoldingScheme<M, N>>::VC as CommitmentDef>::Scalar,
->
-{
-    type Gadget: FoldingSchemePartialGadget<
         M,
         N,
-        Native = Self,
-        VC = <Self::VC as GroupBasedCommitment>::Gadget2,
-    >;
+        VC: GroupBasedCommitment,
+        TranscriptField = <<Self as FoldingScheme<M, N>>::VC as CommitmentDef>::Scalar,
+    >
+{
+    type Gadget: FoldingSchemePartialGadget<
+            M,
+            N,
+            Native = Self,
+            VC = <Self::VC as GroupBasedCommitment>::Gadget2,
+        >;
 }
 
 pub trait GroupBasedFoldingSchemeSecondary<const M: usize = 1, const N: usize = 1>:
     FoldingScheme<
-    M,
-    N,
-    VC: GroupBasedCommitment,
-    TranscriptField = CF2<<<Self as FoldingScheme<M, N>>::VC as CommitmentDef>::Commitment>,
->
-{
-    type Gadget: FoldingSchemeFullGadget<
         M,
         N,
-        Native = Self,
-        VC = <Self::VC as GroupBasedCommitment>::Gadget1,
-    >;
+        VC: GroupBasedCommitment,
+        TranscriptField = CF2<<<Self as FoldingScheme<M, N>>::VC as CommitmentDef>::Commitment>,
+    >
+{
+    type Gadget: FoldingSchemeFullGadget<
+            M,
+            N,
+            Native = Self,
+            VC = <Self::VC as GroupBasedCommitment>::Gadget1,
+        >;
 }
 
 pub trait FoldingSchemePartialGadget<const M: usize = 1, const N: usize = 1> {
@@ -479,7 +482,7 @@ mod tests {
     use sonobe_primitives::{
         circuits::{ArithExtractor, AssignmentsOwned},
         transcripts::{
-            griffin::{sponge::GriffinSponge, GriffinParams},
+            griffin::{GriffinParams, sponge::GriffinSponge},
             poseidon::poseidon_canonical_config,
         },
     };
@@ -501,7 +504,9 @@ mod tests {
         let cs = ArithExtractor::new();
         cs.execute_synthesizer(circuit)?;
         let arith = cs.arith()?;
-        let (pk, vk, dk) = FS::generate_keys(pp, arith)?;
+        let dk = FS::generate_keys(pp, arith)?;
+        let pk = dk.to_pk();
+        let vk = dk.to_vk();
 
         let mut Ws = vec![];
         let mut Us = vec![];
