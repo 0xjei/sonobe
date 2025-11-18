@@ -3,6 +3,7 @@ use ark_r1cs_std::{
     GR1CSVar,
     alloc::AllocVar,
     boolean::Boolean,
+    convert::ToConstraintFieldGadget,
     eq::EqGadget,
     fields::{FieldVar, fp::FpVar},
     groups::CurveVar,
@@ -241,9 +242,7 @@ pub trait CycleFoldConfig: Sized + Default {
     /// The final vector of public inputs is shorter than the result of calling
     /// [`AllocVar::new_input`], because we only need the x and y coordinates of
     /// the point, but the `infinity` flag is not necessary.
-    fn mark_point_as_public(
-        point: &impl CurveVar<Self::C, CF2<Self::C>>,
-    ) -> Result<(), SynthesisError> {
+    fn mark_point_as_public(point: &<Self::C as Val>::Var) -> Result<(), SynthesisError> {
         for x in &point.to_constraint_field()?[..2] {
             // This line "converts" `x` from a witness to a public input.
             // Instead of directly modifying the constraint system, we explicitly
