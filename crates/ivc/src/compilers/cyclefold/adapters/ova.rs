@@ -60,6 +60,7 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
 
     type CFCircuit = OvaCycleFoldCircuit<CM::Commitment, CHALLENGE_BITS>;
 
+    #[allow(non_snake_case)]
     fn to_cyclefold_circuits(
         [U]: &[impl Borrow<Self::RU>; 1],
         _us: &[impl Borrow<Self::IU>; 1],
@@ -72,6 +73,7 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
         }]
     }
 
+    #[allow(non_snake_case)]
     fn to_cyclefold_inputs(
         [U]: [<Self::Gadget as FoldingSchemeDefGadget>::RU; 1],
         _us: [<Self::Gadget as FoldingSchemeDefGadget>::IU; 1],

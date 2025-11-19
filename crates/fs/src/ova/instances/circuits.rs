@@ -1,8 +1,8 @@
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::{AllocVar, AllocationMode},
+    boolean::Boolean,
     fields::fp::FpVar,
-    prelude::Boolean,
     select::CondSelectGadget,
 };
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
