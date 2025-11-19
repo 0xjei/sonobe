@@ -4,6 +4,8 @@ use sonobe_primitives::{
 
 use crate::FoldingWitness;
 
+pub mod circuits;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RunningWitness<CM: CommitmentDef> {
     pub w: Vec<CM::Scalar>,
