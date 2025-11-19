@@ -58,11 +58,10 @@ pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
     >;
 }
 
-pub struct Key<F: PrimeField, FS1: FoldingScheme<1, 1>, FS2: FoldingScheme<1, 1>>(
+pub struct Key<FS1: FoldingScheme<1, 1>, FS2: FoldingScheme<1, 1>, T>(
     FS1::DeciderKey,
     FS2::DeciderKey,
-    Arc<GriffinParams<F>>,
-    F,
+    T,
 );
 
 pub struct Proof<FS1: FoldingScheme<1, 1>, FS2: FoldingScheme<1, 1>>(
@@ -74,29 +73,28 @@ pub struct Proof<FS1: FoldingScheme<1, 1>, FS2: FoldingScheme<1, 1>>(
     FS2::RU,
 );
 
-impl<F: PrimeField, FS1: FoldingScheme<1, 1>, FS2: FoldingScheme<1, 1>> Dummy<&Key<F, FS1, FS2>>
+impl<FS1: FoldingScheme<1, 1>, FS2: FoldingScheme<1, 1>, T> Dummy<&Key<FS1, FS2, T>>
     for Proof<FS1, FS2>
 {
-    fn dummy(pk: &Key<F, FS1, FS2>) -> Self {
+    fn dummy(pk: &Key<FS1, FS2, T>) -> Self {
         let cfg1 = pk.0.to_arith_config();
         let cfg2 = pk.1.to_arith_config();
-
-        let W = FS1::RW::dummy(cfg1);
-        let U = FS1::RU::dummy(cfg1);
-        let w = FS1::IW::dummy(cfg1);
-        let u = FS1::IU::dummy(cfg1);
-        let cf_W = FS2::RW::dummy(cfg2);
-        let cf_U = FS2::RU::dummy(cfg2);
-
-        Self(W, U, w, u, cf_W, cf_U)
+        Self(
+            FS1::RW::dummy(cfg1),
+            FS1::RU::dummy(cfg1),
+            FS1::IW::dummy(cfg1),
+            FS1::IU::dummy(cfg1),
+            FS2::RW::dummy(cfg2),
+            FS2::RU::dummy(cfg2),
+        )
     }
 }
 
-pub struct CycleFoldBasedIVC<FS1, FS2> {
-    _d: PhantomData<(FS1, FS2)>,
+pub struct CycleFoldBasedIVC<FS1, FS2, T> {
+    _d: PhantomData<(FS1, FS2, T)>,
 }
 
-impl<FS1, FS2> IVC for CycleFoldBasedIVC<FS1, FS2>
+impl<FS1, FS2, T> IVC for CycleFoldBasedIVC<FS1, FS2, T>
 where
     FS1: FoldingSchemeCycleFoldExt<
             1,
@@ -116,57 +114,46 @@ where
                 Commitment: SonobeCurve<BaseField = <FS1::VC as CommitmentDef>::Scalar>,
             >,
         >,
+    T: Transcript<CF1<<FS1::VC as CommitmentDef>::Commitment>>,
 {
     type Field = <FS1::VC as CommitmentDef>::Scalar;
 
-    type Config = (FS1::Config, FS2::Config, Arc<GriffinParams<Self::Field>>);
+    type Config = (FS1::Config, FS2::Config, T::Config);
 
-    type PublicParam = (
-        FS1::PublicParam,
-        FS2::PublicParam,
-        Arc<GriffinParams<Self::Field>>,
-    );
+    type PublicParam = (FS1::PublicParam, FS2::PublicParam, T::Config);
 
-    type ProverKey = Key<Self::Field, FS1, FS2>;
+    type ProverKey = Key<FS1, FS2, (T::Config, Self::Field)>;
 
-    type VerifierKey = Key<Self::Field, FS1, FS2>;
+    type VerifierKey = Key<FS1, FS2, (T::Config, Self::Field)>;
 
     type Proof = Proof<FS1, FS2>;
 
     fn preprocess(
-        (cfg1, cfg2, griffin_config): Self::Config,
+        (cfg1, cfg2, hash_config): Self::Config,
         mut rng: impl RngCore,
     ) -> Result<Self::PublicParam, Error> {
         Ok((
             FS1::preprocess(cfg1, &mut rng)?,
             FS2::preprocess(cfg2, &mut rng)?,
-            griffin_config,
+            hash_config,
         ))
     }
 
     fn generate_keys<FC: FCircuit<Field = Self::Field>>(
-        (pp1, pp2, griffin_config): Self::PublicParam,
+        (pp1, pp2, hash_config): Self::PublicParam,
         step_circuit: &FC,
     ) -> Result<(Self::ProverKey, Self::VerifierKey), Error> {
-        let mut arith2 = FS2::Arith::default();
+        let cyclefold_circuit = CycleFoldCircuit::<FS1::CFConfig>::default();
 
-        loop {
-            let cyclefold_circuit = CycleFoldCircuit::<FS1::CFConfig>::default();
-
-            let cs = ArithExtractor::new();
-            cs.execute_synthesizer(cyclefold_circuit)?;
-            let new_arith2 = cs.arith::<FS2::Arith>()?;
-            if new_arith2.config() == arith2.config() {
-                break;
-            }
-            arith2 = new_arith2;
-        }
+        let cs = ArithExtractor::new();
+        cs.execute_synthesizer(cyclefold_circuit)?;
+        let arith2 = cs.arith::<FS2::Arith>()?;
 
         let mut arith1 = FS1::Arith::default();
 
         loop {
-            let augmented_circuit = AugmentedCircuit::<FS1, FS2, _> {
-                griffin_config: griffin_config.clone(),
+            let augmented_circuit = AugmentedCircuit::<FS1, FS2, FC, T> {
+                hash_config: hash_config.clone(),
                 arith1_config: arith1.config(),
                 arith2_config: arith2.config(),
                 step_circuit,
@@ -187,13 +174,13 @@ where
         let pp_hash = Zero::zero(); // TODO
 
         Ok((
-            Key(dk1.clone(), dk2.clone(), griffin_config.clone(), pp_hash),
-            Key(dk1, dk2, griffin_config, pp_hash),
+            Key(dk1.clone(), dk2.clone(), (hash_config.clone(), pp_hash)),
+            Key(dk1, dk2, (hash_config, pp_hash)),
         ))
     }
 
     fn prove<FC: FCircuit<Field = Self::Field>>(
-        Key(dk1, dk2, griffin_config, pp_hash): &Self::ProverKey,
+        Key(dk1, dk2, (hash_config, pp_hash)): &Self::ProverKey,
         step_circuit: &FC,
         i: usize,
         initial_state: &FC::State,
@@ -202,13 +189,13 @@ where
         Proof(W, U, w, u, cf_W, cf_U): &Self::Proof,
         mut rng: impl RngCore,
     ) -> Result<(FC::State, FC::ExternalOutputs, Self::Proof), Error> {
-        let hash = GriffinSponge::new_with_pp_hash(&griffin_config, *pp_hash);
+        let hash = T::new_with_pp_hash(&hash_config, *pp_hash);
         let mut transcript = hash.separate_domain("transcript".as_ref());
 
         let arith1_config = dk1.to_arith_config();
         let arith2_config = dk2.to_arith_config();
-        let augmented_circuit = AugmentedCircuit::<FS1, FS2, _> {
-            griffin_config: griffin_config.clone(),
+        let augmented_circuit = AugmentedCircuit::<FS1, FS2, FC, T> {
+            hash_config: hash_config.clone(),
             arith1_config,
             arith2_config,
             step_circuit,
@@ -223,9 +210,6 @@ where
         let mut cf_WW = Dummy::dummy(arith2_config);
 
         if i != 0 {
-            cf_us.clear();
-            cf_proofs.clear();
-
             let challenge;
             (WW, UU, proof, challenge) = FS1::prove(
                 dk1.to_pk(),
@@ -244,8 +228,7 @@ where
 
                 let (cf_w, cf_u) = dk2.sample(cs.assignments()?, &mut rng)?;
 
-                let cf_proof;
-                (cf_WW, cf_UU, cf_proof, _) = FS2::prove(
+                (cf_WW, cf_UU, cf_proofs[i], _) = FS2::prove(
                     dk2.to_pk(),
                     &mut transcript,
                     &[if i == 0 { cf_W } else { &cf_WW }],
@@ -254,8 +237,7 @@ where
                     &[&cf_u],
                     &mut rng,
                 )?;
-                cf_us.push(cf_u);
-                cf_proofs.push(cf_proof);
+                cf_us[i] = cf_u;
             }
         }
 
@@ -287,7 +269,7 @@ where
     }
 
     fn verify<FC: FCircuit<Field = Self::Field>>(
-        Key(dk1, dk2, griffin_config, pp_hash): &Self::VerifierKey,
+        Key(dk1, dk2, (hash_config, pp_hash)): &Self::VerifierKey,
         i: usize,
         initial_state: &FC::State,
         current_state: &FC::State,
@@ -299,8 +281,8 @@ where
                 .ok_or(Error::IVCVerificationFail);
         }
 
-        let griffin = GriffinSponge::new_with_pp_hash(griffin_config, *pp_hash);
-        let mut sponge = griffin.separate_domain("sponge".as_ref());
+        let hash = T::new_with_pp_hash(hash_config, *pp_hash);
+        let mut sponge = hash.separate_domain("sponge".as_ref());
 
         let u_x = sponge
             .add(&i)
