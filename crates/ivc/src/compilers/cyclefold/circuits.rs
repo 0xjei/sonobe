@@ -108,8 +108,8 @@ where
             .add(&current_state)?
             .add(&U)?
             .add(&cf_U)?
-            .get_field_elements(2)?;
-        let u = FoldingInstanceVar::new_witness_with_public_inputs(cs.clone(), u, u_x)?;
+            .get_field_element()?;
+        let u = FoldingInstanceVar::new_witness_with_public_inputs(cs.clone(), u, vec![u_x])?;
         let (UU, rho) = FS1::Gadget::verify_hinted(&(), &mut transcript, [&U], [&u], &proof)?;
         let actual_UU = is_basecase.select(&U_dummy, &UU)?;
 
@@ -136,7 +136,7 @@ where
             .add(&next_state)?
             .add(&actual_UU)?
             .add(&actual_cf_UU)?
-            .get_field_elements(2)?;
+            .get_field_element()?;
         // This line "converts" `uu_x` from witnesses to public inputs.
         // Instead of directly modifying the constraint system, we explicitly
         // allocate a public input and enforce that its value is indeed `uu_x`.
@@ -146,8 +146,8 @@ where
         //   computing them outside the circuit.
         // - `.enforce_equal()` prevents a malicious prover from claiming wrong
         //   public inputs that are not the honest `uu_x` computed in-circuit.
-        uu_x.enforce_equal(&Vec::new_input(cs.clone(), || {
-            Ok(uu_x.value().unwrap_or(vec![Default::default(); uu_x.len()]))
+        uu_x.enforce_equal(&FpVar::new_input(cs.clone(), || {
+            Ok(uu_x.value().unwrap_or_default())
         })?)?;
 
         if cs.is_in_setup_mode() {
