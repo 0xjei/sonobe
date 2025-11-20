@@ -122,11 +122,11 @@ where
 
     type PublicParam = (FS1::PublicParam, FS2::PublicParam, T::Config);
 
-    type ProverKey = Key<FS1, FS2, (T::Config, Self::Field)>;
+    type ProverKey<FC> = Key<FS1, FS2, (T::Config, Self::Field)>;
 
-    type VerifierKey = Key<FS1, FS2, (T::Config, Self::Field)>;
+    type VerifierKey<FC> = Key<FS1, FS2, (T::Config, Self::Field)>;
 
-    type Proof = Proof<FS1, FS2>;
+    type Proof<FC> = Proof<FS1, FS2>;
 
     fn preprocess(
         (cfg1, cfg2, hash_config): Self::Config,
@@ -142,7 +142,7 @@ where
     fn generate_keys<FC: FCircuit<Field = Self::Field>>(
         (pp1, pp2, hash_config): Self::PublicParam,
         step_circuit: &FC,
-    ) -> Result<(Self::ProverKey, Self::VerifierKey), Error> {
+    ) -> Result<(Self::ProverKey<FC>, Self::VerifierKey<FC>), Error> {
         let cyclefold_circuit = CycleFoldCircuit::<FS1::CFConfig>::default();
 
         let cs = ArithExtractor::new();
@@ -180,16 +180,16 @@ where
     }
 
     fn prove<FC: FCircuit<Field = Self::Field>>(
-        Key(dk1, dk2, (hash_config, pp_hash)): &Self::ProverKey,
+        Key(dk1, dk2, (hash_config, pp_hash)): &Self::ProverKey<FC>,
         step_circuit: &FC,
         i: usize,
         initial_state: &FC::State,
         current_state: &FC::State,
         external_inputs: FC::ExternalInputs,
-        Proof(W, U, w, u, cf_W, cf_U): &Self::Proof,
+        Proof(W, U, w, u, cf_W, cf_U): &Self::Proof<FC>,
         mut rng: impl RngCore,
-    ) -> Result<(FC::State, FC::ExternalOutputs, Self::Proof), Error> {
-        let hash = T::new_with_pp_hash(&hash_config, *pp_hash);
+    ) -> Result<(FC::State, FC::ExternalOutputs, Self::Proof<FC>), Error> {
+        let hash = T::new_with_pp_hash(hash_config, *pp_hash);
         let mut transcript = hash.separate_domain("transcript".as_ref());
 
         let arith1_config = dk1.to_arith_config();
@@ -269,11 +269,11 @@ where
     }
 
     fn verify<FC: FCircuit<Field = Self::Field>>(
-        Key(dk1, dk2, (hash_config, pp_hash)): &Self::VerifierKey,
+        Key(dk1, dk2, (hash_config, pp_hash)): &Self::VerifierKey<FC>,
         i: usize,
         initial_state: &FC::State,
         current_state: &FC::State,
-        Proof(W, U, w, u, cf_W, cf_U): &Self::Proof,
+        Proof(W, U, w, u, cf_W, cf_U): &Self::Proof<FC>,
     ) -> Result<(), Error> {
         if i == 0 {
             return (initial_state == current_state)

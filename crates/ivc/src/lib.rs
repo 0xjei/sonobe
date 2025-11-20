@@ -23,49 +23,49 @@ pub trait IVC {
 
     type Config;
     type PublicParam;
-    type ProverKey;
-    type VerifierKey;
-    type Proof: for<'a> Dummy<&'a Self::ProverKey>;
+    type ProverKey<FC>;
+    type VerifierKey<FC>;
+    type Proof<FC>: for<'a> Dummy<&'a Self::ProverKey<FC>>;
 
     fn preprocess(config: Self::Config, rng: impl RngCore) -> Result<Self::PublicParam, Error>;
 
     fn generate_keys<FC: FCircuit<Field = Self::Field>>(
         pp: Self::PublicParam,
         step_circuit: &FC,
-    ) -> Result<(Self::ProverKey, Self::VerifierKey), Error>;
+    ) -> Result<(Self::ProverKey<FC>, Self::VerifierKey<FC>), Error>;
 
     fn prove<FC: FCircuit<Field = Self::Field>>(
-        pk: &Self::ProverKey,
+        pk: &Self::ProverKey<FC>,
         step_circuit: &FC,
         i: usize,
         initial_state: &FC::State,
         current_state: &FC::State,
         external_inputs: FC::ExternalInputs,
-        current_proof: &Self::Proof,
+        current_proof: &Self::Proof<FC>,
         rng: impl RngCore,
-    ) -> Result<(FC::State, FC::ExternalOutputs, Self::Proof), Error>;
+    ) -> Result<(FC::State, FC::ExternalOutputs, Self::Proof<FC>), Error>;
 
     fn verify<FC: FCircuit<Field = Self::Field>>(
-        vk: &Self::VerifierKey,
+        vk: &Self::VerifierKey<FC>,
         i: usize,
         initial_state: &FC::State,
         current_state: &FC::State,
-        proof: &Self::Proof,
+        proof: &Self::Proof<FC>,
     ) -> Result<(), Error>;
 }
 
 pub struct IVCStatefulProver<FC: FCircuit, I: IVC> {
-    pub pk: I::ProverKey,
+    pub pk: I::ProverKey<FC>,
     pub step_circuit: FC,
     pub i: usize,
     pub initial_state: FC::State,
     pub current_state: FC::State,
-    pub current_proof: I::Proof,
+    pub current_proof: I::Proof<FC>,
 }
 
 impl<FC: FCircuit<Field = I::Field>, I: IVC> IVCStatefulProver<FC, I> {
     pub fn new(
-        pk: I::ProverKey,
+        pk: I::ProverKey<FC>,
         step_circuit: FC,
         initial_state: FC::State,
     ) -> Result<Self, Error> {
@@ -110,8 +110,8 @@ pub trait Decider {
     type Witness;
     type Proof;
 
-    fn preprocess_and_generate_keys(
-        ivc_pk: &<Self::IVC as IVC>::ProverKey,
+    fn preprocess_and_generate_keys<FC>(
+        ivc_pk: &<Self::IVC as IVC>::ProverKey<FC>,
         rng: impl RngCore,
     ) -> Result<(Self::ProverKey, Self::VerifierKey), Error>;
 
@@ -123,14 +123,13 @@ pub trait Decider {
     ) -> Result<Self::Proof, Error>;
 
     fn verify(vk: &Self::VerifierKey, x: &Self::Instance, proof: &Self::Proof)
-        -> Result<(), Error>;
+    -> Result<(), Error>;
 }
 
 #[cfg(test)]
 mod tests {
     use ark_bn254::{Fr, G1Projective as C1};
     use ark_crypto_primitives::sponge::{CryptographicSponge, poseidon::PoseidonSponge};
-    use ark_ff::UniformRand;
     use ark_grumpkin::Projective as C2;
     use ark_std::{error::Error, rand::Rng, sync::Arc, test_rng};
     use sonobe_fs::{
@@ -164,7 +163,7 @@ mod tests {
         for external_inputs in external_inputs_vec {
             prover.prove_step(external_inputs, &mut rng)?;
 
-            I::verify::<F>(
+            I::verify(
                 &vk,
                 prover.i,
                 &prover.initial_state,
