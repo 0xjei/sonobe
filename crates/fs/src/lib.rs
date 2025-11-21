@@ -94,9 +94,7 @@ impl<V: Absorbable, const TAG: char> Absorbable for TaggedVec<V, TAG> {
     }
 }
 
-impl<F: PrimeField, V: AbsorbableVar<F>, const TAG: char> AbsorbableVar<F>
-    for TaggedVec<V, TAG>
-{
+impl<F: PrimeField, V: AbsorbableVar<F>, const TAG: char> AbsorbableVar<F> for TaggedVec<V, TAG> {
     fn absorb_into(&self, dest: &mut Vec<FpVar<F>>) -> Result<(), SynthesisError> {
         self.0.absorb_into(dest)
     }
@@ -197,7 +195,7 @@ pub trait DeciderKey {
     fn to_arith_config(&self) -> &Self::ArithConfig;
 }
 
-pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
+pub trait FoldingSchemeDef {
     type VC: CommitmentDef<Scalar: SonobeField>;
     type RW: FoldingWitness<Self::VC> + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
     type RU: FoldingInstance<Self::VC> + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
@@ -219,8 +217,11 @@ pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
             Error = Error,
         >;
     type Challenge;
-    type Proof: Clone + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
+    type Proof<const M: usize, const N: usize>: Clone
+        + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
+}
 
+pub trait FoldingSchemeOps<const M: usize, const N: usize>: FoldingSchemeDef {
     /// The preprocessing method is a randomized algorithm that takes as input
     /// the size bounds of the folding scheme, which are contained in the
     /// `config` parameter, and outputs the public parameters.
@@ -254,7 +255,7 @@ pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
         ws: &[impl Borrow<Self::IW>; N],
         us: &[impl Borrow<Self::IU>; N],
         rng: impl RngCore,
-    ) -> Result<(Self::RW, Self::RU, Self::Proof, Self::Challenge), Error>;
+    ) -> Result<(Self::RW, Self::RU, Self::Proof<M, N>, Self::Challenge), Error>;
 
     #[allow(non_snake_case)]
     fn verify(
@@ -262,7 +263,7 @@ pub trait FoldingScheme<const M: usize = 1, const N: usize = 1> {
         transcript: &mut impl Transcript<Self::TranscriptField>,
         Us: &[impl Borrow<Self::RU>; M],
         us: &[impl Borrow<Self::IU>; N],
-        proof: &Self::Proof,
+        proof: &Self::Proof<M, N>,
     ) -> Result<Self::RU, Error>;
 
     #[allow(non_snake_case)]
@@ -305,10 +306,10 @@ pub trait FoldingInstanceVar<VC: CommitmentDefGadget>:
     ) -> Result<Self, SynthesisError>;
 }
 
-pub type PlainWitnessVar<VC> = PlainWitness<<VC as CommitmentDefGadget>::ScalarVar>;
-pub type PlainInstanceVar<VC> = PlainInstance<<VC as CommitmentDefGadget>::ScalarVar>;
+pub type PlainWitnessVar<V> = PlainWitness<V>;
+pub type PlainInstanceVar<V> = PlainInstance<V>;
 
-impl<VC: CommitmentDefGadget> FoldingInstanceVar<VC> for PlainInstanceVar<VC> {
+impl<VC: CommitmentDefGadget> FoldingInstanceVar<VC> for PlainInstanceVar<VC::ScalarVar> {
     fn commitments(&self) -> Vec<&VC::CommitmentVar> {
         vec![]
     }
@@ -326,69 +327,40 @@ impl<VC: CommitmentDefGadget> FoldingInstanceVar<VC> for PlainInstanceVar<VC> {
     }
 }
 
-pub trait GroupBasedFoldingSchemePrimary<const M: usize = 1, const N: usize = 1>:
-    FoldingScheme<
-        M,
-        N,
-        VC: GroupBasedCommitment,
-        TranscriptField = <<Self as FoldingScheme<M, N>>::VC as CommitmentDef>::Scalar,
-    >
-{
-    type Gadget: FoldingSchemePartialGadget<
-            M,
-            N,
-            Native = Self,
-            VC = <Self::VC as GroupBasedCommitment>::Gadget2,
-        >;
-}
+pub trait FoldingSchemeGadgetDef {
+    type Native: FoldingSchemeDef;
 
-pub trait GroupBasedFoldingSchemeSecondary<const M: usize = 1, const N: usize = 1>:
-    FoldingScheme<
-        M,
-        N,
-        VC: GroupBasedCommitment,
-        TranscriptField = CF2<<<Self as FoldingScheme<M, N>>::VC as CommitmentDef>::Commitment>,
-    >
-{
-    type Gadget: FoldingSchemeFullGadget<
-            M,
-            N,
-            Native = Self,
-            VC = <Self::VC as GroupBasedCommitment>::Gadget1,
-        >;
-}
-
-pub trait FoldingSchemePartialGadget<const M: usize = 1, const N: usize = 1> {
-    type Native: FoldingScheme<M, N>;
-
-    type VC: CommitmentDefGadget<Widget = <Self::Native as FoldingScheme<M, N>>::VC>;
-    type RU: FoldingInstanceVar<Self::VC, Value = <Self::Native as FoldingScheme<M, N>>::RU>;
-    type IU: FoldingInstanceVar<Self::VC, Value = <Self::Native as FoldingScheme<M, N>>::IU>;
+    type VC: CommitmentDefGadget<Widget = <Self::Native as FoldingSchemeDef>::VC>;
+    type RU: FoldingInstanceVar<Self::VC, Value = <Self::Native as FoldingSchemeDef>::RU>;
+    type IU: FoldingInstanceVar<Self::VC, Value = <Self::Native as FoldingSchemeDef>::IU>;
 
     type VerifierKey;
 
     type Challenge;
-
-    type Proof: AllocVar<
-            <Self::Native as FoldingScheme<M, N>>::Proof,
+    type Proof<const M: usize, const N: usize>: AllocVar<
+            <Self::Native as FoldingSchemeDef>::Proof<M, N>,
             <Self::VC as CommitmentDefGadget>::ConstraintField,
         > + GR1CSVar<
             <Self::VC as CommitmentDefGadget>::ConstraintField,
-            Value = <Self::Native as FoldingScheme<M, N>>::Proof,
+            Value = <Self::Native as FoldingSchemeDef>::Proof<M, N>,
         >;
+}
 
+pub trait FoldingSchemeGadgetOpsPartial<const M: usize, const N: usize>:
+    FoldingSchemeGadgetDef<Native: FoldingSchemeOps<M, N>>
+{
     #[allow(non_snake_case)]
     fn verify_hinted(
         vk: &Self::VerifierKey,
         transcript: &mut impl TranscriptGadget<<Self::VC as CommitmentDefGadget>::ConstraintField>,
         Us: [&Self::RU; M],
         us: [&Self::IU; N],
-        proof: &Self::Proof,
+        proof: &Self::Proof<M, N>,
     ) -> Result<(Self::RU, Self::Challenge), SynthesisError>;
 }
 
-pub trait FoldingSchemeFullGadget<const M: usize = 1, const N: usize = 1>:
-    FoldingSchemePartialGadget<M, N>
+pub trait FoldingSchemeGadgetOpsFull<const M: usize, const N: usize>:
+    FoldingSchemeGadgetOpsPartial<M, N>
 {
     #[allow(non_snake_case)]
     fn verify(
@@ -396,8 +368,36 @@ pub trait FoldingSchemeFullGadget<const M: usize = 1, const N: usize = 1>:
         transcript: &mut impl TranscriptGadget<<Self::VC as CommitmentDefGadget>::ConstraintField>,
         Us: [&Self::RU; M],
         us: [&Self::IU; N],
-        proof: &Self::Proof,
+        proof: &Self::Proof<M, N>,
     ) -> Result<Self::RU, SynthesisError>;
+}
+
+pub trait GroupBasedFoldingSchemePrimary<const M: usize, const N: usize>:
+    FoldingSchemeDef<
+        VC: GroupBasedCommitment,
+        TranscriptField = <<Self as FoldingSchemeDef>::VC as CommitmentDef>::Scalar,
+    > + FoldingSchemeOps<M, N>
+{
+    type Gadget: FoldingSchemeGadgetOpsPartial<
+            M,
+            N,
+            Native = Self,
+            VC = <Self::VC as GroupBasedCommitment>::Gadget2,
+        >;
+}
+
+pub trait GroupBasedFoldingSchemeSecondary<const M: usize, const N: usize>:
+    FoldingSchemeDef<
+        VC: GroupBasedCommitment,
+        TranscriptField = CF2<<<Self as FoldingSchemeDef>::VC as CommitmentDef>::Commitment>,
+    > + FoldingSchemeOps<M, N>
+{
+    type Gadget: FoldingSchemeGadgetOpsFull<
+            M,
+            N,
+            Native = Self,
+            VC = <Self::VC as GroupBasedCommitment>::Gadget1,
+        >;
 }
 
 #[cfg(test)]
@@ -416,7 +416,7 @@ mod tests {
     use super::*;
 
     #[allow(non_snake_case)]
-    pub fn test_folding_scheme<FS: FoldingScheme<M, N>, const M: usize, const N: usize>(
+    pub fn test_folding_scheme<FS: FoldingSchemeOps<M, N>, const M: usize, const N: usize>(
         config: FS::Config,
         circuit: impl ConstraintSynthesizer<<FS::VC as CommitmentDef>::Scalar>,
         assignments_vec: Vec<AssignmentsOwned<<FS::VC as CommitmentDef>::Scalar>>,
@@ -466,9 +466,9 @@ mod tests {
             let ws = ws.try_into().unwrap();
             let us = us.try_into().unwrap();
 
-            let (WW, UU, pi, _) = FS::prove(&pk, &mut transcript_p, &Ws, &Us, &ws, &us, &mut rng)?;
+            let (WW, UU, pi, _) = FS::prove(pk, &mut transcript_p, &Ws, &Us, &ws, &us, &mut rng)?;
             FS::decide_running(&dk, &WW, &UU)?;
-            assert_eq!(FS::verify(&vk, &mut transcript_v, &Us, &us, &pi)?, UU);
+            assert_eq!(FS::verify(vk, &mut transcript_v, &Us, &us, &pi)?, UU);
 
             for i in 0..M {
                 let (W, U) = WitnessInstanceSampler::<FS::RW, FS::RU>::sample(&dk, (), &mut rng)?;

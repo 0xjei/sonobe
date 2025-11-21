@@ -132,10 +132,6 @@ mod tests {
     use ark_crypto_primitives::sponge::{CryptographicSponge, poseidon::PoseidonSponge};
     use ark_grumpkin::Projective as C2;
     use ark_std::{error::Error, rand::Rng, sync::Arc, test_rng};
-    use sonobe_fs::{
-        FoldingScheme, FoldingSchemeFullGadget, FoldingSchemePartialGadget, PlainInstance as IU,
-        PlainInstanceVar as IUVar, PlainWitness as IW, PlainWitnessVar as IWVar,
-    };
     use sonobe_primitives::{
         arithmetizations::Arith,
         circuits::utils::CircuitForTest,
