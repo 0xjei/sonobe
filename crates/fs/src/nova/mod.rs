@@ -1,19 +1,14 @@
-use ark_ff::{BigInteger, One, PrimeField};
+use ark_ff::One;
 use ark_r1cs_std::{GR1CSVar, alloc::AllocVar, boolean::Boolean, groups::CurveVar};
 use ark_relations::gr1cs::SynthesisError;
 use ark_std::{
-    UniformRand,
-    borrow::Borrow,
-    cfg_into_iter, cfg_iter,
-    marker::PhantomData,
-    ops::Mul,
-    rand::{RngCore, rngs::mock::StepRng},
-    sync::Arc,
+    UniformRand, borrow::Borrow, cfg_into_iter, cfg_iter, marker::PhantomData, ops::Mul,
+    rand::RngCore, sync::Arc,
 };
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use sonobe_primitives::{
-    algebra::ops::bits::FromBitsGadget,
+    algebra::ops::bits::{FromBits, FromBitsGadget},
     arithmetizations::{
         Arith, ArithConfig, ArithRelation,
         r1cs::{R1CS, RelaxedInstance, RelaxedWitness},
@@ -266,7 +261,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
             transcript.add(&cm_t);
             transcript.challenge_bits(CHALLENGE_BITS)
         };
-        let rho = CM::Scalar::from(<CM::Scalar as PrimeField>::BigInt::from_bits_le(&rho_bits));
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
 
         Ok((
             RW {
@@ -306,7 +301,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
             transcript.add(&cm_t);
             transcript.challenge_bits(CHALLENGE_BITS)
         };
-        let rho = CM::Scalar::from(<CM::Scalar as PrimeField>::BigInt::from_bits_le(&rho_bits));
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
 
         Ok(RU {
             cm_e: U.cm_e + cm_t.mul(rho),
@@ -354,7 +349,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
             transcript.add(&cm_t);
             transcript.challenge_bits(CHALLENGE_BITS)
         };
-        let rho = CM::Scalar::from(<CM::Scalar as PrimeField>::BigInt::from_bits_le(&rho_bits));
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
         let rho_squared = rho * rho;
 
         Ok((
@@ -405,7 +400,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
             transcript.add(cm_t);
             transcript.challenge_bits(CHALLENGE_BITS)
         };
-        let rho = CM::Scalar::from(<CM::Scalar as PrimeField>::BigInt::from_bits_le(&rho_bits));
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
         let rho_squared = rho * rho;
 
         Ok(RU {
@@ -519,7 +514,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
             transcript.add(&pi);
             transcript.challenge_bits(CHALLENGE_BITS)
         };
-        let rho = CM::Scalar::from(<CM::Scalar as PrimeField>::BigInt::from_bits_le(&rho_bits));
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
 
         Ok((
             RW {
@@ -565,7 +560,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
             transcript.add(pi);
             transcript.challenge_bits(CHALLENGE_BITS)
         };
-        let rho = CM::Scalar::from(<CM::Scalar as PrimeField>::BigInt::from_bits_le(&rho_bits));
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
 
         let (cm_w, cm_t) = pi;
 
