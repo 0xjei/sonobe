@@ -51,7 +51,9 @@ pub trait FoldingWitness<VC: CommitmentDef>: Debug {
     fn openings(&self) -> Vec<(&[VC::Scalar], &VC::Randomness)>;
 }
 
-pub trait FoldingInstance<VC: CommitmentDef>: Clone + Debug + PartialEq + Absorbable {
+pub trait FoldingInstance<VC: CommitmentDef>:
+    Clone + Debug + PartialEq + Eq + Absorbable
+{
     const N_COMMITMENTS: usize;
 
     /// Returns the commitments contained in the committed instance.
@@ -369,32 +371,50 @@ pub trait FoldingSchemeGadgetOpsFull<const M: usize, const N: usize>:
     ) -> Result<Self::RU, SynthesisError>;
 }
 
-pub trait GroupBasedFoldingSchemePrimary<const M: usize, const N: usize>:
+pub trait GroupBasedFoldingSchemePrimaryDef:
     FoldingSchemeDef<
-        VC: GroupBasedCommitment,
-        TranscriptField = <<Self as FoldingSchemeDef>::VC as CommitmentDef>::Scalar,
-    > + FoldingSchemeOps<M, N>
+    VC: GroupBasedCommitment,
+    TranscriptField = <<Self as FoldingSchemeDef>::VC as CommitmentDef>::Scalar,
+>
 {
-    type Gadget: FoldingSchemeGadgetOpsPartial<
-            M,
-            N,
-            Native = Self,
-            VC = <Self::VC as GroupBasedCommitment>::Gadget2,
-        >;
+    type Gadget: FoldingSchemeGadgetDef<
+        Native = Self,
+        VC = <Self::VC as GroupBasedCommitment>::Gadget2,
+    >;
+}
+
+pub trait GroupBasedFoldingSchemePrimary<const M: usize, const N: usize>:
+    GroupBasedFoldingSchemePrimaryDef<Gadget: FoldingSchemeGadgetOpsPartial<M, N>>
+    + FoldingSchemeOps<M, N>
+{
+}
+
+impl<FS, const M: usize, const N: usize> GroupBasedFoldingSchemePrimary<M, N> for FS where
+    FS: GroupBasedFoldingSchemePrimaryDef<Gadget: FoldingSchemeGadgetOpsPartial<M, N>>
+{
+}
+
+pub trait GroupBasedFoldingSchemeSecondaryDef:
+    FoldingSchemeDef<
+    VC: GroupBasedCommitment,
+    TranscriptField = CF2<<<Self as FoldingSchemeDef>::VC as CommitmentDef>::Commitment>,
+>
+{
+    type Gadget: FoldingSchemeGadgetDef<
+        Native = Self,
+        VC = <Self::VC as GroupBasedCommitment>::Gadget1,
+    >;
 }
 
 pub trait GroupBasedFoldingSchemeSecondary<const M: usize, const N: usize>:
-    FoldingSchemeDef<
-        VC: GroupBasedCommitment,
-        TranscriptField = CF2<<<Self as FoldingSchemeDef>::VC as CommitmentDef>::Commitment>,
-    > + FoldingSchemeOps<M, N>
+    GroupBasedFoldingSchemeSecondaryDef<Gadget: FoldingSchemeGadgetOpsFull<M, N>>
+    + FoldingSchemeOps<M, N>
 {
-    type Gadget: FoldingSchemeGadgetOpsFull<
-            M,
-            N,
-            Native = Self,
-            VC = <Self::VC as GroupBasedCommitment>::Gadget1,
-        >;
+}
+
+impl<FS, const M: usize, const N: usize> GroupBasedFoldingSchemeSecondary<M, N> for FS where
+    FS: GroupBasedFoldingSchemeSecondaryDef<Gadget: FoldingSchemeGadgetOpsFull<M, N>>
+{
 }
 
 #[cfg(test)]
