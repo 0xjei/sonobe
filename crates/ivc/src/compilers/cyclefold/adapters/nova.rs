@@ -1,4 +1,4 @@
-use ark_ff::{BigInteger, PrimeField, Zero};
+use ark_ff::{PrimeField, Zero};
 use ark_r1cs_std::{
     GR1CSVar, alloc::AllocVar, fields::fp::FpVar, groups::CurveVar, prelude::Boolean,
 };
@@ -12,7 +12,7 @@ use sonobe_primitives::{
     algebra::{
         field::emulated::{Bounds, EmulatedFieldVar},
         group::emulated::EmulatedAffineVar,
-        ops::bits::{FromBitsGadget, ToBitsGadgetExt},
+        ops::bits::{FromBits, FromBitsGadget, ToBitsGadgetExt},
     },
     commitments::GroupBasedCommitment,
     traits::{CF2, SonobeCurve},
@@ -43,11 +43,7 @@ impl<C: SonobeCurve, const CHALLENGE_BITS: usize> CycleFoldCircuit<CF2<C>>
     for NovaCycleFoldCircuit<C, CHALLENGE_BITS>
 {
     fn verify_point_rlc(&self, cs: ConstraintSystemRef<CF2<C>>) -> Result<(), SynthesisError> {
-        let rho = FpVar::new_input(cs.clone(), || {
-            Ok(CF2::<C>::from(
-                <CF2<C> as PrimeField>::BigInt::from_bits_le(&self.r[..]),
-            ))
-        })?;
+        let rho = FpVar::new_input(cs.clone(), || Ok(CF2::<C>::from_bits_le(&self.r[..])))?;
         let rho_bits = rho.to_n_bits_le(CHALLENGE_BITS)?;
 
         let points = Vec::<C::Var>::new_witness(cs.clone(), || Ok(&self.points[..]))?;
@@ -132,7 +128,7 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
         proof: &Self::Proof<2, 0>,
         rho_bits: Self::Challenge,
     ) -> Vec<Self::CFCircuit> {
-        let rho = CM::Scalar::from(<CM::Scalar as PrimeField>::BigInt::from_bits_le(&rho_bits));
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
         vec![
             NovaCycleFoldCircuit {
                 r: rho_bits.into(),
@@ -168,8 +164,7 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
         let x =
             EmulatedAffineVar::new_witness(U2.cm_e.cs().or(proof.cs()).or(rho_bits.cs()), || {
                 let rho_bits = rho_bits.value().unwrap_or_default();
-                let rho =
-                    CM::Scalar::from(<CM::Scalar as PrimeField>::BigInt::from_bits_le(&rho_bits));
+                let rho = CM::Scalar::from_bits_le(&rho_bits);
                 Ok(proof.value().unwrap_or_default() + U2.cm_e.value().unwrap_or_default() * rho)
             })?;
         Ok(vec![
