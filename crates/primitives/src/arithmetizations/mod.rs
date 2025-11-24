@@ -2,7 +2,7 @@ use ark_relations::gr1cs::SynthesisError;
 use ark_std::{fmt::Debug, log2};
 use thiserror::Error;
 
-use crate::relations::Relation;
+use crate::relations::{Relation, RelationGadget};
 
 pub mod ccs;
 pub mod r1cs;
@@ -183,16 +183,15 @@ pub trait ArithRelationGadget<WVar, UVar> {
     /// Returns the evaluation result.
     fn eval_relation(&self, w: &WVar, u: &UVar) -> Result<Self::Evaluation, SynthesisError>;
 
-    /// Generates constraints for enforcing that witness `w` and instance `u`
-    /// satisfy the constraint system `self` by first computing the evaluation
-    /// result and then checking the validity of the evaluation result.
-    fn enforce_relation(&self, w: &WVar, u: &UVar) -> Result<(), SynthesisError> {
-        let e = self.eval_relation(w, u)?;
-        Self::enforce_evaluation(w, u, e)
-    }
-
     /// Generates constraints for enforcing that the evaluation result is valid.
     /// The witness `w` and instance `u` are also parameters, because the
     /// validity check may need information contained in `w` and/or `u`.
-    fn enforce_evaluation(w: &WVar, u: &UVar, e: Self::Evaluation) -> Result<(), SynthesisError>;
+    fn check_evaluation(w: &WVar, u: &UVar, e: Self::Evaluation) -> Result<(), SynthesisError>;
+}
+
+impl<WVar, UVar, A: ArithRelationGadget<WVar, UVar>> RelationGadget<WVar, UVar> for A {
+    fn check_relation(&self, w: &WVar, u: &UVar) -> Result<(), SynthesisError> {
+        let e = self.eval_relation(w, u)?;
+        Self::check_evaluation(w, u, e)
+    }
 }

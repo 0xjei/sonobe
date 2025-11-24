@@ -8,10 +8,7 @@ use super::{
     CommitmentKey, Error, VectorCommitmentDef, VectorCommitmentGadgetDef, VectorCommitmentOps,
 };
 use crate::{
-    algebra::{
-        field::emulated::{EmulatedFieldVar, IntVarInner},
-        group::emulated::EmulatedAffineVar,
-    },
+    algebra::{field::emulated::EmulatedFieldVar, group::emulated::EmulatedAffineVar},
     commitments::{GroupBasedVectorCommitment, VectorCommitmentGadgetOps},
     traits::{SonobeCurve, CF1, CF2},
     utils::null::Null,
@@ -98,8 +95,6 @@ impl<C: SonobeCurve> VectorCommitmentGadgetDef for PedersenGadget<C, false> {
 
     type ScalarVar = EmulatedFieldVar<CF2<C>, CF1<C>>;
 
-    type IntermediateScalarVar = IntVarInner<CF2<C>, CF1<C>, false>;
-
     type CommitmentVar = C::Var;
 
     type RandomnessVar = Null;
@@ -114,8 +109,6 @@ impl<C: SonobeCurve> VectorCommitmentGadgetDef for PedersenGadget<C, true> {
 
     type ScalarVar = EmulatedFieldVar<CF2<C>, CF1<C>>;
 
-    type IntermediateScalarVar = IntVarInner<CF2<C>, CF1<C>, false>;
-
     type CommitmentVar = C::Var;
 
     type RandomnessVar = EmulatedFieldVar<CF2<C>, CF1<C>>;
@@ -129,8 +122,6 @@ impl<C: SonobeCurve> VectorCommitmentGadgetDef for PedersenEmulatedGadget<C, fal
     type KeyVar = Vec<EmulatedAffineVar<CF1<C>, C>>;
 
     type ScalarVar = FpVar<CF1<C>>;
-
-    type IntermediateScalarVar = FpVar<CF1<C>>;
 
     type CommitmentVar = EmulatedAffineVar<CF1<C>, C>;
 
@@ -148,8 +139,6 @@ impl<C: SonobeCurve> VectorCommitmentGadgetDef for PedersenEmulatedGadget<C, tru
     );
 
     type ScalarVar = FpVar<CF1<C>>;
-
-    type IntermediateScalarVar = FpVar<CF1<C>>;
 
     type CommitmentVar = EmulatedAffineVar<CF1<C>, C>;
 

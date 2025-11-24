@@ -13,6 +13,3 @@ pub trait Val {
 
     type EmulatedVar<F: SonobeField>: AllocVar<Self, F> + GR1CSVar<F, Value = Self>;
 }
-
-pub type Var<T> = <T as Val>::Var;
-pub type EmulatedVar<F, T> = <T as Val>::EmulatedVar<F>;

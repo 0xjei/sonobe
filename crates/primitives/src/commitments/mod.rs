@@ -1,6 +1,6 @@
 use ark_ff::UniformRand;
 use ark_r1cs_std::{
-    alloc::AllocVar, eq::EqGadget, fields::fp::FpVar, select::CondSelectGadget, GR1CSVar,
+    alloc::AllocVar, fields::fp::FpVar, select::CondSelectGadget, GR1CSVar,
 };
 use ark_relations::gr1cs::SynthesisError;
 use ark_std::{
@@ -13,12 +13,10 @@ use thiserror::Error;
 
 use crate::{
     algebra::{
-        field::emulated::{EmulatedFieldVar, IntVarInner},
-        group::emulated::EmulatedAffineVar,
-        ops::bits::FromBitsGadget,
-        Var,
+        Val, field::{TwoStageFieldVar, emulated::{EmulatedFieldVar, IntVarInner}}, group::emulated::EmulatedAffineVar, ops::bits::FromBitsGadget
+        // Var,
     },
-    traits::{SonobeCurve, SonobeField, CF1, CF2},
+    traits::{CF1, CF2, SonobeCurve, SonobeField},
     transcripts::{Absorbable, AbsorbableGadget},
 };
 
@@ -85,27 +83,12 @@ pub trait VectorCommitmentGadgetDef: Clone {
     type ConstraintField: SonobeField;
 
     type KeyVar;
-    type ScalarVar: Clone
-        + EqGadget<Self::ConstraintField>
-        + AbsorbableGadget<Self::ConstraintField>
+    type ScalarVar: AbsorbableGadget<Self::ConstraintField>
         + CondSelectGadget<Self::ConstraintField>
         + FromBitsGadget<Self::ConstraintField>
         + AllocVar<<Self::Native as VectorCommitmentDef>::Scalar, Self::ConstraintField>
         + GR1CSVar<Self::ConstraintField, Value = <Self::Native as VectorCommitmentDef>::Scalar>
-        + Add<Output = Self::IntermediateScalarVar>
-        + for<'a> Add<&'a Self::ScalarVar, Output = Self::IntermediateScalarVar>
-        + Mul<Output = Self::IntermediateScalarVar>
-        + for<'a> Mul<&'a Self::ScalarVar, Output = Self::IntermediateScalarVar>;
-    type IntermediateScalarVar: Clone
-        + TryInto<Self::ScalarVar>
-        + Add<Output = Self::IntermediateScalarVar>
-        + for<'a> Add<&'a Self::IntermediateScalarVar, Output = Self::IntermediateScalarVar>
-        + Mul<Output = Self::IntermediateScalarVar>
-        + for<'a> Mul<&'a Self::IntermediateScalarVar, Output = Self::IntermediateScalarVar>
-        + Add<Self::ScalarVar, Output = Self::IntermediateScalarVar>
-        + for<'a> Add<&'a Self::ScalarVar, Output = Self::IntermediateScalarVar>
-        + Mul<Self::ScalarVar, Output = Self::IntermediateScalarVar>
-        + for<'a> Mul<&'a Self::ScalarVar, Output = Self::IntermediateScalarVar>;
+        + TwoStageFieldVar;
     type CommitmentVar: Clone
         + AbsorbableGadget<Self::ConstraintField>
         + CondSelectGadget<Self::ConstraintField>
@@ -136,14 +119,12 @@ pub trait GroupBasedVectorCommitment:
         + VectorCommitmentGadgetDef<
             ConstraintField = CF2<Self::Commitment>,
             ScalarVar = EmulatedFieldVar<CF2<Self::Commitment>, Self::Scalar>,
-            IntermediateScalarVar = IntVarInner<CF2<Self::Commitment>, Self::Scalar, false>,
-            CommitmentVar = Var<Self::Commitment>,
+            CommitmentVar = <Self::Commitment as Val>::Var,
             Native = Self,
         >;
     type Gadget2: VectorCommitmentGadgetDef<
         ConstraintField = Self::Scalar,
         ScalarVar = FpVar<Self::Scalar>,
-        IntermediateScalarVar = FpVar<Self::Scalar>,
         CommitmentVar = EmulatedAffineVar<Self::Scalar, Self::Commitment>,
         Native = Self,
     >;
