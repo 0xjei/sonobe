@@ -1,6 +1,4 @@
-use sonobe_primitives::{
-    arithmetizations::ArithConfig, commitments::CommitmentDef, traits::Dummy,
-};
+use sonobe_primitives::{arithmetizations::ArithConfig, commitments::CommitmentDef, traits::Dummy};
 
 use crate::FoldingWitness;
 
