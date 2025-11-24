@@ -1,7 +1,11 @@
 use ark_ff::{BigInteger, Fp, FpConfig, PrimeField};
 use ark_r1cs_std::fields::{fp::FpVar, FieldVar};
 use ark_relations::gr1cs::SynthesisError;
-use ark_std::{any::TypeId, mem::transmute_copy};
+use ark_std::{
+    any::TypeId,
+    mem::transmute_copy,
+    ops::{Add, Mul},
+};
 
 use crate::{
     algebra::{field::emulated::EmulatedFieldVar, Val},
@@ -99,4 +103,28 @@ impl<F: SonobeField, P: SonobeField> InputizeEmulated<F> for P {
             .map(|chunk| F::from(F::BigInt::from_bits_le(chunk)))
             .collect()
     }
+}
+
+pub trait TwoStageFieldVar:
+    Clone
+    + Add<Output = Self::Intermediate>
+    + for<'a> Add<&'a Self, Output = Self::Intermediate>
+    + Mul<Output = Self::Intermediate>
+    + for<'a> Mul<&'a Self, Output = Self::Intermediate>
+{
+    type Intermediate: Clone
+        + From<Self>
+        + TryInto<Self>
+        + Add<Output = Self::Intermediate>
+        + for<'a> Add<&'a Self::Intermediate, Output = Self::Intermediate>
+        + Mul<Output = Self::Intermediate>
+        + for<'a> Mul<&'a Self::Intermediate, Output = Self::Intermediate>
+        + Add<Self, Output = Self::Intermediate>
+        + for<'a> Add<&'a Self, Output = Self::Intermediate>
+        + Mul<Self, Output = Self::Intermediate>
+        + for<'a> Mul<&'a Self, Output = Self::Intermediate>;
+}
+
+impl<F: PrimeField> TwoStageFieldVar for FpVar<F> {
+    type Intermediate = Self;
 }
