@@ -54,19 +54,19 @@ pub trait IVC {
     ) -> Result<(), Error>;
 }
 
-pub struct IVCStatefulProver<FC: FCircuit, I: IVC> {
-    pub pk: I::ProverKey<FC>,
-    pub step_circuit: FC,
+pub struct IVCStatefulProver<'a, FC: FCircuit, I: IVC> {
+    pub pk: &'a I::ProverKey<FC>,
+    pub step_circuit: &'a FC,
     pub i: usize,
     pub initial_state: FC::State,
     pub current_state: FC::State,
     pub current_proof: I::Proof<FC>,
 }
 
-impl<FC: FCircuit<Field = I::Field>, I: IVC> IVCStatefulProver<FC, I> {
+impl<'a, FC: FCircuit<Field = I::Field>, I: IVC> IVCStatefulProver<'a, FC, I> {
     pub fn new(
-        pk: I::ProverKey<FC>,
-        step_circuit: FC,
+        pk: &'a I::ProverKey<FC>,
+        step_circuit: &'a FC,
         initial_state: FC::State,
     ) -> Result<Self, Error> {
         Ok(Self {
@@ -154,7 +154,7 @@ mod tests {
 
         let initial_state = step_circuit.dummy_state();
 
-        let mut prover = IVCStatefulProver::<_, I>::new(pk, step_circuit, initial_state)?;
+        let mut prover = IVCStatefulProver::<_, I>::new(&pk, &step_circuit, initial_state)?;
 
         for external_inputs in external_inputs_vec {
             prover.prove_step(external_inputs, &mut rng)?;
