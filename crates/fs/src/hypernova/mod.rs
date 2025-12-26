@@ -1,4 +1,4 @@
-use ark_ff::{Field, One, PrimeField};
+use ark_ff::{Field, PrimeField};
 use ark_poly::MultilinearExtension;
 use ark_r1cs_std::{
     alloc::{AllocVar, AllocationMode},
