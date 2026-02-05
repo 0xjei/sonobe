@@ -194,14 +194,14 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> Fol
 // error ≤ 2/|S|, where S is the subset of the field F from which the challenges are drawn. In this
 // case, we keep the size of S close to 2^128.
 // TODO: experimental design
-struct AbstractNova2<CM, TF, const CHALLENGE_BITS: usize = 128> {
+pub struct AbstractNova2<CM, TF, const CHALLENGE_BITS: usize = 128> {
     _t: PhantomData<(CM, TF)>,
 }
 
-type Nova2<CM, const CHALLENGE_BITS: usize = 128> =
+pub type Nova2<CM, const CHALLENGE_BITS: usize = 128> =
     AbstractNova2<CM, <CM as CommitmentDef>::Scalar, CHALLENGE_BITS>;
 
-type CycleFoldNova2<CM, const CHALLENGE_BITS: usize = 128> =
+pub type CycleFoldNova2<CM, const CHALLENGE_BITS: usize = 128> =
     AbstractNova2<CM, CF2<<CM as CommitmentDef>::Commitment>, CHALLENGE_BITS>;
 
 impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> FoldingSchemeDef
