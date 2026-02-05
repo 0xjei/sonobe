@@ -5,11 +5,11 @@ use ark_relations::gr1cs::SynthesisError;
 use ark_std::{iter::repeat_with, marker::PhantomData, rand::RngCore, UniformRand};
 
 use super::{
-    CommitmentKey, Error, VectorCommitmentDef, VectorCommitmentGadgetDef, VectorCommitmentOps,
+    CommitmentKey, Error, VectorCommitmentDef, VectorCommitmentDefGadget, VectorCommitmentOps,
 };
 use crate::{
     algebra::{field::emulated::EmulatedFieldVar, group::emulated::EmulatedAffineVar},
-    commitments::{GroupBasedVectorCommitment, VectorCommitmentGadgetOps},
+    commitments::{GroupBasedVectorCommitment, VectorCommitmentOpsGadget},
     traits::{SonobeCurve, CF1, CF2},
     utils::null::Null,
 };
@@ -88,7 +88,7 @@ impl<C: SonobeCurve> VectorCommitmentDef for Pedersen<C, true> {
     type Randomness = C::ScalarField;
 }
 
-impl<C: SonobeCurve> VectorCommitmentGadgetDef for PedersenGadget<C, false> {
+impl<C: SonobeCurve> VectorCommitmentDefGadget for PedersenGadget<C, false> {
     type ConstraintField = CF2<C>;
 
     type KeyVar = Vec<C::Var>;
@@ -102,7 +102,7 @@ impl<C: SonobeCurve> VectorCommitmentGadgetDef for PedersenGadget<C, false> {
     type Native = Pedersen<C, false>;
 }
 
-impl<C: SonobeCurve> VectorCommitmentGadgetDef for PedersenGadget<C, true> {
+impl<C: SonobeCurve> VectorCommitmentDefGadget for PedersenGadget<C, true> {
     type ConstraintField = CF2<C>;
 
     type KeyVar = (Vec<C::Var>, C::Var);
@@ -116,7 +116,7 @@ impl<C: SonobeCurve> VectorCommitmentGadgetDef for PedersenGadget<C, true> {
     type Native = Pedersen<C, true>;
 }
 
-impl<C: SonobeCurve> VectorCommitmentGadgetDef for PedersenEmulatedGadget<C, false> {
+impl<C: SonobeCurve> VectorCommitmentDefGadget for PedersenEmulatedGadget<C, false> {
     type ConstraintField = CF1<C>;
 
     type KeyVar = Vec<EmulatedAffineVar<CF1<C>, C>>;
@@ -130,7 +130,7 @@ impl<C: SonobeCurve> VectorCommitmentGadgetDef for PedersenEmulatedGadget<C, fal
     type Native = Pedersen<C, false>;
 }
 
-impl<C: SonobeCurve> VectorCommitmentGadgetDef for PedersenEmulatedGadget<C, true> {
+impl<C: SonobeCurve> VectorCommitmentDefGadget for PedersenEmulatedGadget<C, true> {
     type ConstraintField = CF1<C>;
 
     type KeyVar = (
@@ -313,7 +313,7 @@ impl<C: SonobeCurve, const H: bool> PedersenGadget<C, H> {
     }
 }
 
-impl<C: SonobeCurve> VectorCommitmentGadgetOps for PedersenGadget<C, false> {
+impl<C: SonobeCurve> VectorCommitmentOpsGadget for PedersenGadget<C, false> {
     fn open(
         ck: &Vec<C::Var>,
         v: &[EmulatedFieldVar<CF2<C>, CF1<C>>],
@@ -330,7 +330,7 @@ impl<C: SonobeCurve> VectorCommitmentGadgetOps for PedersenGadget<C, false> {
     }
 }
 
-impl<C: SonobeCurve> VectorCommitmentGadgetOps for PedersenGadget<C, true> {
+impl<C: SonobeCurve> VectorCommitmentOpsGadget for PedersenGadget<C, true> {
     fn open(
         (g, h): &(Vec<C::Var>, C::Var),
         v: &[EmulatedFieldVar<CF2<C>, CF1<C>>],
