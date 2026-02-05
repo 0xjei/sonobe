@@ -56,6 +56,7 @@ where
     FC: FCircuit<Field = <FS1::VC as VectorCommitmentDef>::Scalar>,
     T: Transcript<FC::Field>,
 {
+    #[allow(non_snake_case)]
     pub fn compute_next_state(
         &self,
         cs: ConstraintSystemRef<FC::Field>,

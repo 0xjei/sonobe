@@ -61,6 +61,7 @@ impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeC
 
     type CFConfig = MovaCycleFoldConfig<VC::Commitment, CHALLENGE_BITS>;
 
+    #[allow(non_snake_case)]
     fn to_cyclefold_configs(
         [U]: &[impl Borrow<Self::RU>; 1],
         _us: &[impl Borrow<Self::IU>; 1],
@@ -73,6 +74,7 @@ impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeC
         }]
     }
 
+    #[allow(non_snake_case)]
     fn to_cyclefold_inputs(
         [U]: [<Self::Gadget as FoldingSchemeDefGadget>::RU; 1],
         _us: [<Self::Gadget as FoldingSchemeDefGadget>::IU; 1],

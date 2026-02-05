@@ -74,6 +74,7 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeCycleFoldExt<1
 
     type CFConfig = ProtoGalaxyCycleFoldConfig<VC::Commitment, N>;
 
+    #[allow(non_snake_case)]
     fn to_cyclefold_configs(
         [U]: &[impl Borrow<Self::RU>; 1],
         us: &[impl Borrow<Self::IU>; N],
@@ -95,6 +96,7 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeCycleFoldExt<1
         }]
     }
 
+    #[allow(non_snake_case)]
     fn to_cyclefold_inputs(
         [U]: [<Self::Gadget as FoldingSchemeDefGadget>::RU; 1],
         us: [<Self::Gadget as FoldingSchemeDefGadget>::IU; N],

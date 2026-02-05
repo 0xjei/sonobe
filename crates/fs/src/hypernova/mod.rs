@@ -240,7 +240,7 @@ impl<VC: GroupBasedVectorCommitment, V: CCSVariant, const CHALLENGE_BITS: usize>
 }
 
 // TODO: experimental design
-struct HyperNova2<VC, V: CCSVariant = R1CSConfig, const CHALLENGE_BITS: usize = 128> {
+pub struct HyperNova2<VC, V: CCSVariant = R1CSConfig, const CHALLENGE_BITS: usize = 128> {
     _v: PhantomData<(VC, V)>,
 }
 

@@ -46,9 +46,7 @@ impl<C: SonobeCurve, const M: usize, const N: usize, const CHALLENGE_BITS: usize
         &self,
         cs: ConstraintSystemRef<CF2<Self::C>>,
     ) -> Result<(), SynthesisError> {
-        let rho = FpVar::new_input(cs.clone(), || {
-            Ok(CF2::<C>::from_bits_le(&self.r))
-        })?;
+        let rho = FpVar::new_input(cs.clone(), || Ok(CF2::<C>::from_bits_le(&self.r)))?;
         let rho_bits = rho.to_n_bits_le(CHALLENGE_BITS)?;
 
         let points = Vec::new_witness(cs.clone(), || Ok(&self.points[..]))?;
@@ -79,6 +77,7 @@ impl<
 
     type CFConfig = HyperNovaCycleFoldConfig<VC::Commitment, M, N, CHALLENGE_BITS>;
 
+    #[allow(non_snake_case)]
     fn to_cyclefold_configs(
         Us: &[impl Borrow<Self::RU>; M],
         us: &[impl Borrow<Self::IU>; N],
@@ -95,6 +94,7 @@ impl<
         }]
     }
 
+    #[allow(non_snake_case)]
     fn to_cyclefold_inputs(
         Us: [<Self::Gadget as FoldingSchemeDefGadget>::RU; M],
         us: [<Self::Gadget as FoldingSchemeDefGadget>::IU; N],

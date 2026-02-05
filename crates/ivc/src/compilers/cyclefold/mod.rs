@@ -31,6 +31,7 @@ pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
 
     const N_CYCLEFOLDS: usize;
 
+    #[allow(non_snake_case)]
     fn to_cyclefold_configs(
         Us: &[impl Borrow<Self::RU>; M],
         us: &[impl Borrow<Self::IU>; N],
@@ -38,6 +39,7 @@ pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
         rho: Self::Challenge,
     ) -> Vec<Self::CFConfig>;
 
+    #[allow(non_snake_case)]
     fn to_cyclefold_inputs(
         Us: [<Self::Gadget as FoldingSchemeDefGadget>::RU; M],
         us: [<Self::Gadget as FoldingSchemeDefGadget>::IU; N],
@@ -179,6 +181,7 @@ where
         ))
     }
 
+    #[allow(non_snake_case)]
     fn prove<FC: FCircuit<Field = Self::Field>>(
         Key(dk1, dk2, (hash_config, pp_hash)): &Self::ProverKey<FC>,
         step_circuit: &FC,
@@ -269,6 +272,7 @@ where
         Ok((next_state, external_outputs, Proof(WW, UU, ww, uu, cf_WW, cf_UU)))
     }
 
+    #[allow(non_snake_case)]
     fn verify<FC: FCircuit<Field = Self::Field>>(
         Key(dk1, dk2, (hash_config, pp_hash)): &Self::VerifierKey<FC>,
         i: usize,

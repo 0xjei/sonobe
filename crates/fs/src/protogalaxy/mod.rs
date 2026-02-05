@@ -230,7 +230,7 @@ impl<VC: GroupBasedVectorCommitment> FoldingSchemeDef for ProtoGalaxy<VC> {
 }
 
 // TODO: experimental design
-struct ProtoGalaxy2<VC> {
+pub struct ProtoGalaxy2<VC> {
     _vc: PhantomData<VC>,
 }
 

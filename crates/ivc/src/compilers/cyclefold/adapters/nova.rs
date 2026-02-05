@@ -68,6 +68,7 @@ impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeC
 
     type CFConfig = NovaCycleFoldConfig<VC::Commitment, CHALLENGE_BITS>;
 
+    #[allow(non_snake_case)]
     fn to_cyclefold_configs(
         [U]: &[impl Borrow<Self::RU>; 1],
         [u]: &[impl Borrow<Self::IU>; 1],
@@ -86,6 +87,7 @@ impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeC
         ]
     }
 
+    #[allow(non_snake_case)]
     fn to_cyclefold_inputs(
         [U]: [<Self::Gadget as FoldingSchemeDefGadget>::RU; 1],
         [u]: [<Self::Gadget as FoldingSchemeDefGadget>::IU; 1],
@@ -128,6 +130,7 @@ impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeC
 
     type CFConfig = NovaCycleFoldConfig<VC::Commitment, CHALLENGE_BITS>;
 
+    #[allow(non_snake_case)]
     fn to_cyclefold_configs(
         [U1, U2]: &[impl Borrow<Self::RU>; 2],
         _: &[impl Borrow<Self::IU>; 0],
@@ -151,6 +154,7 @@ impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeC
         ]
     }
 
+    #[allow(non_snake_case)]
     fn to_cyclefold_inputs(
         [U1, U2]: [<Self::Gadget as FoldingSchemeDefGadget>::RU; 2],
         _: [<Self::Gadget as FoldingSchemeDefGadget>::IU; 0],
