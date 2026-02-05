@@ -2,8 +2,8 @@ use ark_std::rand::RngCore;
 use sonobe_primitives::{commitments::GroupBasedCommitment, traits::SonobeField};
 
 use crate::{
-    nova::{AbstractNova, AbstractNova2},
     Error, FoldingSchemePreprocessor,
+    nova::{AbstractNova, AbstractNova2},
 };
 
 impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
