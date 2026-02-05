@@ -22,9 +22,10 @@ use num_traits::Signed;
 
 use crate::{
     algebra::{
-        field::SonobeField,
+        field::{SonobeField, TwoStageFieldVar},
         ops::{
             bits::{FromBitsGadget, ToBitsGadgetExt},
+            eq::EquivalenceGadget,
             matrix::{MatrixGadget, SparseMatrixVar},
             vector::VectorGadget,
         },
@@ -565,6 +566,62 @@ impl<Base: SonobeField, Target: SonobeField, const LHS_ALIGNED: bool>
     }
 }
 
+impl<Base: SonobeField, Target: SonobeField>
+    EquivalenceGadget<IntVarInner<Base, Target, true>> for IntVarInner<Base, Target, true>
+{
+    fn enforce_equivalent(&self, other: &Self) -> Result<(), SynthesisError> {
+        self.enforce_equal(other)
+    }
+}
+
+impl<Base: SonobeField, Target: SonobeField>
+    EquivalenceGadget<IntVarInner<Base, Target, true>> for IntVarInner<Base, Target, false>
+{
+    fn enforce_equivalent(&self, other: &Self) -> Result<(), SynthesisError> {
+        self.enforce_congruent(other)
+    }
+}
+
+impl<Base: SonobeField, Target: SonobeField>
+    EquivalenceGadget<IntVarInner<Base, Target, false>> for IntVarInner<Base, Target, true>
+{
+    fn enforce_equivalent(&self, other: &Self) -> Result<(), SynthesisError> {
+        self.enforce_congruent(other)
+    }
+}
+
+impl<Base: SonobeField, Target: SonobeField>
+    EquivalenceGadget<IntVarInner<Base, Target, false>> for IntVarInner<Base, Target, false>
+{
+    fn enforce_equivalent(&self, other: &Self) -> Result<(), SynthesisError> {
+        self.enforce_congruent(other)
+    }
+}
+
+impl<F: SonobeField> EquivalenceGadget<IntVarInner<F, (), true>> for IntVarInner<F, (), true> {
+    fn enforce_equivalent(&self, other: &Self) -> Result<(), SynthesisError> {
+        self.enforce_equal(other)
+    }
+}
+
+impl<F: SonobeField> EquivalenceGadget<IntVarInner<F, (), true>> for IntVarInner<F, (), false> {
+    fn enforce_equivalent(&self, other: &Self) -> Result<(), SynthesisError> {
+        self.enforce_equal_unaligned(other)
+    }
+}
+
+impl<F: SonobeField> EquivalenceGadget<IntVarInner<F, (), false>> for IntVarInner<F, (), true> {
+    fn enforce_equivalent(&self, other: &Self) -> Result<(), SynthesisError> {
+        self.enforce_equal_unaligned(other)
+    }
+}
+
+impl<F: SonobeField> EquivalenceGadget<IntVarInner<F, (), false>> for IntVarInner<F, (), false> {
+    fn enforce_equivalent(&self, other: &Self) -> Result<(), SynthesisError> {
+        self.enforce_equal_unaligned(other)
+    }
+}
+
 impl<Base: SonobeField, Target: SonobeField> TryFrom<IntVarInner<Base, Target, false>>
     for IntVarInner<Base, Target, true>
 {
@@ -573,6 +630,10 @@ impl<Base: SonobeField, Target: SonobeField> TryFrom<IntVarInner<Base, Target, f
     fn try_from(v: IntVarInner<Base, Target, false>) -> Result<Self, Self::Error> {
         v.modulo()
     }
+}
+
+impl<Base: SonobeField, Target: SonobeField> TwoStageFieldVar for IntVarInner<Base, Target, true> {
+    type Intermediate = IntVarInner<Base, Target, false>;
 }
 
 impl<F: SonobeField, Cfg> EqGadget<F> for IntVarInner<F, Cfg, true> {
