@@ -9,9 +9,6 @@ use ark_r1cs_std::{
     groups::{curves::short_weierstrass::ProjectiveVar, CurveVar},
 };
 use ark_relations::gr1cs::SynthesisError;
-use ark_std::mem::swap;
-use num_bigint::BigInt;
-use num_integer::Integer;
 
 use crate::{
     algebra::{field::SonobeField, group::emulated::EmulatedAffineVar, Val},
@@ -107,34 +104,34 @@ impl<P: SWCurveConfig<BaseField: SonobeField, ScalarField: SonobeField>>
     }
 }
 
-fn lattice_reduction_2x2(
-    mut b1: (BigInt, BigInt),
-    mut b2: (BigInt, BigInt),
-) -> ((BigInt, BigInt), (BigInt, BigInt)) {
-    loop {
-        let mut b1_norm_sq = &b1.0 * &b1.0 + &b1.1 * &b1.1;
-        let mut b2_norm_sq = &b2.0 * &b2.0 + &b2.1 * &b2.1;
+// fn lattice_reduction_2x2(
+//     mut b1: (BigInt, BigInt),
+//     mut b2: (BigInt, BigInt),
+// ) -> ((BigInt, BigInt), (BigInt, BigInt)) {
+//     loop {
+//         let mut b1_norm_sq = &b1.0 * &b1.0 + &b1.1 * &b1.1;
+//         let mut b2_norm_sq = &b2.0 * &b2.0 + &b2.1 * &b2.1;
 
-        if b1_norm_sq > b2_norm_sq {
-            swap(&mut b1, &mut b2);
-            swap(&mut b1_norm_sq, &mut b2_norm_sq);
-        }
+//         if b1_norm_sq > b2_norm_sq {
+//             swap(&mut b1, &mut b2);
+//             swap(&mut b1_norm_sq, &mut b2_norm_sq);
+//         }
 
-        let (mut m, r) = (&b1.0 * &b2.0 + &b1.1 * &b2.1).div_rem(&b1_norm_sq);
-        if &r + &r >= b1_norm_sq {
-            m += BigInt::one();
-        }
+//         let (mut m, r) = (&b1.0 * &b2.0 + &b1.1 * &b2.1).div_rem(&b1_norm_sq);
+//         if &r + &r >= b1_norm_sq {
+//             m += BigInt::one();
+//         }
 
-        if m.is_zero() {
-            break;
-        }
+//         if m.is_zero() {
+//             break;
+//         }
 
-        b2.0 -= &m * &b1.0;
-        b2.1 -= &m * &b1.1;
-    }
+//         b2.0 -= &m * &b1.0;
+//         b2.1 -= &m * &b1.1;
+//     }
 
-    (b1, b2)
-}
+//     (b1, b2)
+// }
 
 // impl<C: SonobeCurve> PointScalarMulGadget<CF2<C>> for C {
 //     fn mul_scalar(&self, scalar: &impl ToBitsGadget<CF2<C>>) -> Result<Self, SynthesisError> {

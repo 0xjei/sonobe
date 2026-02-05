@@ -1,7 +1,8 @@
-pub use absorbable::{Absorbable, AbsorbableGadget};
 use ark_ff::{BigInteger, PrimeField};
 use ark_r1cs_std::{boolean::Boolean, fields::fp::FpVar};
 use ark_relations::gr1cs::SynthesisError;
+
+pub use self::absorbable::{Absorbable, AbsorbableGadget};
 
 pub mod absorbable;
 pub mod griffin;
