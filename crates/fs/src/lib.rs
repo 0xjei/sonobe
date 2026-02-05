@@ -363,7 +363,7 @@ impl<VC: CommitmentDefGadget> FoldingInstanceVar<VC> for PlainInstanceVar<VC::Sc
     }
 }
 
-pub trait FoldingSchemeGadgetDef {
+pub trait FoldingSchemeDefGadget {
     type Native: FoldingSchemeDef;
 
     type VC: CommitmentDefGadget<Widget = <Self::Native as FoldingSchemeDef>::VC>;
@@ -388,8 +388,8 @@ pub trait FoldingSchemeGadgetDef {
         >;
 }
 
-pub trait FoldingSchemeGadgetOpsPartial<const M: usize, const N: usize>:
-    FoldingSchemeGadgetDef<Native: FoldingSchemeOps<M, N>>
+pub trait FoldingSchemePartialVerifierGadget<const M: usize, const N: usize>:
+    FoldingSchemeDefGadget<Native: FoldingSchemeOps<M, N>>
 {
     #[allow(non_snake_case)]
     fn verify_hinted(
@@ -401,8 +401,8 @@ pub trait FoldingSchemeGadgetOpsPartial<const M: usize, const N: usize>:
     ) -> Result<(Self::RU, Self::Challenge), SynthesisError>;
 }
 
-pub trait FoldingSchemeGadgetOpsFull<const M: usize, const N: usize>:
-    FoldingSchemeGadgetOpsPartial<M, N>
+pub trait FoldingSchemeFullVerifierGadget<const M: usize, const N: usize>:
+    FoldingSchemePartialVerifierGadget<M, N>
 {
     #[allow(non_snake_case)]
     fn verify(
@@ -420,20 +420,20 @@ pub trait GroupBasedFoldingSchemePrimaryDef:
     TranscriptField = <<Self as FoldingSchemeDef>::VC as CommitmentDef>::Scalar,
 >
 {
-    type Gadget: FoldingSchemeGadgetDef<
+    type Gadget: FoldingSchemeDefGadget<
         Native = Self,
         VC = <Self::VC as GroupBasedCommitment>::Gadget2,
     >;
 }
 
 pub trait GroupBasedFoldingSchemePrimary<const M: usize, const N: usize>:
-    GroupBasedFoldingSchemePrimaryDef<Gadget: FoldingSchemeGadgetOpsPartial<M, N>>
+    GroupBasedFoldingSchemePrimaryDef<Gadget: FoldingSchemePartialVerifierGadget<M, N>>
     + FoldingSchemeOps<M, N>
 {
 }
 
 impl<FS, const M: usize, const N: usize> GroupBasedFoldingSchemePrimary<M, N> for FS where
-    FS: GroupBasedFoldingSchemePrimaryDef<Gadget: FoldingSchemeGadgetOpsPartial<M, N>>
+    FS: GroupBasedFoldingSchemePrimaryDef<Gadget: FoldingSchemePartialVerifierGadget<M, N>>
 {
 }
 
@@ -443,20 +443,20 @@ pub trait GroupBasedFoldingSchemeSecondaryDef:
     TranscriptField = CF2<<<Self as FoldingSchemeDef>::VC as CommitmentDef>::Commitment>,
 >
 {
-    type Gadget: FoldingSchemeGadgetDef<
+    type Gadget: FoldingSchemeDefGadget<
         Native = Self,
         VC = <Self::VC as GroupBasedCommitment>::Gadget1,
     >;
 }
 
 pub trait GroupBasedFoldingSchemeSecondary<const M: usize, const N: usize>:
-    GroupBasedFoldingSchemeSecondaryDef<Gadget: FoldingSchemeGadgetOpsFull<M, N>>
+    GroupBasedFoldingSchemeSecondaryDef<Gadget: FoldingSchemeFullVerifierGadget<M, N>>
     + FoldingSchemeOps<M, N>
 {
 }
 
 impl<FS, const M: usize, const N: usize> GroupBasedFoldingSchemeSecondary<M, N> for FS where
-    FS: GroupBasedFoldingSchemeSecondaryDef<Gadget: FoldingSchemeGadgetOpsFull<M, N>>
+    FS: GroupBasedFoldingSchemeSecondaryDef<Gadget: FoldingSchemeFullVerifierGadget<M, N>>
 {
 }
 
