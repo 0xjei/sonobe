@@ -24,11 +24,11 @@ use self::{
 };
 
 pub trait FoldingSchemeDef {
-    type VC: CommitmentDef<Scalar: SonobeField>;
-    type RW: FoldingWitness<Self::VC> + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
-    type RU: FoldingInstance<Self::VC> + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
-    type IW: FoldingWitness<Self::VC> + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
-    type IU: FoldingInstance<Self::VC> + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
+    type CM: CommitmentDef<Scalar: SonobeField>;
+    type RW: FoldingWitness<Self::CM> + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
+    type RU: FoldingInstance<Self::CM> + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
+    type IW: FoldingWitness<Self::CM> + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
+    type IU: FoldingInstance<Self::CM> + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
     type TranscriptField: SonobeField;
     type Arith: Arith<Config = <Self::DeciderKey as DeciderKey>::ArithConfig>;
     type Config;
@@ -41,7 +41,7 @@ pub trait FoldingSchemeDef {
         + WitnessInstanceSampler<
             Self::IW,
             Self::IU,
-            Source = AssignmentsOwned<<Self::VC as CommitmentDef>::Scalar>,
+            Source = AssignmentsOwned<<Self::CM as CommitmentDef>::Scalar>,
             Error = Error,
         >;
     type Challenge;
@@ -52,24 +52,24 @@ pub trait FoldingSchemeDef {
 pub trait FoldingSchemeDefGadget {
     type Native: FoldingSchemeDef;
 
-    type VC: CommitmentDefGadget<Widget = <Self::Native as FoldingSchemeDef>::VC>;
-    type RU: FoldingInstanceVar<Self::VC, Value = <Self::Native as FoldingSchemeDef>::RU>;
-    type IU: FoldingInstanceVar<Self::VC, Value = <Self::Native as FoldingSchemeDef>::IU>;
+    type CM: CommitmentDefGadget<Widget = <Self::Native as FoldingSchemeDef>::CM>;
+    type RU: FoldingInstanceVar<Self::CM, Value = <Self::Native as FoldingSchemeDef>::RU>;
+    type IU: FoldingInstanceVar<Self::CM, Value = <Self::Native as FoldingSchemeDef>::IU>;
 
     type VerifierKey;
 
     type Challenge: AllocVar<
             <Self::Native as FoldingSchemeDef>::Challenge,
-            <Self::VC as CommitmentDefGadget>::ConstraintField,
+            <Self::CM as CommitmentDefGadget>::ConstraintField,
         > + GR1CSVar<
-            <Self::VC as CommitmentDefGadget>::ConstraintField,
+            <Self::CM as CommitmentDefGadget>::ConstraintField,
             Value = <Self::Native as FoldingSchemeDef>::Challenge,
         >;
     type Proof<const M: usize, const N: usize>: AllocVar<
             <Self::Native as FoldingSchemeDef>::Proof<M, N>,
-            <Self::VC as CommitmentDefGadget>::ConstraintField,
+            <Self::CM as CommitmentDefGadget>::ConstraintField,
         > + GR1CSVar<
-            <Self::VC as CommitmentDefGadget>::ConstraintField,
+            <Self::CM as CommitmentDefGadget>::ConstraintField,
             Value = <Self::Native as FoldingSchemeDef>::Proof<M, N>,
         >;
 }

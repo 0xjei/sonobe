@@ -1,5 +1,5 @@
 use ark_ff::Zero;
-use ark_relations::gr1cs::{ConstraintSystem, SynthesisError, SynthesisMode};
+use ark_relations::gr1cs::{ConstraintSystem, SynthesisError};
 use ark_std::{borrow::Borrow, marker::PhantomData, rand::RngCore};
 use sonobe_fs::{
     DeciderKey, FoldingInstance, FoldingSchemeDef, FoldingSchemeDefGadget,
@@ -9,14 +9,11 @@ use sonobe_fs::{
 use sonobe_primitives::{
     algebra::field::emulated::EmulatedFieldVar,
     arithmetizations::Arith,
-    circuits::{ArithExtractor, AssignmentsExtractor, ConstraintSystemExt, FCircuit},
-    commitments::{CommitmentDef, CommitmentDefGadget},
+    circuits::{ArithExtractor, AssignmentsExtractor, FCircuit},
+    commitments::CommitmentDef,
     relations::WitnessInstanceSampler,
-    traits::{CF1, CF2, Dummy, Inputize, InputizeEmulated, SonobeCurve, SonobeField},
-    transcripts::{
-        Absorbable, Transcript,
-        griffin::{GriffinParams, sponge::GriffinSponge},
-    },
+    traits::{CF1, CF2, Dummy, SonobeCurve},
+    transcripts::Transcript,
 };
 
 use crate::{
@@ -29,10 +26,11 @@ pub mod circuits;
 pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
     GroupBasedFoldingSchemePrimary<M, N>
 {
-    type CFConfig: CycleFoldConfig<C = <Self::VC as CommitmentDef>::Commitment>;
+    type CFConfig: CycleFoldConfig<C = <Self::CM as CommitmentDef>::Commitment>;
 
     const N_CYCLEFOLDS: usize;
 
+    #[allow(non_snake_case)]
     fn to_cyclefold_configs(
         Us: &[impl Borrow<Self::RU>; M],
         us: &[impl Borrow<Self::IU>; N],
@@ -40,6 +38,7 @@ pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
         rho: Self::Challenge,
     ) -> Vec<Self::CFConfig>;
 
+    #[allow(non_snake_case)]
     fn to_cyclefold_inputs(
         Us: [<Self::Gadget as FoldingSchemeDefGadget>::RU; M],
         us: [<Self::Gadget as FoldingSchemeDefGadget>::IU; N],
@@ -50,8 +49,8 @@ pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
         Vec<
             Vec<
                 EmulatedFieldVar<
-                    <Self::VC as CommitmentDef>::Scalar,
-                    CF2<<Self::VC as CommitmentDef>::Commitment>,
+                    <Self::CM as CommitmentDef>::Scalar,
+                    CF2<<Self::CM as CommitmentDef>::Commitment>,
                 >,
             >,
         >,
@@ -96,26 +95,26 @@ pub struct CycleFoldBasedIVC<FS1, FS2, T> {
 impl<FS1, FS2, T> IVC for CycleFoldBasedIVC<FS1, FS2, T>
 where
     FS1: FoldingSchemeCycleFoldExt<
-            1,
-            1,
-            Arith: From<ConstraintSystem<CF1<<FS1::VC as CommitmentDef>::Commitment>>>,
-            Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
-            VC: CommitmentDef<
-                Commitment: SonobeCurve<BaseField = <FS2::VC as CommitmentDef>::Scalar>,
+                1,
+                1,
+                Arith: From<ConstraintSystem<CF1<<FS1::CM as CommitmentDef>::Commitment>>>,
+                Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
+                CM: CommitmentDef<
+                    Commitment: SonobeCurve<BaseField = <FS2::CM as CommitmentDef>::Scalar>,
+                >,
             >,
-        >,
     FS2: GroupBasedFoldingSchemeSecondary<
             1,
             1,
-            Arith: From<ConstraintSystem<CF1<<FS2::VC as CommitmentDef>::Commitment>>>,
+            Arith: From<ConstraintSystem<CF1<<FS2::CM as CommitmentDef>::Commitment>>>,
             Gadget: FoldingSchemeFullVerifierGadget<1, 1, VerifierKey = ()>,
-            VC: CommitmentDef<
-                Commitment: SonobeCurve<BaseField = <FS1::VC as CommitmentDef>::Scalar>,
+            CM: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS1::CM as CommitmentDef>::Scalar>,
             >,
         >,
-    T: Transcript<CF1<<FS1::VC as CommitmentDef>::Commitment>>,
+    T: Transcript<CF1<<FS1::CM as CommitmentDef>::Commitment>>,
 {
-    type Field = <FS1::VC as CommitmentDef>::Scalar;
+    type Field = <FS1::CM as CommitmentDef>::Scalar;
 
     type Config = (FS1::Config, FS2::Config, T::Config);
 
@@ -157,7 +156,6 @@ where
                 arith2_config: arith2.config(),
                 step_circuit,
             };
-
             let cs = ArithExtractor::new();
             cs.execute_synthesizer(augmented_circuit)?;
             let new_arith1 = cs.arith::<FS1::Arith>()?;
@@ -178,6 +176,7 @@ where
         ))
     }
 
+    #[allow(non_snake_case)]
     fn prove<FC: FCircuit<Field = Self::Field>>(
         Key(dk1, dk2, (hash_config, pp_hash)): &Self::ProverKey<FC>,
         step_circuit: &FC,
@@ -267,6 +266,7 @@ where
         ))
     }
 
+    #[allow(non_snake_case)]
     fn verify<FC: FCircuit<Field = Self::Field>>(
         Key(dk1, dk2, (hash_config, pp_hash)): &Self::VerifierKey<FC>,
         i: usize,

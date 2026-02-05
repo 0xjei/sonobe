@@ -37,12 +37,12 @@ mod tests {
     #[allow(non_snake_case)]
     pub fn test_folding_scheme<FS: FoldingSchemeOps<M, N>, const M: usize, const N: usize>(
         config: FS::Config,
-        circuit: impl ConstraintSynthesizer<<FS::VC as CommitmentDef>::Scalar>,
-        assignments_vec: Vec<AssignmentsOwned<<FS::VC as CommitmentDef>::Scalar>>,
+        circuit: impl ConstraintSynthesizer<<FS::CM as CommitmentDef>::Scalar>,
+        assignments_vec: Vec<AssignmentsOwned<<FS::CM as CommitmentDef>::Scalar>>,
         mut rng: impl Rng,
     ) -> Result<(), Box<dyn Error>>
     where
-        FS::Arith: From<ConstraintSystem<<FS::VC as CommitmentDef>::Scalar>>,
+        FS::Arith: From<ConstraintSystem<<FS::CM as CommitmentDef>::Scalar>>,
     {
         let pp = FS::preprocess(config, &mut rng)?;
 
