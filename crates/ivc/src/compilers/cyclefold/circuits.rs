@@ -11,7 +11,7 @@ use ark_r1cs_std::{
 use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use ark_std::marker::PhantomData;
 use sonobe_fs::{
-    FoldingInstanceVar, FoldingSchemeGadgetOpsFull, FoldingSchemeGadgetOpsPartial,
+    FoldingInstanceVar, FoldingSchemeFullVerifierGadget, FoldingSchemePartialVerifierGadget,
     GroupBasedFoldingSchemePrimary, GroupBasedFoldingSchemeSecondary,
 };
 use sonobe_primitives::{
@@ -47,7 +47,7 @@ where
     FS1: FoldingSchemeCycleFoldExt<
         1,
         1,
-        Gadget: FoldingSchemeGadgetOpsPartial<1, 1, VerifierKey = ()>,
+        Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
         VC: CommitmentDef<
             Commitment: SonobeCurve<BaseField = <FS2::VC as CommitmentDef>::Scalar>,
         >,
@@ -55,7 +55,7 @@ where
     FS2: GroupBasedFoldingSchemeSecondary<
         1,
         1,
-        Gadget: FoldingSchemeGadgetOpsFull<1, 1, VerifierKey = ()>,
+        Gadget: FoldingSchemeFullVerifierGadget<1, 1, VerifierKey = ()>,
         VC: CommitmentDef<
             Commitment: SonobeCurve<BaseField = <FS1::VC as CommitmentDef>::Scalar>,
         >,
@@ -163,7 +163,7 @@ where
     FS1: FoldingSchemeCycleFoldExt<
         1,
         1,
-        Gadget: FoldingSchemeGadgetOpsPartial<1, 1, VerifierKey = ()>,
+        Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
         VC: CommitmentDef<
             Commitment: SonobeCurve<BaseField = <FS2::VC as CommitmentDef>::Scalar>,
         >,
@@ -171,7 +171,7 @@ where
     FS2: GroupBasedFoldingSchemeSecondary<
         1,
         1,
-        Gadget: FoldingSchemeGadgetOpsFull<1, 1, VerifierKey = ()>,
+        Gadget: FoldingSchemeFullVerifierGadget<1, 1, VerifierKey = ()>,
         VC: CommitmentDef<
             Commitment: SonobeCurve<BaseField = <FS1::VC as CommitmentDef>::Scalar>,
         >,
