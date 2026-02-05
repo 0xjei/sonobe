@@ -2,7 +2,7 @@
 
 Experimental folding schemes library implemented jointly by [0xPARC](https://0xparc.org/) and [PSE](https://pse.dev).
 
-<img align="right" style="width:30%;min-width:250px;margin-bottom:20px;" src="https://privacy-scaling-explorations.github.io/sonobe-docs/imgs/sonobe.png">
+<img align="right" style="width:30%;min-width:250px;margin-bottom:20px;" src="https://raw.githubusercontent.com/privacy-ethereum/sonobe-docs/refs/heads/main/src/imgs/sonobe.png">
 
 <b>Sonobe</b> is a modular library to fold arithmetic circuit instances in an Incremental Verifiable computation (IVC) style. It features multiple folding schemes and decider setups, allowing users to pick the scheme which best fits their needs.
 <br><br>
@@ -67,7 +67,7 @@ Once the IVC iterations are completed, the IVC proof is compressed into the Deci
 
 
 <p align="center">
-    <img src="https://privacy-scaling-explorations.github.io/sonobe-docs/imgs/folding-main-idea-diagram.png" style="width:70%;" />
+    <img src="https://raw.githubusercontent.com/privacy-ethereum/sonobe-docs/refs/heads/main/src/imgs/folding-main-idea-diagram.png" style="width:70%;" />
 </p>
 
 Where $w_i$ are the external witnesses used at each iterative step.
@@ -87,14 +87,14 @@ The development flow using Sonobe looks like:
 4. Generate the decider verifier
 
 <p align="center">
-    <img src="https://privacy-scaling-explorations.github.io/sonobe-docs/imgs/sonobe-lib-pipeline.png"/>
+    <img src="https://raw.githubusercontent.com/privacy-ethereum/sonobe-docs/refs/heads/main/src/imgs/sonobe-lib-pipeline.png"/>
 </p>
 
 The folding scheme and decider used can be swapped with a few lines of code (eg. switching from a Decider that uses two Spartan proofs over a cycle of curves, to a Decider that uses a single Groth16 proof over the BN254 to be verified in an Ethereum smart contract).
 
 The [Sonobe docs](https://privacy-scaling-explorations.github.io/sonobe-docs/) contain more details about the usage and design of the library.
 
-Complete examples can be found at [folding-schemes/examples](https://github.com/privacy-scaling-explorations/sonobe/tree/main/examples)
+Complete examples can be found at [folding-schemes/examples](https://github.com/privacy-scaling-explorations/sonobeAcknowledgments/tree/main/examples)
 
 ## License
 
