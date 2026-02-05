@@ -22,7 +22,7 @@ use ark_std::{
 use sonobe_primitives::{
     arithmetizations::{Arith, ArithConfig},
     circuits::AssignmentsOwned,
-    commitments::{GroupBasedVectorCommitment, VectorCommitmentDef, VectorCommitmentGadgetDef},
+    commitments::{GroupBasedVectorCommitment, VectorCommitmentDef, VectorCommitmentDefGadget},
     relations::{Relation, WitnessInstanceSampler},
     sumcheck::Error as SumCheckError,
     traits::{Dummy, SonobeField, CF2},
@@ -320,19 +320,19 @@ impl<FS, const M: usize, const N: usize> FoldingSchemeOps<M, N> for FS where
 {
 }
 
-pub trait FoldingWitnessVar<VC: VectorCommitmentGadgetDef>:
+pub trait FoldingWitnessVar<VC: VectorCommitmentDefGadget>:
     AllocVar<Self::Value, VC::ConstraintField>
     + GR1CSVar<VC::ConstraintField, Value: FoldingWitness<VC::Native>>
 {
 }
 
-impl<VC: VectorCommitmentGadgetDef, T> FoldingWitnessVar<VC> for T where
+impl<VC: VectorCommitmentDefGadget, T> FoldingWitnessVar<VC> for T where
     T: AllocVar<Self::Value, VC::ConstraintField>
         + GR1CSVar<VC::ConstraintField, Value: FoldingWitness<VC::Native>>
 {
 }
 
-pub trait FoldingInstanceVar<VC: VectorCommitmentGadgetDef>:
+pub trait FoldingInstanceVar<VC: VectorCommitmentDefGadget>:
     AllocVar<Self::Value, VC::ConstraintField>
     + GR1CSVar<VC::ConstraintField, Value: FoldingInstance<VC::Native>>
     + AbsorbableGadget<VC::ConstraintField>
@@ -353,7 +353,7 @@ pub trait FoldingInstanceVar<VC: VectorCommitmentGadgetDef>:
 pub type PlainWitnessVar<V> = PlainWitness<V>;
 pub type PlainInstanceVar<V> = PlainInstance<V>;
 
-impl<VC: VectorCommitmentGadgetDef> FoldingInstanceVar<VC> for PlainInstanceVar<VC::ScalarVar> {
+impl<VC: VectorCommitmentDefGadget> FoldingInstanceVar<VC> for PlainInstanceVar<VC::ScalarVar> {
     fn commitments(&self) -> Vec<&VC::CommitmentVar> {
         vec![]
     }
@@ -371,10 +371,10 @@ impl<VC: VectorCommitmentGadgetDef> FoldingInstanceVar<VC> for PlainInstanceVar<
     }
 }
 
-pub trait FoldingSchemeGadgetDef {
+pub trait FoldingSchemeDefGadget {
     type Native: FoldingSchemeDef;
 
-    type VC: VectorCommitmentGadgetDef<Native = <Self::Native as FoldingSchemeDef>::VC>;
+    type VC: VectorCommitmentDefGadget<Native = <Self::Native as FoldingSchemeDef>::VC>;
     type RU: FoldingInstanceVar<Self::VC, Value = <Self::Native as FoldingSchemeDef>::RU>;
     type IU: FoldingInstanceVar<Self::VC, Value = <Self::Native as FoldingSchemeDef>::IU>;
 
@@ -382,40 +382,40 @@ pub trait FoldingSchemeGadgetDef {
 
     type Challenge: AllocVar<
             <Self::Native as FoldingSchemeDef>::Challenge,
-            <Self::VC as VectorCommitmentGadgetDef>::ConstraintField,
+            <Self::VC as VectorCommitmentDefGadget>::ConstraintField,
         > + GR1CSVar<
-            <Self::VC as VectorCommitmentGadgetDef>::ConstraintField,
+            <Self::VC as VectorCommitmentDefGadget>::ConstraintField,
             Value = <Self::Native as FoldingSchemeDef>::Challenge,
         >;
     type Proof<const M: usize, const N: usize>: AllocVar<
             <Self::Native as FoldingSchemeDef>::Proof<M, N>,
-            <Self::VC as VectorCommitmentGadgetDef>::ConstraintField,
+            <Self::VC as VectorCommitmentDefGadget>::ConstraintField,
         > + GR1CSVar<
-            <Self::VC as VectorCommitmentGadgetDef>::ConstraintField,
+            <Self::VC as VectorCommitmentDefGadget>::ConstraintField,
             Value = <Self::Native as FoldingSchemeDef>::Proof<M, N>,
         >;
 }
 
-pub trait FoldingSchemeGadgetOpsPartial<const M: usize, const N: usize>:
-    FoldingSchemeGadgetDef<Native: FoldingSchemeOps<M, N>>
+pub trait FoldingSchemePartialVerifierGadget<const M: usize, const N: usize>:
+    FoldingSchemeDefGadget<Native: FoldingSchemeOps<M, N>>
 {
     #[allow(non_snake_case)]
     fn verify_hinted(
         vk: &Self::VerifierKey,
-        transcript: &mut impl TranscriptVar<<Self::VC as VectorCommitmentGadgetDef>::ConstraintField>,
+        transcript: &mut impl TranscriptVar<<Self::VC as VectorCommitmentDefGadget>::ConstraintField>,
         Us: [&Self::RU; M],
         us: [&Self::IU; N],
         proof: &Self::Proof<M, N>,
     ) -> Result<(Self::RU, Self::Challenge), SynthesisError>;
 }
 
-pub trait FoldingSchemeGadgetOpsFull<const M: usize, const N: usize>:
-    FoldingSchemeGadgetOpsPartial<M, N>
+pub trait FoldingSchemeFullVerifierGadget<const M: usize, const N: usize>:
+    FoldingSchemePartialVerifierGadget<M, N>
 {
     #[allow(non_snake_case)]
     fn verify(
         vk: &Self::VerifierKey,
-        transcript: &mut impl TranscriptVar<<Self::VC as VectorCommitmentGadgetDef>::ConstraintField>,
+        transcript: &mut impl TranscriptVar<<Self::VC as VectorCommitmentDefGadget>::ConstraintField>,
         Us: [&Self::RU; M],
         us: [&Self::IU; N],
         proof: &Self::Proof<M, N>,
@@ -428,20 +428,20 @@ pub trait GroupBasedFoldingSchemePrimaryDef:
     TranscriptField = <<Self as FoldingSchemeDef>::VC as VectorCommitmentDef>::Scalar,
 >
 {
-    type Gadget: FoldingSchemeGadgetDef<
+    type Gadget: FoldingSchemeDefGadget<
         Native = Self,
         VC = <Self::VC as GroupBasedVectorCommitment>::Gadget2,
     >;
 }
 
 pub trait GroupBasedFoldingSchemePrimary<const M: usize, const N: usize>:
-    GroupBasedFoldingSchemePrimaryDef<Gadget: FoldingSchemeGadgetOpsPartial<M, N>>
+    GroupBasedFoldingSchemePrimaryDef<Gadget: FoldingSchemePartialVerifierGadget<M, N>>
     + FoldingSchemeOps<M, N>
 {
 }
 
 impl<FS, const M: usize, const N: usize> GroupBasedFoldingSchemePrimary<M, N> for FS where
-    FS: GroupBasedFoldingSchemePrimaryDef<Gadget: FoldingSchemeGadgetOpsPartial<M, N>>
+    FS: GroupBasedFoldingSchemePrimaryDef<Gadget: FoldingSchemePartialVerifierGadget<M, N>>
 {
 }
 
@@ -451,20 +451,20 @@ pub trait GroupBasedFoldingSchemeSecondaryDef:
     TranscriptField = CF2<<<Self as FoldingSchemeDef>::VC as VectorCommitmentDef>::Commitment>,
 >
 {
-    type Gadget: FoldingSchemeGadgetDef<
+    type Gadget: FoldingSchemeDefGadget<
         Native = Self,
         VC = <Self::VC as GroupBasedVectorCommitment>::Gadget1,
     >;
 }
 
 pub trait GroupBasedFoldingSchemeSecondary<const M: usize, const N: usize>:
-    GroupBasedFoldingSchemeSecondaryDef<Gadget: FoldingSchemeGadgetOpsFull<M, N>>
+    GroupBasedFoldingSchemeSecondaryDef<Gadget: FoldingSchemeFullVerifierGadget<M, N>>
     + FoldingSchemeOps<M, N>
 {
 }
 
 impl<FS, const M: usize, const N: usize> GroupBasedFoldingSchemeSecondary<M, N> for FS where
-    FS: GroupBasedFoldingSchemeSecondaryDef<Gadget: FoldingSchemeGadgetOpsFull<M, N>>
+    FS: GroupBasedFoldingSchemeSecondaryDef<Gadget: FoldingSchemeFullVerifierGadget<M, N>>
 {
 }
 

@@ -32,7 +32,7 @@ use self::{
     witnesses::{IncomingWitness as IW, RunningWitness as RW},
 };
 use crate::{
-    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeGadgetDef,
+    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeDefGadget,
     GroupBasedFoldingSchemePrimaryDef, PlainInstance as PU,
     PlainWitness as PW, TaggedVec,
 };
@@ -297,7 +297,7 @@ pub struct ProtoGalaxyGadget<VC> {
     _v: PhantomData<VC>,
 }
 
-impl<VC: GroupBasedVectorCommitment> FoldingSchemeGadgetDef for ProtoGalaxyGadget<VC> {
+impl<VC: GroupBasedVectorCommitment> FoldingSchemeDefGadget for ProtoGalaxyGadget<VC> {
     type Native = ProtoGalaxy<VC>;
 
     type VC = VC::Gadget2;

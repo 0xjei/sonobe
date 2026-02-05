@@ -20,7 +20,7 @@ use sonobe_primitives::{
     transcripts::TranscriptVar,
 };
 
-use crate::{hypernova::HyperNovaGadget, FoldingSchemeGadgetOpsPartial};
+use crate::{hypernova::HyperNovaGadget, FoldingSchemePartialVerifierGadget};
 
 impl<
         VC: GroupBasedVectorCommitment,
@@ -28,7 +28,7 @@ impl<
         const M: usize,
         const N: usize,
         const CHALLENGE_BITS: usize,
-    > FoldingSchemeGadgetOpsPartial<M, N> for HyperNovaGadget<VC, V, CHALLENGE_BITS>
+    > FoldingSchemePartialVerifierGadget<M, N> for HyperNovaGadget<VC, V, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn verify_hinted(

@@ -25,7 +25,7 @@ use sonobe_primitives::{
     },
     circuits::AssignmentsOwned,
     commitments::{
-        GroupBasedVectorCommitment, VectorCommitmentDef, VectorCommitmentGadgetDef,
+        GroupBasedVectorCommitment, VectorCommitmentDef, VectorCommitmentDefGadget,
         VectorCommitmentOps,
     },
     relations::{Relation, WitnessInstanceSampler},
@@ -37,7 +37,7 @@ use self::{
     witnesses::RunningWitness as RW,
 };
 use crate::{
-    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeGadgetDef, GroupBasedFoldingSchemePrimaryDef,
+    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeDefGadget, GroupBasedFoldingSchemePrimaryDef,
     PlainInstance as IU, PlainInstanceVar as IUVar, PlainWitness as IW,
 };
 
@@ -246,14 +246,14 @@ pub struct MovaGadget<VC, const CHALLENGE_BITS: usize = 128> {
     _vc: PhantomData<VC>,
 }
 
-impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeGadgetDef
+impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeDefGadget
     for MovaGadget<VC, CHALLENGE_BITS>
 {
     type Native = Mova<VC, CHALLENGE_BITS>;
 
     type VC = VC::Gadget2;
     type RU = RUVar<VC::Gadget2>;
-    type IU = IUVar<<VC::Gadget2 as VectorCommitmentGadgetDef>::ScalarVar>;
+    type IU = IUVar<<VC::Gadget2 as VectorCommitmentDefGadget>::ScalarVar>;
     type VerifierKey = ();
     type Challenge = [Boolean<VC::Scalar>; CHALLENGE_BITS];
     type Proof<const M: usize, const N: usize> = MovaProofVar<VC::Commitment>;

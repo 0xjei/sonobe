@@ -32,7 +32,7 @@ use self::{
     witnesses::{CCCSWitness as IW, LCCCSWitness as RW},
 };
 use crate::{
-    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeGadgetDef, GroupBasedFoldingSchemePrimaryDef,
+    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeDefGadget, GroupBasedFoldingSchemePrimaryDef,
     PlainInstance as PU, PlainWitness as PW,
 };
 
@@ -325,7 +325,7 @@ pub struct HyperNovaGadget<VC, V: CCSVariant = R1CSConfig, const CHALLENGE_BITS:
 }
 
 impl<VC: GroupBasedVectorCommitment, V: CCSVariant, const CHALLENGE_BITS: usize>
-    FoldingSchemeGadgetDef for HyperNovaGadget<VC, V, CHALLENGE_BITS>
+    FoldingSchemeDefGadget for HyperNovaGadget<VC, V, CHALLENGE_BITS>
 {
     type Native = HyperNova<VC, V, CHALLENGE_BITS>;
 

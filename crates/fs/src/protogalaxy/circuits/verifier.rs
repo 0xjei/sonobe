@@ -17,9 +17,9 @@ use sonobe_primitives::{
     transcripts::TranscriptVar,
 };
 
-use crate::{protogalaxy::ProtoGalaxyGadget, FoldingSchemeGadgetOpsPartial};
+use crate::{protogalaxy::ProtoGalaxyGadget, FoldingSchemePartialVerifierGadget};
 
-impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeGadgetOpsPartial<1, N>
+impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemePartialVerifierGadget<1, N>
     for ProtoGalaxyGadget<VC>
 {
     #[allow(non_snake_case)]

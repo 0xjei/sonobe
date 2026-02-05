@@ -5,7 +5,7 @@ use ark_std::{borrow::Borrow, iter::once};
 use sonobe_fs::{
     nova::CycleFoldNova,
     ova::{CycleFoldOva, Ova},
-    FoldingSchemeGadgetDef,
+    FoldingSchemeDefGadget,
 };
 use sonobe_primitives::{
     algebra::{
@@ -78,11 +78,11 @@ impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeC
     }
 
     fn to_cyclefold_inputs(
-        [U]: [<Self::Gadget as FoldingSchemeGadgetDef>::RU; 1],
-        _us: [<Self::Gadget as FoldingSchemeGadgetDef>::IU; 1],
-        UU: <Self::Gadget as FoldingSchemeGadgetDef>::RU,
-        proof: <Self::Gadget as FoldingSchemeGadgetDef>::Proof<1, 1>,
-        rho: <Self::Gadget as FoldingSchemeGadgetDef>::Challenge,
+        [U]: [<Self::Gadget as FoldingSchemeDefGadget>::RU; 1],
+        _us: [<Self::Gadget as FoldingSchemeDefGadget>::IU; 1],
+        UU: <Self::Gadget as FoldingSchemeDefGadget>::RU,
+        proof: <Self::Gadget as FoldingSchemeDefGadget>::Proof<1, 1>,
+        rho: <Self::Gadget as FoldingSchemeDefGadget>::Challenge,
     ) -> Result<Vec<Vec<EmulatedFieldVar<VC::Scalar, CF2<VC::Commitment>>>>, SynthesisError> {
         let mut rho = rho.to_vec();
         rho.resize(

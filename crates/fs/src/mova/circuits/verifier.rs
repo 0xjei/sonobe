@@ -11,10 +11,10 @@ use sonobe_primitives::{
     transcripts::TranscriptVar,
 };
 
-use crate::{mova::MovaGadget, FoldingSchemeGadgetOpsPartial};
+use crate::{mova::MovaGadget, FoldingSchemePartialVerifierGadget};
 
 impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize>
-    FoldingSchemeGadgetOpsPartial<1, 1> for MovaGadget<VC, CHALLENGE_BITS>
+    FoldingSchemePartialVerifierGadget<1, 1> for MovaGadget<VC, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn verify_hinted(

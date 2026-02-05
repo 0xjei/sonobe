@@ -4,17 +4,17 @@ use ark_r1cs_std::{
 };
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::borrow::Borrow;
-use sonobe_primitives::commitments::VectorCommitmentGadgetDef;
+use sonobe_primitives::commitments::VectorCommitmentDefGadget;
 
 use super::{CCCSWitness, LCCCSWitness};
 
 #[derive(Debug, PartialEq)]
-pub struct LCCCSWitnessVar<VC: VectorCommitmentGadgetDef> {
+pub struct LCCCSWitnessVar<VC: VectorCommitmentDefGadget> {
     pub w: Vec<VC::ScalarVar>,
     pub r: VC::RandomnessVar,
 }
 
-impl<VC: VectorCommitmentGadgetDef> AllocVar<LCCCSWitness<VC::Native>, VC::ConstraintField>
+impl<VC: VectorCommitmentDefGadget> AllocVar<LCCCSWitness<VC::Native>, VC::ConstraintField>
     for LCCCSWitnessVar<VC>
 {
     fn new_variable<T: Borrow<LCCCSWitness<VC::Native>>>(
@@ -32,7 +32,7 @@ impl<VC: VectorCommitmentGadgetDef> AllocVar<LCCCSWitness<VC::Native>, VC::Const
     }
 }
 
-impl<VC: VectorCommitmentGadgetDef> GR1CSVar<VC::ConstraintField> for LCCCSWitnessVar<VC> {
+impl<VC: VectorCommitmentDefGadget> GR1CSVar<VC::ConstraintField> for LCCCSWitnessVar<VC> {
     type Value = LCCCSWitness<VC::Native>;
 
     fn cs(&self) -> ConstraintSystemRef<VC::ConstraintField> {
@@ -48,12 +48,12 @@ impl<VC: VectorCommitmentGadgetDef> GR1CSVar<VC::ConstraintField> for LCCCSWitne
 }
 
 #[derive(Debug, PartialEq)]
-pub struct CCCSWitnessVar<VC: VectorCommitmentGadgetDef> {
+pub struct CCCSWitnessVar<VC: VectorCommitmentDefGadget> {
     pub w: Vec<VC::ScalarVar>,
     pub r: VC::RandomnessVar,
 }
 
-impl<VC: VectorCommitmentGadgetDef> AllocVar<CCCSWitness<VC::Native>, VC::ConstraintField>
+impl<VC: VectorCommitmentDefGadget> AllocVar<CCCSWitness<VC::Native>, VC::ConstraintField>
     for CCCSWitnessVar<VC>
 {
     fn new_variable<T: Borrow<CCCSWitness<VC::Native>>>(
@@ -71,7 +71,7 @@ impl<VC: VectorCommitmentGadgetDef> AllocVar<CCCSWitness<VC::Native>, VC::Constr
     }
 }
 
-impl<VC: VectorCommitmentGadgetDef> GR1CSVar<VC::ConstraintField> for CCCSWitnessVar<VC> {
+impl<VC: VectorCommitmentDefGadget> GR1CSVar<VC::ConstraintField> for CCCSWitnessVar<VC> {
     type Value = CCCSWitness<VC::Native>;
 
     fn cs(&self) -> ConstraintSystemRef<VC::ConstraintField> {

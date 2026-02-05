@@ -3,7 +3,7 @@ use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar, groups::CurveVar, prelude
 use ark_relations::gr1cs::{ConstraintSystemRef, SynthesisError};
 use ark_std::{borrow::Borrow, iter::once};
 use sonobe_fs::{
-    hypernova::HyperNova, nova::CycleFoldNova, ova::CycleFoldOva, FoldingSchemeGadgetDef,
+    hypernova::HyperNova, nova::CycleFoldNova, ova::CycleFoldOva, FoldingSchemeDefGadget,
 };
 use sonobe_primitives::{
     algebra::{
@@ -96,11 +96,11 @@ impl<
     }
 
     fn to_cyclefold_inputs(
-        Us: [<Self::Gadget as FoldingSchemeGadgetDef>::RU; M],
-        us: [<Self::Gadget as FoldingSchemeGadgetDef>::IU; N],
-        UU: <Self::Gadget as FoldingSchemeGadgetDef>::RU,
-        _proof: <Self::Gadget as FoldingSchemeGadgetDef>::Proof<M, N>,
-        rho: <Self::Gadget as FoldingSchemeGadgetDef>::Challenge,
+        Us: [<Self::Gadget as FoldingSchemeDefGadget>::RU; M],
+        us: [<Self::Gadget as FoldingSchemeDefGadget>::IU; N],
+        UU: <Self::Gadget as FoldingSchemeDefGadget>::RU,
+        _proof: <Self::Gadget as FoldingSchemeDefGadget>::Proof<M, N>,
+        rho: <Self::Gadget as FoldingSchemeDefGadget>::Challenge,
     ) -> Result<Vec<Vec<EmulatedFieldVar<VC::Scalar, CF2<VC::Commitment>>>>, SynthesisError> {
         let mut rho = rho.to_vec();
         rho.resize(

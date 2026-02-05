@@ -1,7 +1,5 @@
 use ark_ff::UniformRand;
-use ark_r1cs_std::{
-    alloc::AllocVar, fields::fp::FpVar, select::CondSelectGadget, GR1CSVar,
-};
+use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar, select::CondSelectGadget, GR1CSVar};
 use ark_relations::gr1cs::SynthesisError;
 use ark_std::{
     fmt::Debug,
@@ -13,10 +11,12 @@ use thiserror::Error;
 
 use crate::{
     algebra::{
-        Val, field::{TwoStageFieldVar, emulated::{EmulatedFieldVar, IntVarInner}}, group::emulated::EmulatedAffineVar, ops::bits::FromBitsGadget
-        // Var,
+        field::{emulated::EmulatedFieldVar, TwoStageFieldVar},
+        group::emulated::EmulatedAffineVar,
+        ops::bits::FromBitsGadget,
+        Val,
     },
-    traits::{CF1, CF2, SonobeCurve, SonobeField},
+    traits::{SonobeCurve, SonobeField, CF1, CF2},
     transcripts::{Absorbable, AbsorbableGadget},
 };
 
@@ -79,7 +79,7 @@ pub trait VectorCommitmentOps: VectorCommitmentDef {
     ) -> Result<(), Error>;
 }
 
-pub trait VectorCommitmentGadgetDef: Clone {
+pub trait VectorCommitmentDefGadget: Clone {
     type ConstraintField: SonobeField;
 
     type KeyVar;
@@ -100,7 +100,7 @@ pub trait VectorCommitmentGadgetDef: Clone {
     type Native: VectorCommitmentDef;
 }
 
-pub trait VectorCommitmentGadgetOps: VectorCommitmentGadgetDef {
+pub trait VectorCommitmentOpsGadget: VectorCommitmentDefGadget {
     fn open(
         ck: &Self::KeyVar,
         v: &[Self::ScalarVar],
@@ -115,14 +115,14 @@ pub trait GroupBasedVectorCommitment:
         Scalar = CF1<<Self as VectorCommitmentDef>::Commitment>,
     > + VectorCommitmentOps
 {
-    type Gadget1: VectorCommitmentGadgetOps
-        + VectorCommitmentGadgetDef<
+    type Gadget1: VectorCommitmentOpsGadget
+        + VectorCommitmentDefGadget<
             ConstraintField = CF2<Self::Commitment>,
             ScalarVar = EmulatedFieldVar<CF2<Self::Commitment>, Self::Scalar>,
             CommitmentVar = <Self::Commitment as Val>::Var,
             Native = Self,
         >;
-    type Gadget2: VectorCommitmentGadgetDef<
+    type Gadget2: VectorCommitmentDefGadget<
         ConstraintField = Self::Scalar,
         ScalarVar = FpVar<Self::Scalar>,
         CommitmentVar = EmulatedAffineVar<Self::Scalar, Self::Commitment>,

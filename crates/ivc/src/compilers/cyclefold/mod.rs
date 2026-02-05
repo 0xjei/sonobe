@@ -2,8 +2,8 @@ use ark_ff::Zero;
 use ark_relations::gr1cs::{ConstraintSystem, SynthesisError, SynthesisMode};
 use ark_std::{borrow::Borrow, marker::PhantomData, rand::RngCore};
 use sonobe_fs::{
-    DeciderKey, FoldingInstance, FoldingSchemeDef, FoldingSchemeGadgetDef,
-    FoldingSchemeGadgetOpsFull, FoldingSchemeGadgetOpsPartial, GroupBasedFoldingSchemePrimary,
+    DeciderKey, FoldingInstance, FoldingSchemeDef, FoldingSchemeDefGadget,
+    FoldingSchemeFullVerifierGadget, FoldingSchemePartialVerifierGadget, GroupBasedFoldingSchemePrimary,
     GroupBasedFoldingSchemeSecondary,
 };
 use sonobe_primitives::{
@@ -39,11 +39,11 @@ pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
     ) -> Vec<Self::CFConfig>;
 
     fn to_cyclefold_inputs(
-        Us: [<Self::Gadget as FoldingSchemeGadgetDef>::RU; M],
-        us: [<Self::Gadget as FoldingSchemeGadgetDef>::IU; N],
-        UU: <Self::Gadget as FoldingSchemeGadgetDef>::RU,
-        proof: <Self::Gadget as FoldingSchemeGadgetDef>::Proof<M, N>,
-        rho: <Self::Gadget as FoldingSchemeGadgetDef>::Challenge,
+        Us: [<Self::Gadget as FoldingSchemeDefGadget>::RU; M],
+        us: [<Self::Gadget as FoldingSchemeDefGadget>::IU; N],
+        UU: <Self::Gadget as FoldingSchemeDefGadget>::RU,
+        proof: <Self::Gadget as FoldingSchemeDefGadget>::Proof<M, N>,
+        rho: <Self::Gadget as FoldingSchemeDefGadget>::Challenge,
     ) -> Result<
         Vec<
             Vec<
@@ -97,7 +97,7 @@ where
         1,
         1,
         Arith: From<ConstraintSystem<CF1<<FS1::VC as VectorCommitmentDef>::Commitment>>>,
-        Gadget: FoldingSchemeGadgetOpsPartial<1, 1, VerifierKey = ()>,
+        Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
         VC: VectorCommitmentDef<
             Commitment: SonobeCurve<BaseField = <FS2::VC as VectorCommitmentDef>::Scalar>,
         >,
@@ -106,7 +106,7 @@ where
         1,
         1,
         Arith: From<ConstraintSystem<CF1<<FS2::VC as VectorCommitmentDef>::Commitment>>>,
-        Gadget: FoldingSchemeGadgetOpsFull<1, 1, VerifierKey = ()>,
+        Gadget: FoldingSchemeFullVerifierGadget<1, 1, VerifierKey = ()>,
         VC: VectorCommitmentDef<
             Commitment: SonobeCurve<BaseField = <FS1::VC as VectorCommitmentDef>::Scalar>,
         >,

@@ -6,16 +6,16 @@ use ark_relations::gr1cs::SynthesisError;
 use num_bigint::BigInt;
 use sonobe_primitives::{
     algebra::{field::emulated::Bound, ops::bits::FromBitsGadget},
-    commitments::{GroupBasedVectorCommitment, VectorCommitmentDef, VectorCommitmentGadgetDef},
+    commitments::{GroupBasedVectorCommitment, VectorCommitmentDef, VectorCommitmentDefGadget},
     transcripts::TranscriptVar,
 };
 
-use crate::{ova::AbstractOvaGadget, FoldingSchemeGadgetOpsFull, FoldingSchemeGadgetOpsPartial};
+use crate::{ova::AbstractOvaGadget, FoldingSchemeFullVerifierGadget, FoldingSchemePartialVerifierGadget};
 
-impl<VC, const CHALLENGE_BITS: usize> FoldingSchemeGadgetOpsPartial<1, 1>
+impl<VC, const CHALLENGE_BITS: usize> FoldingSchemePartialVerifierGadget<1, 1>
     for AbstractOvaGadget<VC, CHALLENGE_BITS>
 where
-    VC: VectorCommitmentGadgetDef<Native: GroupBasedVectorCommitment>,
+    VC: VectorCommitmentDefGadget<Native: GroupBasedVectorCommitment>,
 {
     #[allow(non_snake_case)]
     fn verify_hinted(
@@ -60,10 +60,10 @@ where
     }
 }
 
-impl<VC, const CHALLENGE_BITS: usize> FoldingSchemeGadgetOpsFull<1, 1>
+impl<VC, const CHALLENGE_BITS: usize> FoldingSchemeFullVerifierGadget<1, 1>
     for AbstractOvaGadget<VC, CHALLENGE_BITS>
 where
-    VC: VectorCommitmentGadgetDef<Native: GroupBasedVectorCommitment>,
+    VC: VectorCommitmentDefGadget<Native: GroupBasedVectorCommitment>,
     VC::CommitmentVar:
         CurveVar<<VC::Native as VectorCommitmentDef>::Commitment, VC::ConstraintField>,
 {

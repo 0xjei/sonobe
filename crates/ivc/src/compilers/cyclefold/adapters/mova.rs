@@ -2,7 +2,7 @@ use ark_ff::{PrimeField, Zero};
 use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar, groups::CurveVar, prelude::Boolean};
 use ark_relations::gr1cs::{ConstraintSystemRef, SynthesisError};
 use ark_std::{borrow::Borrow, iter::once};
-use sonobe_fs::{mova::Mova, nova::CycleFoldNova, ova::CycleFoldOva, FoldingSchemeGadgetDef};
+use sonobe_fs::{mova::Mova, nova::CycleFoldNova, ova::CycleFoldOva, FoldingSchemeDefGadget};
 use sonobe_primitives::{
     algebra::{
         field::emulated::{Bound, EmulatedFieldVar},
@@ -74,11 +74,11 @@ impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeC
     }
 
     fn to_cyclefold_inputs(
-        [U]: [<Self::Gadget as FoldingSchemeGadgetDef>::RU; 1],
-        _us: [<Self::Gadget as FoldingSchemeGadgetDef>::IU; 1],
-        UU: <Self::Gadget as FoldingSchemeGadgetDef>::RU,
-        proof: <Self::Gadget as FoldingSchemeGadgetDef>::Proof<1, 1>,
-        rho: <Self::Gadget as FoldingSchemeGadgetDef>::Challenge,
+        [U]: [<Self::Gadget as FoldingSchemeDefGadget>::RU; 1],
+        _us: [<Self::Gadget as FoldingSchemeDefGadget>::IU; 1],
+        UU: <Self::Gadget as FoldingSchemeDefGadget>::RU,
+        proof: <Self::Gadget as FoldingSchemeDefGadget>::Proof<1, 1>,
+        rho: <Self::Gadget as FoldingSchemeDefGadget>::Challenge,
     ) -> Result<Vec<Vec<EmulatedFieldVar<VC::Scalar, CF2<VC::Commitment>>>>, SynthesisError> {
         let mut rho = rho.to_vec();
         rho.resize(

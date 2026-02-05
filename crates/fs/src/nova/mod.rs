@@ -7,7 +7,7 @@ use sonobe_primitives::{
     },
     circuits::AssignmentsOwned,
     commitments::{
-        GroupBasedVectorCommitment, VectorCommitmentDef, VectorCommitmentGadgetDef,
+        GroupBasedVectorCommitment, VectorCommitmentDef, VectorCommitmentDefGadget,
         VectorCommitmentOps,
     },
     relations::{Relation, WitnessInstanceSampler},
@@ -22,7 +22,7 @@ use self::{
     witnesses::{IncomingWitness as IW, RunningWitness as RW},
 };
 use crate::{
-    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeGadgetDef, GroupBasedFoldingSchemePrimaryDef,
+    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeDefGadget, GroupBasedFoldingSchemePrimaryDef,
     GroupBasedFoldingSchemeSecondaryDef, PlainInstance as PU, PlainWitness as PW,
 };
 
@@ -230,10 +230,10 @@ pub struct AbstractNovaGadget<VC, const CHALLENGE_BITS: usize = 128> {
     _vc: PhantomData<VC>,
 }
 
-impl<VC, const CHALLENGE_BITS: usize> FoldingSchemeGadgetDef
+impl<VC, const CHALLENGE_BITS: usize> FoldingSchemeDefGadget
     for AbstractNovaGadget<VC, CHALLENGE_BITS>
 where
-    VC: VectorCommitmentGadgetDef<Native: GroupBasedVectorCommitment>,
+    VC: VectorCommitmentDefGadget<Native: GroupBasedVectorCommitment>,
 {
     type Native = AbstractNova<VC::Native, VC::ConstraintField, CHALLENGE_BITS>;
 
