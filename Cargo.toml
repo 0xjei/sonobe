@@ -30,9 +30,10 @@ ark-crypto-primitives = { git = "https://github.com/winderica/crypto-primitives"
 ark-r1cs-std = { git = "https://github.com/winderica/r1cs-std", rev = "ae8283a" } # "sw-fix-updated" branch
 
 [workspace.package]
-edition = "2021"
+edition = "2024"
 license = "MIT"
 repository = "https://github.com/privacy-scaling-explorations/sonobe/"
+rust-version = "1.85.1"
 
 [workspace.dependencies]
 acvm = { git = "https://github.com/winderica/noir", rev = "fc9e99", default-features = false } # "arkworks-next" branch

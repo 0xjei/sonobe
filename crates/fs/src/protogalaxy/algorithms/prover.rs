@@ -126,7 +126,7 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeProver<1, N> f
             .zip(invs)
             .enumerate()
             .map(|(k, (e, inv))| {
-                if k.is_multiple_of(H.size()) {
+                if k % H.size() == 0 {
                     return Ok(VC::Scalar::zero());
                 }
                 let z = AssignmentsOwned::from((
@@ -306,7 +306,7 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeProver<1, N>
             .zip(invs)
             .enumerate()
             .map(|(k, (e, inv))| {
-                if k.is_multiple_of(H.size()) {
+                if k % H.size() == 0 {
                     return Ok(VC::Scalar::zero());
                 }
                 let z = AssignmentsOwned::from((
