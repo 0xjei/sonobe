@@ -3,16 +3,13 @@ use ark_std::{borrow::Borrow, cfg_into_iter, cfg_iter, ops::Mul, rand::RngCore};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use sonobe_primitives::{
-    algebra::ops::bits::FromBits,
-    circuits::AssignmentsOwned,
-    commitments::GroupBasedCommitment,
-    traits::SonobeField,
-    transcripts::Transcript,
+    algebra::ops::bits::FromBits, circuits::AssignmentsOwned, commitments::GroupBasedCommitment,
+    traits::SonobeField, transcripts::Transcript,
 };
 
 use crate::{
-    nova::{AbstractNova, AbstractNova2, NovaKey},
     Error, FoldingSchemeProver,
+    nova::{AbstractNova, AbstractNova2, NovaKey},
 };
 
 impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>

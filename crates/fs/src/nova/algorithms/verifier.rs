@@ -7,8 +7,8 @@ use sonobe_primitives::{
 };
 
 use crate::{
-    nova::{AbstractNova, AbstractNova2},
     Error, FoldingSchemeVerifier,
+    nova::{AbstractNova, AbstractNova2},
 };
 
 impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
