@@ -33,49 +33,33 @@ repository = "https://github.com/privacy-scaling-explorations/sonobe/"
 rust-version = "1.85.1"
 
 [workspace.dependencies]
-acvm = { git = "https://github.com/winderica/noir", rev = "fc9e99", default-features = false } # "arkworks-next" branch
-askama = { version = "0.12.0", default-features = false }
-clap = { version = "4.4" }
-clap-verbosity-flag = { version = "2.1" }
-criterion = { version = "0.5" }
-env_logger = { version = "0.10" }
-getrandom = { version = "0.2" }
-log = { version = "0.4" }
-noname = { git = "https://github.com/dmpierre/noname", rev = "c34f17" }
 num-bigint = { version = "0.4.3" }
 num-integer = { version = "0.1" }
 num-traits = { version = "0.2" }
-pprof = { version = "0.13" }
-serde = { version = "^1.0.0" }
-serde_json = { version = "^1.0.0" }
 sha3 = { version = "0.10" }
 rand = { version = "0.8.5" }
 rayon = { version = "1" }
-revm = { version = "19.5.0", default-features = false }
-rust-crypto = { version = "0.2" }
-thiserror = { version = "1.0" }
-tokio = "1.44.1"
-wasmer = { version = "6.1.0", default-features = false }
+thiserror = { version = "2.0.16" }
+wasm-bindgen-test = { version = "0.3" }
 
 # Arkworks family
-ark-bn254 = { version = "^0.5.0", default-features = false }
-ark-circom = { git = "https://github.com/arkworks-rs/circom-compat", default-features = false }
-ark-crypto-primitives = { version = "^0.5.0", default-features = false }
-ark-ec = { version = "^0.5.0", default-features = false }
-ark-ff = { version = "^0.5.0", default-features = false }
-ark-groth16 = { git = "https://github.com/arkworks-rs/groth16" }
-ark-grumpkin = { version = "^0.5.0", default-features = false }
-ark-mnt4-298 = { version = "^0.5.0" }
-ark-mnt6-298 = { version = "^0.5.0" }
-ark-pallas = { version = "^0.5.0" }
-ark-poly = { version = "^0.5.0", default-features = false }
-ark-poly-commit = { version = "^0.5.0" }
-ark-r1cs-std = { version = "^0.5.0", default-features = false }
+ark-crypto-primitives = { git = "https://github.com/arkworks-rs/crypto-primitives", default-features = false }
+ark-ec = { git = "https://github.com/arkworks-rs/algebra", default-features = false }
+ark-ff = { git = "https://github.com/arkworks-rs/algebra", default-features = false }
+ark-groth16 = { git = "https://github.com/arkworks-rs/groth16", default-features = false }
+ark-poly = { git = "https://github.com/arkworks-rs/algebra", default-features = false }
+ark-poly-commit = { git = "https://github.com/arkworks-rs/poly-commit", default-features = false }
+ark-r1cs-std = { git = "https://github.com/arkworks-rs/r1cs-std", default-features = false }
 ark-relations = { git = "https://github.com/arkworks-rs/snark", default-features = false }
-ark-serialize = { version = "^0.5.0" }
+ark-serialize = { git = "https://github.com/arkworks-rs/algebra", default-features = false }
 ark-snark = { git = "https://github.com/arkworks-rs/snark", default-features = false }
-ark-std = { version = "^0.5.0", default-features = false }
-ark-vesta = { version = "^0.5.0" }
+ark-std = { git = "https://github.com/arkworks-rs/std", default-features = false }
+
+# Ark curves
+ark-bn254 = { git = "https://github.com/arkworks-rs/algebra", default-features = false }
+ark-grumpkin = { git = "https://github.com/arkworks-rs/algebra", default-features = false }
+ark-pallas = { git = "https://github.com/arkworks-rs/algebra", default-features = false }
+ark-vesta = { git = "https://github.com/arkworks-rs/algebra", default-features = false }
 
 # Local crates
 sonobe-primitives = { path = "crates/primitives", default-features = false }

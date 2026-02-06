@@ -458,6 +458,8 @@ mod tests {
     use ark_ff::UniformRand;
     use ark_relations::gr1cs::ConstraintSystem;
     use ark_std::{error::Error, rand::thread_rng};
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::*;
 
