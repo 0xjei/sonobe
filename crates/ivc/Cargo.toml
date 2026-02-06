@@ -22,6 +22,8 @@ sonobe-fs = { workspace = true }
 ark-bn254 = { workspace = true, features = ["curve", "r1cs"] }
 ark-grumpkin = { workspace = true, features = ["r1cs"] }
 
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [features]
 default = ["parallel"]
