@@ -5,10 +5,10 @@ use ark_std::{borrow::Borrow, cfg_into_iter, cfg_iter, fmt::Debug, marker::Phant
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-use super::{r1cs::R1CS, Arith, ArithRelation, Error};
+use super::{Arith, ArithRelation, Error, r1cs::R1CS};
 use crate::{
     algebra::ops::poly::MLEHelper,
-    arithmetizations::{r1cs::R1CSConfig, ArithConfig},
+    arithmetizations::{ArithConfig, r1cs::R1CSConfig},
     circuits::Assignments,
 };
 
@@ -106,14 +106,18 @@ impl<F: Field, V: CCSVariant> CCS<F, V> {
         let public_len = z.public.as_ref().len();
         let private_len = z.private.as_ref().len();
         if public_len != self.n_public_inputs() {
-            return Err(Error::MalformedAssignments(
-                format!("The number of public inputs in R1CS ({}) does not match the length of the provided public inputs ({}).", self.n_public_inputs(), public_len)
-            ));
+            return Err(Error::MalformedAssignments(format!(
+                "The number of public inputs in R1CS ({}) does not match the length of the provided public inputs ({}).",
+                self.n_public_inputs(),
+                public_len
+            )));
         }
         if private_len != self.n_witnesses() {
-            return Err(Error::MalformedAssignments(
-                format!("The number of witnesses in R1CS ({}) does not match the length of the provided witnesses ({}).", self.n_witnesses(), private_len)
-            ));
+            return Err(Error::MalformedAssignments(format!(
+                "The number of witnesses in R1CS ({}) does not match the length of the provided witnesses ({}).",
+                self.n_witnesses(),
+                private_len
+            )));
         }
 
         // Recall that the evaluation of CCS at z is defined as:

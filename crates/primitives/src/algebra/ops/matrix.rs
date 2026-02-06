@@ -1,8 +1,8 @@
 use ark_ff::PrimeField;
 use ark_r1cs_std::{
-    alloc::{AllocVar, AllocationMode},
-    fields::{fp::FpVar, FieldVar},
     GR1CSVar,
+    alloc::{AllocVar, AllocationMode},
+    fields::{FieldVar, fp::FpVar},
 };
 use ark_relations::gr1cs::{Matrix, Namespace, SynthesisError};
 use ark_std::{borrow::Borrow, ops::Index};

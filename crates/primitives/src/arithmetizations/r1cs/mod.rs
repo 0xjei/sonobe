@@ -4,9 +4,9 @@ use ark_std::{cfg_into_iter, cfg_iter, iterable::Iterable};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-use super::{ccs::CCS, Arith, ArithRelation, Error};
+use super::{Arith, ArithRelation, Error, ccs::CCS};
 use crate::{
-    arithmetizations::{ccs::CCSVariant, ArithConfig},
+    arithmetizations::{ArithConfig, ccs::CCSVariant},
     circuits::Assignments,
 };
 
@@ -111,14 +111,18 @@ impl<F: Field> R1CS<F> {
         let public_len = z.public.as_ref().len();
         let private_len = z.private.as_ref().len();
         if public_len != self.n_public_inputs() {
-            return Err(Error::MalformedAssignments(
-                format!("The number of public inputs in R1CS ({}) does not match the length of the provided public inputs ({}).", self.n_public_inputs(), public_len)
-            ));
+            return Err(Error::MalformedAssignments(format!(
+                "The number of public inputs in R1CS ({}) does not match the length of the provided public inputs ({}).",
+                self.n_public_inputs(),
+                public_len
+            )));
         }
         if private_len != self.n_witnesses() {
-            return Err(Error::MalformedAssignments(
-                format!("The number of witnesses in R1CS ({}) does not match the length of the provided witnesses ({}).", self.n_witnesses(), private_len)
-            ));
+            return Err(Error::MalformedAssignments(format!(
+                "The number of witnesses in R1CS ({}) does not match the length of the provided witnesses ({}).",
+                self.n_witnesses(),
+                private_len
+            )));
         }
 
         Ok(cfg_iter!(self.A)
@@ -249,12 +253,12 @@ pub mod tests {
 
     use super::*;
     use crate::circuits::{
-        utils::{constraints_for_test, satisfying_assignments_for_test, CircuitForTest},
-        ConstraintSystemExt,
+        ArithExtractor, AssignmentsExtractor,
+        utils::{CircuitForTest, constraints_for_test, satisfying_assignments_for_test},
     };
 
     #[test]
-    fn test_constraint_extraction() -> Result<(), Box<dyn Error>> {
+    fn test_satisfiability() -> Result<(), Box<dyn Error>> {
         let mut rng = test_rng();
         let circuit = CircuitForTest::<Fr> {
             x: Fr::rand(&mut rng),
@@ -262,10 +266,19 @@ pub mod tests {
         let cs = ConstraintSystem::new_ref();
         circuit.generate_constraints(cs.clone())?;
         assert!(cs.is_satisfied()?);
-        cs.finalize();
-        let cs = cs.into_inner().unwrap();
 
-        assert_eq!(R1CS::from(&cs), constraints_for_test());
+        Ok(())
+    }
+
+    #[test]
+    fn test_constraint_extraction() -> Result<(), Box<dyn Error>> {
+        let mut rng = test_rng();
+        let circuit = CircuitForTest::<Fr> {
+            x: Fr::rand(&mut rng),
+        };
+        let cs = ArithExtractor::new();
+        cs.execute_synthesizer(circuit)?;
+        assert_eq!(cs.arith::<R1CS<_>>()?, constraints_for_test());
         Ok(())
     }
 
@@ -274,11 +287,9 @@ pub mod tests {
         let mut rng = test_rng();
         let x = Fr::rand(&mut rng);
         let circuit = CircuitForTest::<Fr> { x };
-        let cs = ConstraintSystem::new_ref();
-        circuit.generate_constraints(cs.clone())?;
-        assert!(cs.is_satisfied()?);
-        cs.finalize();
 
+        let cs = AssignmentsExtractor::new();
+        cs.execute_synthesizer(circuit)?;
         assert_eq!(cs.assignments()?, satisfying_assignments_for_test(x));
         Ok(())
     }

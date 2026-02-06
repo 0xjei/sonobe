@@ -1,6 +1,6 @@
 pub use crate::algebra::{
     field::SonobeField,
-    group::{SonobeCurve, CF1, CF2},
+    group::{CF1, CF2, SonobeCurve},
 };
 
 pub trait Dummy<Cfg> {

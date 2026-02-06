@@ -1,5 +1,5 @@
 use ark_ff::{BigInteger, PrimeField};
-use ark_r1cs_std::{alloc::AllocVar, boolean::Boolean, eq::EqGadget, fields::fp::FpVar, GR1CSVar};
+use ark_r1cs_std::{GR1CSVar, alloc::AllocVar, boolean::Boolean, eq::EqGadget, fields::fp::FpVar};
 use ark_relations::gr1cs::SynthesisError;
 
 use crate::algebra::field::emulated::Bound;
