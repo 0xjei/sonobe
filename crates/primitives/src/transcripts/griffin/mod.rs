@@ -50,7 +50,9 @@ impl<F: PrimeField> GriffinParams<F> {
     pub const INIT_SHAKE: &'static str = "Griffin";
 
     pub fn new(t: usize, d: usize, rounds: usize) -> Self {
-        assert!(t == 3 || t % 4 == 0);
+        // Equivalent to `assert!(t == 3 || t % 4 == 0);`, but bypass clippy's
+        // warning about `is_multiple_of`.
+        assert!(t == 3 || t & 3 == 0);
         assert!(d == 3 || d == 5);
         assert!(rounds >= 1);
 
