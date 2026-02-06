@@ -207,6 +207,8 @@ mod tests {
         commitments::pedersen::Pedersen,
         transcripts::griffin::{GriffinParams, sponge::GriffinSponge},
     };
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::*;
     use crate::tests::test_ivc;
