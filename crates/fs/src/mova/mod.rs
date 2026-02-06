@@ -1,39 +1,27 @@
 use ark_ff::{Field, Zero};
-use ark_poly::{
-    DenseMultilinearExtension as MLE, Polynomial,
-};
+use ark_poly::{DenseMultilinearExtension as MLE, Polynomial};
 use ark_r1cs_std::{
+    GR1CSVar,
     alloc::{AllocVar, AllocationMode},
     fields::fp::FpVar,
     prelude::Boolean,
-    GR1CSVar,
 };
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
-use ark_std::{
-    borrow::Borrow, marker::PhantomData, rand::RngCore, sync::Arc,
-    UniformRand,
-};
+use ark_std::{UniformRand, borrow::Borrow, marker::PhantomData, rand::RngCore, sync::Arc};
 use sonobe_primitives::{
-    algebra::
-        ops::
-            poly::MLEHelper
-        
-    ,
+    algebra::ops::poly::MLEHelper,
     arithmetizations::{
-        r1cs::{RelaxedInstance, RelaxedWitness, R1CS},
         Arith, ArithConfig, ArithRelation,
+        r1cs::{R1CS, RelaxedInstance, RelaxedWitness},
     },
     circuits::AssignmentsOwned,
-    commitments::{
-        GroupBasedVectorCommitment, VectorCommitmentDef, VectorCommitmentDefGadget,
-        VectorCommitmentOps,
-    },
+    commitments::{CommitmentDef, CommitmentDefGadget, CommitmentOps, GroupBasedCommitment},
     relations::{Relation, WitnessInstanceSampler},
-    traits::{Dummy, SonobeCurve, CF1},
+    traits::{CF1, Dummy, SonobeCurve},
 };
 
 use self::{
-    instances::{circuits::RunningInstanceVar as RUVar, RunningInstance as RU},
+    instances::{RunningInstance as RU, circuits::RunningInstanceVar as RUVar},
     witnesses::RunningWitness as RW,
 };
 use crate::{
@@ -47,12 +35,12 @@ pub mod instances;
 pub mod witnesses;
 
 #[derive(Clone)]
-pub struct MovaKey<A, VC: VectorCommitmentDef> {
+pub struct MovaKey<A, CM: CommitmentDef> {
     pub arith: Arc<A>,
-    pub ck: Arc<VC::Key>,
+    pub ck: Arc<CM::Key>,
 }
 
-impl<A: Arith, VC: VectorCommitmentDef> DeciderKey for MovaKey<A, VC> {
+impl<A: Arith, CM: CommitmentDef> DeciderKey for MovaKey<A, CM> {
     type ProverKey = Self;
     type VerifierKey = ();
     type ArithConfig = A::Config;
@@ -70,23 +58,23 @@ impl<A: Arith, VC: VectorCommitmentDef> DeciderKey for MovaKey<A, VC> {
     }
 }
 
-impl<A, VC> Relation<RW<VC>, RU<VC>> for MovaKey<A, VC>
+impl<A, CM> Relation<RW<CM>, RU<CM>> for MovaKey<A, CM>
 where
     A: for<'a> ArithRelation<
-        RelaxedWitness<&'a [VC::Scalar]>,
-        RelaxedInstance<&'a [VC::Scalar]>,
-        Evaluation = Vec<VC::Scalar>,
-    >,
-    VC: VectorCommitmentOps<Scalar: Field>,
+            RelaxedWitness<&'a [CM::Scalar]>,
+            RelaxedInstance<&'a [CM::Scalar]>,
+            Evaluation = Vec<CM::Scalar>,
+        >,
+    CM: CommitmentOps<Scalar: Field>,
 {
     type Error = Error;
 
-    fn check_relation(&self, w: &RW<VC>, u: &RU<VC>) -> Result<(), Self::Error> {
+    fn check_relation(&self, w: &RW<CM>, u: &RU<CM>) -> Result<(), Self::Error> {
         self.arith.check_relation(
             &RelaxedWitness { w: &w.w, e: &w.e },
             &RelaxedInstance { x: &u.x, u: &u.u },
         )?;
-        VC::open(&self.ck, &w.w, &w.r_w, &u.cm_w)?;
+        CM::open(&self.ck, &w.w, &w.r_w, &u.cm_w)?;
 
         (MLE::from_evaluations(&w.e).evaluate(&u.r_e) == u.v)
             .then_some(())
@@ -96,63 +84,63 @@ where
     }
 }
 
-impl<A, VC> Relation<IW<VC::Scalar>, IU<VC::Scalar>> for MovaKey<A, VC>
+impl<A, CM> Relation<IW<CM::Scalar>, IU<CM::Scalar>> for MovaKey<A, CM>
 where
-    A: ArithRelation<Vec<VC::Scalar>, Vec<VC::Scalar>>,
-    VC: VectorCommitmentDef,
+    A: ArithRelation<Vec<CM::Scalar>, Vec<CM::Scalar>>,
+    CM: CommitmentDef,
 {
     type Error = Error;
 
-    fn check_relation(&self, w: &IW<VC::Scalar>, u: &IU<VC::Scalar>) -> Result<(), Self::Error> {
+    fn check_relation(&self, w: &IW<CM::Scalar>, u: &IU<CM::Scalar>) -> Result<(), Self::Error> {
         self.arith.check_relation(w, u)?;
         Ok(())
     }
 }
 
-impl<A, VC: VectorCommitmentDef> WitnessInstanceSampler<IW<VC::Scalar>, IU<VC::Scalar>>
-    for MovaKey<A, VC>
+impl<A, CM: CommitmentDef> WitnessInstanceSampler<IW<CM::Scalar>, IU<CM::Scalar>>
+    for MovaKey<A, CM>
 {
-    type Source = AssignmentsOwned<VC::Scalar>;
+    type Source = AssignmentsOwned<CM::Scalar>;
     type Error = Error;
 
     fn sample(
         &self,
         z: Self::Source,
         _rng: impl RngCore,
-    ) -> Result<(IW<VC::Scalar>, IU<VC::Scalar>), Error> {
+    ) -> Result<(IW<CM::Scalar>, IU<CM::Scalar>), Error> {
         Ok((z.private.into(), z.public.into()))
     }
 }
 
-impl<A, VC> WitnessInstanceSampler<RW<VC>, RU<VC>> for MovaKey<A, VC>
+impl<A, CM> WitnessInstanceSampler<RW<CM>, RU<CM>> for MovaKey<A, CM>
 where
     A: for<'a> ArithRelation<
-        RelaxedWitness<&'a [VC::Scalar]>,
-        RelaxedInstance<&'a [VC::Scalar]>,
-        Evaluation = Vec<VC::Scalar>,
-    >,
-    VC: VectorCommitmentOps<Scalar: Field>,
+            RelaxedWitness<&'a [CM::Scalar]>,
+            RelaxedInstance<&'a [CM::Scalar]>,
+            Evaluation = Vec<CM::Scalar>,
+        >,
+    CM: CommitmentOps<Scalar: Field>,
 {
     type Source = ();
     type Error = Error;
 
-    fn sample(&self, _: Self::Source, mut rng: impl RngCore) -> Result<(RW<VC>, RU<VC>), Error> {
-        let u = VC::Scalar::rand(&mut rng);
+    fn sample(&self, _: Self::Source, mut rng: impl RngCore) -> Result<(RW<CM>, RU<CM>), Error> {
+        let u = CM::Scalar::rand(&mut rng);
         let x = (0..self.arith.n_public_inputs())
-            .map(|_| VC::Scalar::rand(&mut rng))
+            .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
         let w = (0..self.arith.n_witnesses())
-            .map(|_| VC::Scalar::rand(&mut rng))
+            .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
         let e = self.arith.eval_relation(
             &RelaxedWitness { w: &w, e: &[] },
             &RelaxedInstance { x: &x, u: &u },
         )?;
 
-        let (cm_w, r_w) = VC::commit(&self.ck, &w, &mut rng)?;
+        let (cm_w, r_w) = CM::commit(&self.ck, &w, &mut rng)?;
 
         let r_e = (0..self.arith.log_constraints())
-            .map(|_| VC::Scalar::rand(&mut rng))
+            .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
         let v = MLE::from_evaluations(&e).evaluate(&r_e);
 
@@ -177,27 +165,27 @@ impl<C: SonobeCurve, Cfg: ArithConfig> Dummy<&Cfg> for MovaProof<C> {
     }
 }
 
-pub struct Mova<VC, const CHALLENGE_BITS: usize = 128> {
-    _vc: PhantomData<VC>,
+pub struct Mova<CM, const CHALLENGE_BITS: usize = 128> {
+    _vc: PhantomData<CM>,
 }
 
-impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeDef
-    for Mova<VC, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeDef
+    for Mova<CM, CHALLENGE_BITS>
 {
-    type VC = VC;
-    type RW = RW<VC>;
-    type RU = RU<VC>;
-    type IW = IW<VC::Scalar>;
-    type IU = IU<VC::Scalar>;
+    type CM = CM;
+    type RW = RW<CM>;
+    type RU = RU<CM>;
+    type IW = IW<CM::Scalar>;
+    type IU = IU<CM::Scalar>;
 
-    type TranscriptField = VC::Scalar;
-    type Arith = R1CS<VC::Scalar>;
+    type TranscriptField = CM::Scalar;
+    type Arith = R1CS<CM::Scalar>;
 
     type Config = usize;
-    type PublicParam = VC::Key;
-    type DeciderKey = MovaKey<Self::Arith, VC>;
+    type PublicParam = CM::Key;
+    type DeciderKey = MovaKey<Self::Arith, CM>;
     type Challenge = [bool; CHALLENGE_BITS];
-    type Proof<const M: usize, const N: usize> = MovaProof<VC::Commitment>;
+    type Proof<const M: usize, const N: usize> = MovaProof<CM::Commitment>;
 }
 
 #[derive(Clone)]
@@ -242,27 +230,27 @@ impl<C: SonobeCurve> GR1CSVar<CF1<C>> for MovaProofVar<C> {
     }
 }
 
-pub struct MovaGadget<VC, const CHALLENGE_BITS: usize = 128> {
-    _vc: PhantomData<VC>,
+pub struct MovaGadget<CM, const CHALLENGE_BITS: usize = 128> {
+    _vc: PhantomData<CM>,
 }
 
-impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeDefGadget
-    for MovaGadget<VC, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeDefGadget
+    for MovaGadget<CM, CHALLENGE_BITS>
 {
-    type Native = Mova<VC, CHALLENGE_BITS>;
+    type Native = Mova<CM, CHALLENGE_BITS>;
 
-    type VC = VC::Gadget2;
-    type RU = RUVar<VC::Gadget2>;
-    type IU = IUVar<<VC::Gadget2 as VectorCommitmentDefGadget>::ScalarVar>;
+    type CM = CM::Gadget2;
+    type RU = RUVar<CM::Gadget2>;
+    type IU = IUVar<<CM::Gadget2 as CommitmentDefGadget>::ScalarVar>;
     type VerifierKey = ();
-    type Challenge = [Boolean<VC::Scalar>; CHALLENGE_BITS];
-    type Proof<const M: usize, const N: usize> = MovaProofVar<VC::Commitment>;
+    type Challenge = [Boolean<CM::Scalar>; CHALLENGE_BITS];
+    type Proof<const M: usize, const N: usize> = MovaProofVar<CM::Commitment>;
 }
 
-impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> GroupBasedFoldingSchemePrimaryDef
-    for Mova<VC, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> GroupBasedFoldingSchemePrimaryDef
+    for Mova<CM, CHALLENGE_BITS>
 {
-    type Gadget = MovaGadget<VC, CHALLENGE_BITS>;
+    type Gadget = MovaGadget<CM, CHALLENGE_BITS>;
 }
 
 #[cfg(test)]
@@ -271,7 +259,7 @@ mod tests {
     use ark_ff::UniformRand;
     use ark_std::{error::Error, rand::Rng, test_rng};
     use sonobe_primitives::{
-        circuits::utils::{satisfying_assignments_for_test, CircuitForTest},
+        circuits::utils::{CircuitForTest, satisfying_assignments_for_test},
         commitments::pedersen::Pedersen,
     };
 

@@ -3,7 +3,7 @@ use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar, groups::CurveVar, prelude
 use ark_relations::gr1cs::{ConstraintSystemRef, SynthesisError};
 use ark_std::{borrow::Borrow, iter::once};
 use sonobe_fs::{
-    hypernova::HyperNova, nova::CycleFoldNova, ova::CycleFoldOva, FoldingSchemeDefGadget,
+    FoldingSchemeDefGadget, hypernova::HyperNova, nova::CycleFoldNova, ova::CycleFoldOva,
 };
 use sonobe_primitives::{
     algebra::{
@@ -11,12 +11,12 @@ use sonobe_primitives::{
         ops::bits::{FromBits, FromBitsGadget, ToBitsGadgetExt},
     },
     arithmetizations::{ccs::CCSVariant, r1cs::R1CSConfig},
-    commitments::GroupBasedVectorCommitment,
-    traits::{SonobeCurve, CF2},
+    commitments::GroupBasedCommitment,
+    traits::{CF2, SonobeCurve},
 };
 
 use crate::compilers::cyclefold::{
-    circuits::CycleFoldConfig, CycleFoldBasedIVC, FoldingSchemeCycleFoldExt,
+    CycleFoldBasedIVC, FoldingSchemeCycleFoldExt, circuits::CycleFoldConfig,
 };
 
 /// Configuration for HyperNova's CycleFold circuit
@@ -66,16 +66,16 @@ impl<C: SonobeCurve, const M: usize, const N: usize, const CHALLENGE_BITS: usize
 }
 
 impl<
-        VC: GroupBasedVectorCommitment,
-        V: CCSVariant,
-        const M: usize,
-        const N: usize,
-        const CHALLENGE_BITS: usize,
-    > FoldingSchemeCycleFoldExt<M, N> for HyperNova<VC, V, CHALLENGE_BITS>
+    CM: GroupBasedCommitment,
+    V: CCSVariant,
+    const M: usize,
+    const N: usize,
+    const CHALLENGE_BITS: usize,
+> FoldingSchemeCycleFoldExt<M, N> for HyperNova<CM, V, CHALLENGE_BITS>
 {
     const N_CYCLEFOLDS: usize = 1;
 
-    type CFConfig = HyperNovaCycleFoldConfig<VC::Commitment, M, N, CHALLENGE_BITS>;
+    type CFConfig = HyperNovaCycleFoldConfig<CM::Commitment, M, N, CHALLENGE_BITS>;
 
     #[allow(non_snake_case)]
     fn to_cyclefold_configs(
@@ -101,24 +101,26 @@ impl<
         UU: <Self::Gadget as FoldingSchemeDefGadget>::RU,
         _proof: <Self::Gadget as FoldingSchemeDefGadget>::Proof<M, N>,
         rho: <Self::Gadget as FoldingSchemeDefGadget>::Challenge,
-    ) -> Result<Vec<Vec<EmulatedFieldVar<VC::Scalar, CF2<VC::Commitment>>>>, SynthesisError> {
+    ) -> Result<Vec<Vec<EmulatedFieldVar<CM::Scalar, CF2<CM::Commitment>>>>, SynthesisError> {
         let mut rho = rho.to_vec();
         rho.resize(
-            CF2::<VC::Commitment>::MODULUS_BIT_SIZE as usize,
+            CF2::<CM::Commitment>::MODULUS_BIT_SIZE as usize,
             Boolean::FALSE,
         );
-        Ok(vec![once(EmulatedFieldVar::from_bits_le(
-            &rho,
-            Bound(Zero::zero(), CF2::<VC::Commitment>::MODULUS.into().into()),
-        )?)
-        .chain(
-            Us.into_iter()
-                .map(|U| U.cm)
-                .chain(us.into_iter().map(|u| u.cm))
-                .chain(once(UU.cm))
-                .flat_map(|p| [p.x, p.y]),
-        )
-        .collect()])
+        Ok(vec![
+            once(EmulatedFieldVar::from_bits_le(
+                &rho,
+                Bound(Zero::zero(), CF2::<CM::Commitment>::MODULUS.into().into()),
+            )?)
+            .chain(
+                Us.into_iter()
+                    .map(|U| U.cm)
+                    .chain(us.into_iter().map(|u| u.cm))
+                    .chain(once(UU.cm))
+                    .flat_map(|p| [p.x, p.y]),
+            )
+            .collect(),
+        ])
     }
 }
 
@@ -137,7 +139,7 @@ mod tests {
     use sonobe_primitives::{
         circuits::utils::CircuitForTest,
         commitments::pedersen::Pedersen,
-        transcripts::griffin::{sponge::GriffinSponge, GriffinParams},
+        transcripts::griffin::{GriffinParams, sponge::GriffinSponge},
     };
 
     use super::*;

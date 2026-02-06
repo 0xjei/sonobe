@@ -1,16 +1,16 @@
 use ark_std::sync::Arc;
 use sonobe_primitives::{
     arithmetizations::Arith,
-    commitments::{CommitmentKey, GroupBasedVectorCommitment},
+    commitments::{CommitmentKey, GroupBasedCommitment},
 };
 
 use crate::{
-    mova::{Mova, MovaKey},
     Error, FoldingSchemeKeyGenerator,
+    mova::{Mova, MovaKey},
 };
 
-impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeKeyGenerator
-    for Mova<VC, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeKeyGenerator
+    for Mova<CM, CHALLENGE_BITS>
 {
     fn generate_keys(ck: Self::PublicParam, r1cs: Self::Arith) -> Result<Self::DeciderKey, Error> {
         let ck = Arc::new(ck);

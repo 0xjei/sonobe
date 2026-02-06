@@ -1,21 +1,18 @@
 use ark_r1cs_std::boolean::Boolean;
-use ark_std::{marker::PhantomData, rand::RngCore, sync::Arc, UniformRand};
+use ark_std::{UniformRand, marker::PhantomData, rand::RngCore, sync::Arc};
 use sonobe_primitives::{
     arithmetizations::{
-        r1cs::{RelaxedInstance, RelaxedWitness, R1CS},
         Arith, ArithRelation,
+        r1cs::{R1CS, RelaxedInstance, RelaxedWitness},
     },
     circuits::AssignmentsOwned,
-    commitments::{
-        GroupBasedVectorCommitment, VectorCommitmentDef, VectorCommitmentDefGadget,
-        VectorCommitmentOps,
-    },
+    commitments::{CommitmentDef, CommitmentDefGadget, CommitmentOps, GroupBasedCommitment},
     relations::{Relation, WitnessInstanceSampler},
-    traits::{SonobeField, CF2},
+    traits::{CF2, SonobeField},
 };
 
 use self::{
-    instances::{circuits::RunningInstanceVar as RUVar, RunningInstance as RU},
+    instances::{RunningInstance as RU, circuits::RunningInstanceVar as RUVar},
     witnesses::RunningWitness as RW,
 };
 use crate::{
@@ -30,12 +27,12 @@ pub mod instances;
 pub mod witnesses;
 
 #[derive(Clone)]
-pub struct OvaKey<A, VC: VectorCommitmentDef> {
+pub struct OvaKey<A, CM: CommitmentDef> {
     pub arith: Arc<A>,
-    pub ck: Arc<VC::Key>,
+    pub ck: Arc<CM::Key>,
 }
 
-impl<A: Arith, VC: VectorCommitmentDef> DeciderKey for OvaKey<A, VC> {
+impl<A: Arith, CM: CommitmentDef> DeciderKey for OvaKey<A, CM> {
     type ProverKey = Self;
     type VerifierKey = ();
     type ArithConfig = A::Config;
@@ -52,144 +49,144 @@ impl<A: Arith, VC: VectorCommitmentDef> DeciderKey for OvaKey<A, VC> {
         self.arith.config()
     }
 }
-impl<A, VC> Relation<RW<VC>, RU<VC>> for OvaKey<A, VC>
+impl<A, CM> Relation<RW<CM>, RU<CM>> for OvaKey<A, CM>
 where
     A: for<'a> ArithRelation<
-        RelaxedWitness<&'a [VC::Scalar]>,
-        RelaxedInstance<&'a [VC::Scalar]>,
-        Evaluation = Vec<VC::Scalar>,
-    >,
-    VC: VectorCommitmentOps,
+            RelaxedWitness<&'a [CM::Scalar]>,
+            RelaxedInstance<&'a [CM::Scalar]>,
+            Evaluation = Vec<CM::Scalar>,
+        >,
+    CM: CommitmentOps,
 {
     type Error = Error;
 
-    fn check_relation(&self, w: &RW<VC>, u: &RU<VC>) -> Result<(), Self::Error> {
+    fn check_relation(&self, w: &RW<CM>, u: &RU<CM>) -> Result<(), Self::Error> {
         let e = self.arith.eval_relation(
             &RelaxedWitness { w: &w.w, e: &[] },
             &RelaxedInstance { x: &u.x, u: &u.u },
         )?;
-        VC::open(&self.ck, &[&w.w[..], &e].concat(), &w.r, &u.cm)?;
+        CM::open(&self.ck, &[&w.w[..], &e].concat(), &w.r, &u.cm)?;
         Ok(())
     }
 }
 
-impl<A, VC> Relation<IW<VC::Scalar>, IU<VC::Scalar>> for OvaKey<A, VC>
+impl<A, CM> Relation<IW<CM::Scalar>, IU<CM::Scalar>> for OvaKey<A, CM>
 where
-    A: ArithRelation<Vec<VC::Scalar>, Vec<VC::Scalar>>,
-    VC: VectorCommitmentDef,
+    A: ArithRelation<Vec<CM::Scalar>, Vec<CM::Scalar>>,
+    CM: CommitmentDef,
 {
     type Error = Error;
 
-    fn check_relation(&self, w: &IW<VC::Scalar>, u: &IU<VC::Scalar>) -> Result<(), Self::Error> {
+    fn check_relation(&self, w: &IW<CM::Scalar>, u: &IU<CM::Scalar>) -> Result<(), Self::Error> {
         self.arith.check_relation(w, u)?;
         Ok(())
     }
 }
 
-impl<A, VC: VectorCommitmentDef> WitnessInstanceSampler<IW<VC::Scalar>, IU<VC::Scalar>>
-    for OvaKey<A, VC>
+impl<A, CM: CommitmentDef> WitnessInstanceSampler<IW<CM::Scalar>, IU<CM::Scalar>>
+    for OvaKey<A, CM>
 {
-    type Source = AssignmentsOwned<VC::Scalar>;
+    type Source = AssignmentsOwned<CM::Scalar>;
     type Error = Error;
 
     fn sample(
         &self,
         z: Self::Source,
         _rng: impl RngCore,
-    ) -> Result<(IW<VC::Scalar>, IU<VC::Scalar>), Error> {
+    ) -> Result<(IW<CM::Scalar>, IU<CM::Scalar>), Error> {
         Ok((z.private.into(), z.public.into()))
     }
 }
 
-impl<A, VC> WitnessInstanceSampler<RW<VC>, RU<VC>> for OvaKey<A, VC>
+impl<A, CM> WitnessInstanceSampler<RW<CM>, RU<CM>> for OvaKey<A, CM>
 where
     A: for<'a> ArithRelation<
-        RelaxedWitness<&'a [VC::Scalar]>,
-        RelaxedInstance<&'a [VC::Scalar]>,
-        Evaluation = Vec<VC::Scalar>,
-    >,
-    VC: VectorCommitmentOps,
+            RelaxedWitness<&'a [CM::Scalar]>,
+            RelaxedInstance<&'a [CM::Scalar]>,
+            Evaluation = Vec<CM::Scalar>,
+        >,
+    CM: CommitmentOps,
 {
     type Source = ();
     type Error = Error;
 
-    fn sample(&self, _: Self::Source, mut rng: impl RngCore) -> Result<(RW<VC>, RU<VC>), Error> {
-        let u = VC::Scalar::rand(&mut rng);
+    fn sample(&self, _: Self::Source, mut rng: impl RngCore) -> Result<(RW<CM>, RU<CM>), Error> {
+        let u = CM::Scalar::rand(&mut rng);
         let x = (0..self.arith.n_public_inputs())
-            .map(|_| VC::Scalar::rand(&mut rng))
+            .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
         let w = (0..self.arith.n_witnesses())
-            .map(|_| VC::Scalar::rand(&mut rng))
+            .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
         let e = self.arith.eval_relation(
             &RelaxedWitness { w: &w, e: &[] },
             &RelaxedInstance { x: &x, u: &u },
         )?;
 
-        let (cm, r) = VC::commit(&self.ck, &[&w[..], &e].concat(), &mut rng)?;
+        let (cm, r) = CM::commit(&self.ck, &[&w[..], &e].concat(), &mut rng)?;
         Ok((RW { w, r }, RU { x, cm, u }))
     }
 }
 
-pub struct AbstractOva<VC, TF, const CHALLENGE_BITS: usize = 128> {
-    _vc: PhantomData<VC>,
+pub struct AbstractOva<CM, TF, const CHALLENGE_BITS: usize = 128> {
+    _vc: PhantomData<CM>,
     _tf: PhantomData<TF>,
 }
 
-pub type Ova<VC, const CHALLENGE_BITS: usize = 128> =
-    AbstractOva<VC, <VC as VectorCommitmentDef>::Scalar, CHALLENGE_BITS>;
+pub type Ova<CM, const CHALLENGE_BITS: usize = 128> =
+    AbstractOva<CM, <CM as CommitmentDef>::Scalar, CHALLENGE_BITS>;
 
-pub type CycleFoldOva<VC, const CHALLENGE_BITS: usize = 128> =
-    AbstractOva<VC, CF2<<VC as VectorCommitmentDef>::Commitment>, CHALLENGE_BITS>;
+pub type CycleFoldOva<CM, const CHALLENGE_BITS: usize = 128> =
+    AbstractOva<CM, CF2<<CM as CommitmentDef>::Commitment>, CHALLENGE_BITS>;
 
-impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> FoldingSchemeDef
-    for AbstractOva<VC, TF, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> FoldingSchemeDef
+    for AbstractOva<CM, TF, CHALLENGE_BITS>
 {
-    type VC = VC;
-    type RW = RW<VC>;
-    type RU = RU<VC>;
-    type IW = IW<VC::Scalar>;
-    type IU = IU<VC::Scalar>;
+    type CM = CM;
+    type RW = RW<CM>;
+    type RU = RU<CM>;
+    type IW = IW<CM::Scalar>;
+    type IU = IU<CM::Scalar>;
 
     type TranscriptField = TF;
-    type Arith = R1CS<VC::Scalar>;
+    type Arith = R1CS<CM::Scalar>;
 
     type Config = (usize, usize);
-    type PublicParam = VC::Key;
-    type DeciderKey = OvaKey<Self::Arith, VC>;
+    type PublicParam = CM::Key;
+    type DeciderKey = OvaKey<Self::Arith, CM>;
     type Challenge = [bool; CHALLENGE_BITS];
-    type Proof<const M: usize, const N: usize> = VC::Commitment;
+    type Proof<const M: usize, const N: usize> = CM::Commitment;
 }
 
-pub struct AbstractOvaGadget<VC, const CHALLENGE_BITS: usize = 128> {
-    _vc: PhantomData<VC>,
+pub struct AbstractOvaGadget<CM, const CHALLENGE_BITS: usize = 128> {
+    _vc: PhantomData<CM>,
 }
 
-impl<VC, const CHALLENGE_BITS: usize> FoldingSchemeDefGadget
-    for AbstractOvaGadget<VC, CHALLENGE_BITS>
+impl<CM, const CHALLENGE_BITS: usize> FoldingSchemeDefGadget
+    for AbstractOvaGadget<CM, CHALLENGE_BITS>
 where
-    VC: VectorCommitmentDefGadget<Native: GroupBasedVectorCommitment>,
+    CM: CommitmentDefGadget<Native: GroupBasedCommitment>,
 {
-    type Native = AbstractOva<VC::Native, VC::ConstraintField, CHALLENGE_BITS>;
+    type Native = AbstractOva<CM::Native, CM::ConstraintField, CHALLENGE_BITS>;
 
-    type VC = VC;
-    type RU = RUVar<VC>;
-    type IU = IUVar<VC::ScalarVar>;
+    type CM = CM;
+    type RU = RUVar<CM>;
+    type IU = IUVar<CM::ScalarVar>;
     type VerifierKey = ();
-    type Challenge = [Boolean<VC::ConstraintField>; CHALLENGE_BITS];
-    type Proof<const M: usize, const N: usize> = VC::CommitmentVar;
+    type Challenge = [Boolean<CM::ConstraintField>; CHALLENGE_BITS];
+    type Proof<const M: usize, const N: usize> = CM::CommitmentVar;
 }
 
-impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> GroupBasedFoldingSchemePrimaryDef
-    for AbstractOva<VC, VC::Scalar, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> GroupBasedFoldingSchemePrimaryDef
+    for AbstractOva<CM, CM::Scalar, CHALLENGE_BITS>
 {
-    type Gadget = AbstractOvaGadget<VC::Gadget2, CHALLENGE_BITS>;
+    type Gadget = AbstractOvaGadget<CM::Gadget2, CHALLENGE_BITS>;
 }
 
-impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize>
-    GroupBasedFoldingSchemeSecondaryDef for AbstractOva<VC, CF2<VC::Commitment>, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> GroupBasedFoldingSchemeSecondaryDef
+    for AbstractOva<CM, CF2<CM::Commitment>, CHALLENGE_BITS>
 {
-    type Gadget = AbstractOvaGadget<VC::Gadget1, CHALLENGE_BITS>;
+    type Gadget = AbstractOvaGadget<CM::Gadget1, CHALLENGE_BITS>;
 }
 
 #[cfg(test)]
@@ -198,7 +195,7 @@ mod tests {
     use ark_ff::UniformRand;
     use ark_std::{error::Error, test_rng};
     use sonobe_primitives::{
-        circuits::utils::{satisfying_assignments_for_test, CircuitForTest},
+        circuits::utils::{CircuitForTest, satisfying_assignments_for_test},
         commitments::pedersen::Pedersen,
     };
 

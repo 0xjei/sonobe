@@ -1,24 +1,24 @@
 use ark_r1cs_std::{
-    alloc::{AllocVar, AllocationMode},
     GR1CSVar,
+    alloc::{AllocVar, AllocationMode},
 };
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::borrow::Borrow;
-use sonobe_primitives::commitments::VectorCommitmentDefGadget;
+use sonobe_primitives::commitments::CommitmentDefGadget;
 
 use super::{CCCSWitness, LCCCSWitness};
 
 #[derive(Debug, PartialEq)]
-pub struct LCCCSWitnessVar<VC: VectorCommitmentDefGadget> {
-    pub w: Vec<VC::ScalarVar>,
-    pub r: VC::RandomnessVar,
+pub struct LCCCSWitnessVar<CM: CommitmentDefGadget> {
+    pub w: Vec<CM::ScalarVar>,
+    pub r: CM::RandomnessVar,
 }
 
-impl<VC: VectorCommitmentDefGadget> AllocVar<LCCCSWitness<VC::Native>, VC::ConstraintField>
-    for LCCCSWitnessVar<VC>
+impl<CM: CommitmentDefGadget> AllocVar<LCCCSWitness<CM::Native>, CM::ConstraintField>
+    for LCCCSWitnessVar<CM>
 {
-    fn new_variable<T: Borrow<LCCCSWitness<VC::Native>>>(
-        cs: impl Into<Namespace<VC::ConstraintField>>,
+    fn new_variable<T: Borrow<LCCCSWitness<CM::Native>>>(
+        cs: impl Into<Namespace<CM::ConstraintField>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
         mode: AllocationMode,
     ) -> Result<Self, SynthesisError> {
@@ -32,10 +32,10 @@ impl<VC: VectorCommitmentDefGadget> AllocVar<LCCCSWitness<VC::Native>, VC::Const
     }
 }
 
-impl<VC: VectorCommitmentDefGadget> GR1CSVar<VC::ConstraintField> for LCCCSWitnessVar<VC> {
-    type Value = LCCCSWitness<VC::Native>;
+impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for LCCCSWitnessVar<CM> {
+    type Value = LCCCSWitness<CM::Native>;
 
-    fn cs(&self) -> ConstraintSystemRef<VC::ConstraintField> {
+    fn cs(&self) -> ConstraintSystemRef<CM::ConstraintField> {
         self.w.cs().or(self.r.cs())
     }
 
@@ -48,16 +48,16 @@ impl<VC: VectorCommitmentDefGadget> GR1CSVar<VC::ConstraintField> for LCCCSWitne
 }
 
 #[derive(Debug, PartialEq)]
-pub struct CCCSWitnessVar<VC: VectorCommitmentDefGadget> {
-    pub w: Vec<VC::ScalarVar>,
-    pub r: VC::RandomnessVar,
+pub struct CCCSWitnessVar<CM: CommitmentDefGadget> {
+    pub w: Vec<CM::ScalarVar>,
+    pub r: CM::RandomnessVar,
 }
 
-impl<VC: VectorCommitmentDefGadget> AllocVar<CCCSWitness<VC::Native>, VC::ConstraintField>
-    for CCCSWitnessVar<VC>
+impl<CM: CommitmentDefGadget> AllocVar<CCCSWitness<CM::Native>, CM::ConstraintField>
+    for CCCSWitnessVar<CM>
 {
-    fn new_variable<T: Borrow<CCCSWitness<VC::Native>>>(
-        cs: impl Into<Namespace<VC::ConstraintField>>,
+    fn new_variable<T: Borrow<CCCSWitness<CM::Native>>>(
+        cs: impl Into<Namespace<CM::ConstraintField>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
         mode: AllocationMode,
     ) -> Result<Self, SynthesisError> {
@@ -71,10 +71,10 @@ impl<VC: VectorCommitmentDefGadget> AllocVar<CCCSWitness<VC::Native>, VC::Constr
     }
 }
 
-impl<VC: VectorCommitmentDefGadget> GR1CSVar<VC::ConstraintField> for CCCSWitnessVar<VC> {
-    type Value = CCCSWitness<VC::Native>;
+impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for CCCSWitnessVar<CM> {
+    type Value = CCCSWitness<CM::Native>;
 
-    fn cs(&self) -> ConstraintSystemRef<VC::ConstraintField> {
+    fn cs(&self) -> ConstraintSystemRef<CM::ConstraintField> {
         self.w.cs().or(self.r.cs())
     }
 

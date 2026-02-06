@@ -1,40 +1,34 @@
 use ark_ff::{Field, PrimeField};
 use ark_r1cs_std::{
+    GR1CSVar,
     alloc::{AllocVar, AllocationMode},
     fields::fp::FpVar,
-    GR1CSVar,
 };
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::{
-    borrow::Borrow, cfg_into_iter, log2, marker::PhantomData, rand::RngCore, sync::Arc,
-    UniformRand,
+    UniformRand, borrow::Borrow, cfg_into_iter, log2, marker::PhantomData, rand::RngCore, sync::Arc,
 };
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use sonobe_primitives::{
-    algebra::ops::
-        pow::Pow
-    ,
-    arithmetizations::{r1cs::R1CS, Arith, ArithConfig, ArithRelation, Error as ArithError},
+    algebra::ops::pow::Pow,
+    arithmetizations::{Arith, ArithConfig, ArithRelation, Error as ArithError, r1cs::R1CS},
     circuits::AssignmentsOwned,
-    commitments::{
-        GroupBasedVectorCommitment, VectorCommitmentDef, VectorCommitmentOps,
-    },
+    commitments::{CommitmentDef, CommitmentOps, GroupBasedCommitment},
     relations::{Relation, WitnessInstanceSampler},
     traits::Dummy,
 };
 
 use self::{
     instances::{
-        circuits::{IncomingInstanceVar as IUVar, RunningInstanceVar as RUVar},
         IncomingInstance as IU, RunningInstance as RU,
+        circuits::{IncomingInstanceVar as IUVar, RunningInstanceVar as RUVar},
     },
     witnesses::{IncomingWitness as IW, RunningWitness as RW},
 };
 use crate::{
-    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeDefGadget,
-    GroupBasedFoldingSchemePrimaryDef, PlainInstance as PU,
-    PlainWitness as PW, TaggedVec,
+    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeDefGadget, GroupBasedFoldingSchemePrimaryDef,
+    PlainInstance as PU, PlainWitness as PW, TaggedVec,
 };
 
 pub mod algorithms;
@@ -43,12 +37,12 @@ pub mod instances;
 pub mod witnesses;
 
 #[derive(Clone)]
-pub struct ProtoGalaxyKey<A, VC: VectorCommitmentDef> {
+pub struct ProtoGalaxyKey<A, CM: CommitmentDef> {
     arith: Arc<A>,
-    ck: Arc<VC::Key>,
+    ck: Arc<CM::Key>,
 }
 
-impl<A: Arith, VC: VectorCommitmentDef> DeciderKey for ProtoGalaxyKey<A, VC> {
+impl<A: Arith, CM: CommitmentDef> DeciderKey for ProtoGalaxyKey<A, CM> {
     type ProverKey = Self;
     type VerifierKey = ();
     type ArithConfig = A::Config;
@@ -66,18 +60,20 @@ impl<A: Arith, VC: VectorCommitmentDef> DeciderKey for ProtoGalaxyKey<A, VC> {
     }
 }
 
-impl<VC: VectorCommitmentDef<Scalar: Field>> ArithRelation<RW<VC>, RU<VC>> for R1CS<VC::Scalar> {
-    type Evaluation = Vec<VC::Scalar>;
+impl<CM: CommitmentDef<Scalar: Field>> ArithRelation<RW<CM>, RU<CM>> for R1CS<CM::Scalar> {
+    type Evaluation = Vec<CM::Scalar>;
 
-    fn eval_relation(&self, w: &RW<VC>, u: &RU<VC>) -> Result<Self::Evaluation, ArithError> {
+    fn eval_relation(&self, w: &RW<CM>, u: &RU<CM>) -> Result<Self::Evaluation, ArithError> {
         Self::eval_relation(self, &w.w, &u.x)
     }
 
-    fn check_evaluation(_w: &RW<VC>, u: &RU<VC>, v: Self::Evaluation) -> Result<(), ArithError> {
+    fn check_evaluation(_w: &RW<CM>, u: &RU<CM>, v: Self::Evaluation) -> Result<(), ArithError> {
         if u.betas.len() != log2(v.len()) as usize {
-            return Err(ArithError::MalformedAssignments(
-                format!("The number of betas in the running instance ({}) does not match the expected length ({}).", u.betas.len(), log2(v.len()))
-            ));
+            return Err(ArithError::MalformedAssignments(format!(
+                "The number of betas in the running instance ({}) does not match the expected length ({}).",
+                u.betas.len(),
+                log2(v.len())
+            )));
         }
 
         let e = cfg_into_iter!(v)
@@ -94,92 +90,92 @@ impl<VC: VectorCommitmentDef<Scalar: Field>> ArithRelation<RW<VC>, RU<VC>> for R
     }
 }
 
-impl<A, VC> Relation<RW<VC>, RU<VC>> for ProtoGalaxyKey<A, VC>
+impl<A, CM> Relation<RW<CM>, RU<CM>> for ProtoGalaxyKey<A, CM>
 where
-    A: ArithRelation<RW<VC>, RU<VC>>,
-    VC: VectorCommitmentOps,
+    A: ArithRelation<RW<CM>, RU<CM>>,
+    CM: CommitmentOps,
 {
     type Error = Error;
 
-    fn check_relation(&self, w: &RW<VC>, u: &RU<VC>) -> Result<(), Self::Error> {
+    fn check_relation(&self, w: &RW<CM>, u: &RU<CM>) -> Result<(), Self::Error> {
         self.arith.check_relation(w, u)?;
-        VC::open(&self.ck, &w.w, &w.r, &u.phi)?;
+        CM::open(&self.ck, &w.w, &w.r, &u.phi)?;
         Ok(())
     }
 }
 
-impl<A, VC> Relation<IW<VC>, IU<VC>> for ProtoGalaxyKey<A, VC>
+impl<A, CM> Relation<IW<CM>, IU<CM>> for ProtoGalaxyKey<A, CM>
 where
-    A: ArithRelation<Vec<VC::Scalar>, Vec<VC::Scalar>>,
-    VC: VectorCommitmentOps,
+    A: ArithRelation<Vec<CM::Scalar>, Vec<CM::Scalar>>,
+    CM: CommitmentOps,
 {
     type Error = Error;
 
-    fn check_relation(&self, w: &IW<VC>, u: &IU<VC>) -> Result<(), Self::Error> {
+    fn check_relation(&self, w: &IW<CM>, u: &IU<CM>) -> Result<(), Self::Error> {
         self.arith.check_relation(&w.w, &u.x)?;
-        VC::open(&self.ck, &w.w, &w.r, &u.phi)?;
+        CM::open(&self.ck, &w.w, &w.r, &u.phi)?;
         Ok(())
     }
 }
 
-impl<A, VC> Relation<PW<VC::Scalar>, PU<VC::Scalar>> for ProtoGalaxyKey<A, VC>
+impl<A, CM> Relation<PW<CM::Scalar>, PU<CM::Scalar>> for ProtoGalaxyKey<A, CM>
 where
-    A: ArithRelation<Vec<VC::Scalar>, Vec<VC::Scalar>>,
-    VC: VectorCommitmentDef,
+    A: ArithRelation<Vec<CM::Scalar>, Vec<CM::Scalar>>,
+    CM: CommitmentDef,
 {
     type Error = Error;
 
-    fn check_relation(&self, w: &PW<VC::Scalar>, u: &PU<VC::Scalar>) -> Result<(), Self::Error> {
+    fn check_relation(&self, w: &PW<CM::Scalar>, u: &PU<CM::Scalar>) -> Result<(), Self::Error> {
         self.arith.check_relation(w, u)?;
         Ok(())
     }
 }
 
-impl<A, VC: VectorCommitmentOps> WitnessInstanceSampler<IW<VC>, IU<VC>> for ProtoGalaxyKey<A, VC> {
-    type Source = AssignmentsOwned<VC::Scalar>;
+impl<A, CM: CommitmentOps> WitnessInstanceSampler<IW<CM>, IU<CM>> for ProtoGalaxyKey<A, CM> {
+    type Source = AssignmentsOwned<CM::Scalar>;
     type Error = Error;
 
-    fn sample(&self, z: Self::Source, rng: impl RngCore) -> Result<(IW<VC>, IU<VC>), Error> {
+    fn sample(&self, z: Self::Source, rng: impl RngCore) -> Result<(IW<CM>, IU<CM>), Error> {
         let (w, x) = (z.private, z.public);
-        let (phi, r) = VC::commit(&self.ck, &w, rng)?;
+        let (phi, r) = CM::commit(&self.ck, &w, rng)?;
         Ok((IW { w, r }, IU { phi, x }))
     }
 }
 
-impl<A, VC: VectorCommitmentDef> WitnessInstanceSampler<PW<VC::Scalar>, PU<VC::Scalar>>
-    for ProtoGalaxyKey<A, VC>
+impl<A, CM: CommitmentDef> WitnessInstanceSampler<PW<CM::Scalar>, PU<CM::Scalar>>
+    for ProtoGalaxyKey<A, CM>
 {
-    type Source = AssignmentsOwned<VC::Scalar>;
+    type Source = AssignmentsOwned<CM::Scalar>;
     type Error = Error;
 
     fn sample(
         &self,
         z: Self::Source,
         _rng: impl RngCore,
-    ) -> Result<(PW<VC::Scalar>, PU<VC::Scalar>), Error> {
+    ) -> Result<(PW<CM::Scalar>, PU<CM::Scalar>), Error> {
         Ok((z.private.into(), z.public.into()))
     }
 }
 
-impl<A, VC> WitnessInstanceSampler<RW<VC>, RU<VC>> for ProtoGalaxyKey<A, VC>
+impl<A, CM> WitnessInstanceSampler<RW<CM>, RU<CM>> for ProtoGalaxyKey<A, CM>
 where
-    A: ArithRelation<Vec<VC::Scalar>, Vec<VC::Scalar>, Evaluation = Vec<VC::Scalar>>,
-    VC: VectorCommitmentOps<Scalar: Field>,
+    A: ArithRelation<Vec<CM::Scalar>, Vec<CM::Scalar>, Evaluation = Vec<CM::Scalar>>,
+    CM: CommitmentOps<Scalar: Field>,
 {
     type Source = ();
     type Error = Error;
 
-    fn sample(&self, _: Self::Source, mut rng: impl RngCore) -> Result<(RW<VC>, RU<VC>), Error> {
+    fn sample(&self, _: Self::Source, mut rng: impl RngCore) -> Result<(RW<CM>, RU<CM>), Error> {
         let x = (0..self.arith.n_public_inputs())
-            .map(|_| VC::Scalar::rand(&mut rng))
+            .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
         let w = (0..self.arith.n_witnesses())
-            .map(|_| VC::Scalar::rand(&mut rng))
+            .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
-        let (phi, r) = VC::commit(&self.ck, &w, &mut rng)?;
+        let (phi, r) = CM::commit(&self.ck, &w, &mut rng)?;
 
         let betas = (0..self.arith.log_constraints())
-            .map(|_| VC::Scalar::rand(&mut rng))
+            .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
 
         let v = self.arith.eval_relation(&w, &x)?;
@@ -208,48 +204,48 @@ impl<F: Field, Cfg: ArithConfig, const N: usize> Dummy<&Cfg> for ProtoGalaxyProo
     }
 }
 
-pub struct ProtoGalaxy<VC> {
-    _vc: PhantomData<VC>,
+pub struct ProtoGalaxy<CM> {
+    _vc: PhantomData<CM>,
 }
 
-impl<VC: GroupBasedVectorCommitment> FoldingSchemeDef for ProtoGalaxy<VC> {
-    type VC = VC;
-    type RW = RW<VC>;
-    type RU = RU<VC>;
-    type IW = IW<VC>;
-    type IU = IU<VC>;
+impl<CM: GroupBasedCommitment> FoldingSchemeDef for ProtoGalaxy<CM> {
+    type CM = CM;
+    type RW = RW<CM>;
+    type RU = RU<CM>;
+    type IW = IW<CM>;
+    type IU = IU<CM>;
 
-    type TranscriptField = VC::Scalar;
-    type Arith = R1CS<VC::Scalar>;
+    type TranscriptField = CM::Scalar;
+    type Arith = R1CS<CM::Scalar>;
 
     type Config = usize;
-    type PublicParam = VC::Key;
-    type DeciderKey = ProtoGalaxyKey<Self::Arith, VC>;
-    type Challenge = TaggedVec<VC::Scalar, 'c'>;
-    type Proof<const M: usize, const N: usize> = ProtoGalaxyProof<VC::Scalar, N>;
+    type PublicParam = CM::Key;
+    type DeciderKey = ProtoGalaxyKey<Self::Arith, CM>;
+    type Challenge = TaggedVec<CM::Scalar, 'c'>;
+    type Proof<const M: usize, const N: usize> = ProtoGalaxyProof<CM::Scalar, N>;
 }
 
 // TODO: experimental design
-pub struct ProtoGalaxy2<VC> {
-    _vc: PhantomData<VC>,
+pub struct ProtoGalaxy2<CM> {
+    _vc: PhantomData<CM>,
 }
 
-impl<VC: GroupBasedVectorCommitment> FoldingSchemeDef for ProtoGalaxy2<VC> {
-    type VC = VC;
-    type RW = RW<VC>;
-    type RU = RU<VC>;
-    type IW = PW<VC::Scalar>;
-    type IU = PU<VC::Scalar>;
+impl<CM: GroupBasedCommitment> FoldingSchemeDef for ProtoGalaxy2<CM> {
+    type CM = CM;
+    type RW = RW<CM>;
+    type RU = RU<CM>;
+    type IW = PW<CM::Scalar>;
+    type IU = PU<CM::Scalar>;
 
-    type TranscriptField = VC::Scalar;
-    type Arith = R1CS<VC::Scalar>;
+    type TranscriptField = CM::Scalar;
+    type Arith = R1CS<CM::Scalar>;
 
     type Config = usize;
-    type PublicParam = VC::Key;
-    type DeciderKey = ProtoGalaxyKey<Self::Arith, VC>;
-    type Challenge = Vec<VC::Scalar>;
+    type PublicParam = CM::Key;
+    type DeciderKey = ProtoGalaxyKey<Self::Arith, CM>;
+    type Challenge = Vec<CM::Scalar>;
     type Proof<const M: usize, const N: usize> =
-        ([VC::Commitment; N], ProtoGalaxyProof<VC::Scalar, N>);
+        ([CM::Commitment; N], ProtoGalaxyProof<CM::Scalar, N>);
 }
 
 #[derive(Clone)]
@@ -293,23 +289,23 @@ impl<F: PrimeField, const N: usize> GR1CSVar<F> for ProtoGalaxyProofVar<F, N> {
     }
 }
 
-pub struct ProtoGalaxyGadget<VC> {
-    _v: PhantomData<VC>,
+pub struct ProtoGalaxyGadget<CM> {
+    _v: PhantomData<CM>,
 }
 
-impl<VC: GroupBasedVectorCommitment> FoldingSchemeDefGadget for ProtoGalaxyGadget<VC> {
-    type Native = ProtoGalaxy<VC>;
+impl<CM: GroupBasedCommitment> FoldingSchemeDefGadget for ProtoGalaxyGadget<CM> {
+    type Native = ProtoGalaxy<CM>;
 
-    type VC = VC::Gadget2;
-    type RU = RUVar<VC::Gadget2>;
-    type IU = IUVar<VC::Gadget2>;
+    type CM = CM::Gadget2;
+    type RU = RUVar<CM::Gadget2>;
+    type IU = IUVar<CM::Gadget2>;
     type VerifierKey = ();
-    type Challenge = TaggedVec<FpVar<VC::Scalar>, 'c'>;
-    type Proof<const M: usize, const N: usize> = ProtoGalaxyProofVar<VC::Scalar, N>;
+    type Challenge = TaggedVec<FpVar<CM::Scalar>, 'c'>;
+    type Proof<const M: usize, const N: usize> = ProtoGalaxyProofVar<CM::Scalar, N>;
 }
 
-impl<VC: GroupBasedVectorCommitment> GroupBasedFoldingSchemePrimaryDef for ProtoGalaxy<VC> {
-    type Gadget = ProtoGalaxyGadget<VC>;
+impl<CM: GroupBasedCommitment> GroupBasedFoldingSchemePrimaryDef for ProtoGalaxy<CM> {
+    type Gadget = ProtoGalaxyGadget<CM>;
 }
 
 #[cfg(test)]
@@ -318,7 +314,7 @@ mod tests {
     use ark_ff::UniformRand;
     use ark_std::{error::Error, rand::Rng, test_rng};
     use sonobe_primitives::{
-        circuits::utils::{satisfying_assignments_for_test, CircuitForTest},
+        circuits::utils::{CircuitForTest, satisfying_assignments_for_test},
         commitments::pedersen::Pedersen,
     };
 

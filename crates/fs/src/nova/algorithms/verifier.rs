@@ -2,17 +2,17 @@ use ark_std::{borrow::Borrow, cfg_iter, ops::Mul};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use sonobe_primitives::{
-    algebra::ops::bits::FromBits, commitments::GroupBasedVectorCommitment, traits::SonobeField,
+    algebra::ops::bits::FromBits, commitments::GroupBasedCommitment, traits::SonobeField,
     transcripts::Transcript,
 };
 
 use crate::{
-    nova::{AbstractNova, AbstractNova2},
     Error, FoldingSchemeVerifier,
+    nova::{AbstractNova, AbstractNova2},
 };
 
-impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
-    FoldingSchemeVerifier<1, 1> for AbstractNova<VC, TF, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemeVerifier<1, 1> for AbstractNova<CM, TF, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn verify(
@@ -30,7 +30,7 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
             transcript.add(cm_t);
             transcript.challenge_bits(CHALLENGE_BITS)
         };
-        let rho = VC::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
 
         Ok(Self::RU {
             cm_e: U.cm_e + cm_t.mul(rho),
@@ -41,8 +41,8 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
     }
 }
 
-impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
-    FoldingSchemeVerifier<2, 0> for AbstractNova<VC, TF, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemeVerifier<2, 0> for AbstractNova<CM, TF, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn verify(
@@ -60,7 +60,7 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
             transcript.add(cm_t);
             transcript.challenge_bits(CHALLENGE_BITS)
         };
-        let rho = VC::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
         let rho_squared = rho * rho;
 
         Ok(Self::RU {
@@ -75,8 +75,8 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
     }
 }
 
-impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
-    FoldingSchemeVerifier<1, 1> for AbstractNova2<VC, TF, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemeVerifier<1, 1> for AbstractNova2<CM, TF, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn verify(
@@ -94,7 +94,7 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
             transcript.add(pi);
             transcript.challenge_bits(CHALLENGE_BITS)
         };
-        let rho = VC::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
 
         let (cm_w, cm_t) = pi;
 

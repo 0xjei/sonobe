@@ -1,27 +1,25 @@
-use sonobe_primitives::{
-    arithmetizations::ArithConfig, commitments::VectorCommitmentDef, traits::Dummy,
-};
+use sonobe_primitives::{arithmetizations::ArithConfig, commitments::CommitmentDef, traits::Dummy};
 
 use crate::FoldingWitness;
 
 pub mod circuits;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct RunningWitness<VC: VectorCommitmentDef> {
-    pub w: Vec<VC::Scalar>,
-    pub r_w: VC::Randomness,
-    pub e: Vec<VC::Scalar>,
+pub struct RunningWitness<CM: CommitmentDef> {
+    pub w: Vec<CM::Scalar>,
+    pub r_w: CM::Randomness,
+    pub e: Vec<CM::Scalar>,
 }
 
-impl<VC: VectorCommitmentDef> FoldingWitness<VC> for RunningWitness<VC> {
+impl<CM: CommitmentDef> FoldingWitness<CM> for RunningWitness<CM> {
     const N_OPENINGS: usize = 1;
 
-    fn openings(&self) -> Vec<(&[VC::Scalar], &VC::Randomness)> {
+    fn openings(&self) -> Vec<(&[CM::Scalar], &CM::Randomness)> {
         vec![(&self.w, &self.r_w)]
     }
 }
 
-impl<VC: VectorCommitmentDef, Cfg: ArithConfig> Dummy<&Cfg> for RunningWitness<VC> {
+impl<CM: CommitmentDef, Cfg: ArithConfig> Dummy<&Cfg> for RunningWitness<CM> {
     fn dummy(cfg: &Cfg) -> Self {
         Self {
             w: vec![Default::default(); cfg.n_witnesses()],

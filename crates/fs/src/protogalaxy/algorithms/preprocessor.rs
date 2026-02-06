@@ -1,21 +1,21 @@
 use ark_std::rand::RngCore;
-use sonobe_primitives::commitments::GroupBasedVectorCommitment;
+use sonobe_primitives::commitments::GroupBasedCommitment;
 
 use crate::{
-    protogalaxy::{ProtoGalaxy, ProtoGalaxy2},
     Error, FoldingSchemePreprocessor,
+    protogalaxy::{ProtoGalaxy, ProtoGalaxy2},
 };
 
-impl<VC: GroupBasedVectorCommitment> FoldingSchemePreprocessor for ProtoGalaxy<VC> {
+impl<CM: GroupBasedCommitment> FoldingSchemePreprocessor for ProtoGalaxy<CM> {
     fn preprocess(ck_len: usize, mut rng: impl RngCore) -> Result<Self::PublicParam, Error> {
-        let ck = VC::generate_key(ck_len, &mut rng)?;
+        let ck = CM::generate_key(ck_len, &mut rng)?;
         Ok(ck)
     }
 }
 
-impl<VC: GroupBasedVectorCommitment> FoldingSchemePreprocessor for ProtoGalaxy2<VC> {
+impl<CM: GroupBasedCommitment> FoldingSchemePreprocessor for ProtoGalaxy2<CM> {
     fn preprocess(ck_len: usize, mut rng: impl RngCore) -> Result<Self::PublicParam, Error> {
-        let ck = VC::generate_key(ck_len, &mut rng)?;
+        let ck = CM::generate_key(ck_len, &mut rng)?;
         Ok(ck)
     }
 }

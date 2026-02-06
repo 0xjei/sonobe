@@ -1,31 +1,31 @@
 use ark_r1cs_std::{
+    GR1CSVar,
     alloc::{AllocVar, AllocationMode},
     fields::fp::FpVar,
     prelude::Boolean,
     select::CondSelectGadget,
-    GR1CSVar,
 };
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::borrow::Borrow;
-use sonobe_primitives::{commitments::VectorCommitmentDefGadget, transcripts::AbsorbableGadget};
+use sonobe_primitives::{commitments::CommitmentDefGadget, transcripts::AbsorbableGadget};
 
 use super::{CCCSInstance, LCCCSInstance};
 use crate::FoldingInstanceVar;
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct LCCCSInstanceVar<VC: VectorCommitmentDefGadget> {
-    pub cm: VC::CommitmentVar,
-    pub u: VC::ScalarVar,
-    pub x: Vec<VC::ScalarVar>,
-    pub r_x: Vec<VC::ScalarVar>,
-    pub v: Vec<VC::ScalarVar>,
+pub struct LCCCSInstanceVar<CM: CommitmentDefGadget> {
+    pub cm: CM::CommitmentVar,
+    pub u: CM::ScalarVar,
+    pub x: Vec<CM::ScalarVar>,
+    pub r_x: Vec<CM::ScalarVar>,
+    pub v: Vec<CM::ScalarVar>,
 }
 
-impl<VC: VectorCommitmentDefGadget> AllocVar<LCCCSInstance<VC::Native>, VC::ConstraintField>
-    for LCCCSInstanceVar<VC>
+impl<CM: CommitmentDefGadget> AllocVar<LCCCSInstance<CM::Native>, CM::ConstraintField>
+    for LCCCSInstanceVar<CM>
 {
-    fn new_variable<T: Borrow<LCCCSInstance<VC::Native>>>(
-        cs: impl Into<Namespace<VC::ConstraintField>>,
+    fn new_variable<T: Borrow<LCCCSInstance<CM::Native>>>(
+        cs: impl Into<Namespace<CM::ConstraintField>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
         mode: AllocationMode,
     ) -> Result<Self, SynthesisError> {
@@ -42,10 +42,10 @@ impl<VC: VectorCommitmentDefGadget> AllocVar<LCCCSInstance<VC::Native>, VC::Cons
     }
 }
 
-impl<VC: VectorCommitmentDefGadget> GR1CSVar<VC::ConstraintField> for LCCCSInstanceVar<VC> {
-    type Value = LCCCSInstance<VC::Native>;
+impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for LCCCSInstanceVar<CM> {
+    type Value = LCCCSInstance<CM::Native>;
 
-    fn cs(&self) -> ConstraintSystemRef<VC::ConstraintField> {
+    fn cs(&self) -> ConstraintSystemRef<CM::ConstraintField> {
         self.cm
             .cs()
             .or(self.u.cs())
@@ -65,10 +65,10 @@ impl<VC: VectorCommitmentDefGadget> GR1CSVar<VC::ConstraintField> for LCCCSInsta
     }
 }
 
-impl<VC: VectorCommitmentDefGadget> AbsorbableGadget<VC::ConstraintField> for LCCCSInstanceVar<VC> {
+impl<CM: CommitmentDefGadget> AbsorbableGadget<CM::ConstraintField> for LCCCSInstanceVar<CM> {
     fn absorb_into(
         &self,
-        dest: &mut Vec<FpVar<VC::ConstraintField>>,
+        dest: &mut Vec<FpVar<CM::ConstraintField>>,
     ) -> Result<(), SynthesisError> {
         self.cm.absorb_into(dest)?;
         self.u.absorb_into(dest)?;
@@ -78,9 +78,9 @@ impl<VC: VectorCommitmentDefGadget> AbsorbableGadget<VC::ConstraintField> for LC
     }
 }
 
-impl<VC: VectorCommitmentDefGadget> CondSelectGadget<VC::ConstraintField> for LCCCSInstanceVar<VC> {
+impl<CM: CommitmentDefGadget> CondSelectGadget<CM::ConstraintField> for LCCCSInstanceVar<CM> {
     fn conditionally_select(
-        cond: &Boolean<VC::ConstraintField>,
+        cond: &Boolean<CM::ConstraintField>,
         true_value: &Self,
         false_value: &Self,
     ) -> Result<Self, SynthesisError> {
@@ -118,19 +118,19 @@ impl<VC: VectorCommitmentDefGadget> CondSelectGadget<VC::ConstraintField> for LC
     }
 }
 
-impl<VC: VectorCommitmentDefGadget> FoldingInstanceVar<VC> for LCCCSInstanceVar<VC> {
-    fn commitments(&self) -> Vec<&VC::CommitmentVar> {
+impl<CM: CommitmentDefGadget> FoldingInstanceVar<CM> for LCCCSInstanceVar<CM> {
+    fn commitments(&self) -> Vec<&CM::CommitmentVar> {
         vec![&self.cm]
     }
 
-    fn public_inputs(&self) -> &Vec<VC::ScalarVar> {
+    fn public_inputs(&self) -> &Vec<CM::ScalarVar> {
         &self.x
     }
 
     fn new_witness_with_public_inputs(
-        cs: impl Into<Namespace<VC::ConstraintField>>,
+        cs: impl Into<Namespace<CM::ConstraintField>>,
         u: &Self::Value,
-        x: Vec<VC::ScalarVar>,
+        x: Vec<CM::ScalarVar>,
     ) -> Result<Self, SynthesisError> {
         let cs = cs.into().cs();
         Ok(Self {
@@ -144,16 +144,16 @@ impl<VC: VectorCommitmentDefGadget> FoldingInstanceVar<VC> for LCCCSInstanceVar<
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct CCCSInstanceVar<VC: VectorCommitmentDefGadget> {
-    pub cm: VC::CommitmentVar,
-    pub x: Vec<VC::ScalarVar>,
+pub struct CCCSInstanceVar<CM: CommitmentDefGadget> {
+    pub cm: CM::CommitmentVar,
+    pub x: Vec<CM::ScalarVar>,
 }
 
-impl<VC: VectorCommitmentDefGadget> AllocVar<CCCSInstance<VC::Native>, VC::ConstraintField>
-    for CCCSInstanceVar<VC>
+impl<CM: CommitmentDefGadget> AllocVar<CCCSInstance<CM::Native>, CM::ConstraintField>
+    for CCCSInstanceVar<CM>
 {
-    fn new_variable<T: Borrow<CCCSInstance<VC::Native>>>(
-        cs: impl Into<Namespace<VC::ConstraintField>>,
+    fn new_variable<T: Borrow<CCCSInstance<CM::Native>>>(
+        cs: impl Into<Namespace<CM::ConstraintField>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
         mode: AllocationMode,
     ) -> Result<Self, SynthesisError> {
@@ -167,10 +167,10 @@ impl<VC: VectorCommitmentDefGadget> AllocVar<CCCSInstance<VC::Native>, VC::Const
     }
 }
 
-impl<VC: VectorCommitmentDefGadget> GR1CSVar<VC::ConstraintField> for CCCSInstanceVar<VC> {
-    type Value = CCCSInstance<VC::Native>;
+impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for CCCSInstanceVar<CM> {
+    type Value = CCCSInstance<CM::Native>;
 
-    fn cs(&self) -> ConstraintSystemRef<VC::ConstraintField> {
+    fn cs(&self) -> ConstraintSystemRef<CM::ConstraintField> {
         self.cm.cs().or(self.x.cs())
     }
 
@@ -182,19 +182,19 @@ impl<VC: VectorCommitmentDefGadget> GR1CSVar<VC::ConstraintField> for CCCSInstan
     }
 }
 
-impl<VC: VectorCommitmentDefGadget> AbsorbableGadget<VC::ConstraintField> for CCCSInstanceVar<VC> {
+impl<CM: CommitmentDefGadget> AbsorbableGadget<CM::ConstraintField> for CCCSInstanceVar<CM> {
     fn absorb_into(
         &self,
-        dest: &mut Vec<FpVar<VC::ConstraintField>>,
+        dest: &mut Vec<FpVar<CM::ConstraintField>>,
     ) -> Result<(), SynthesisError> {
         self.cm.absorb_into(dest)?;
         self.x.absorb_into(dest)
     }
 }
 
-impl<VC: VectorCommitmentDefGadget> CondSelectGadget<VC::ConstraintField> for CCCSInstanceVar<VC> {
+impl<CM: CommitmentDefGadget> CondSelectGadget<CM::ConstraintField> for CCCSInstanceVar<CM> {
     fn conditionally_select(
-        cond: &Boolean<VC::ConstraintField>,
+        cond: &Boolean<CM::ConstraintField>,
         true_value: &Self,
         false_value: &Self,
     ) -> Result<Self, SynthesisError> {
@@ -213,19 +213,19 @@ impl<VC: VectorCommitmentDefGadget> CondSelectGadget<VC::ConstraintField> for CC
     }
 }
 
-impl<VC: VectorCommitmentDefGadget> FoldingInstanceVar<VC> for CCCSInstanceVar<VC> {
-    fn commitments(&self) -> Vec<&VC::CommitmentVar> {
+impl<CM: CommitmentDefGadget> FoldingInstanceVar<CM> for CCCSInstanceVar<CM> {
+    fn commitments(&self) -> Vec<&CM::CommitmentVar> {
         vec![&self.cm]
     }
 
-    fn public_inputs(&self) -> &Vec<VC::ScalarVar> {
+    fn public_inputs(&self) -> &Vec<CM::ScalarVar> {
         &self.x
     }
 
     fn new_witness_with_public_inputs(
-        cs: impl Into<Namespace<VC::ConstraintField>>,
+        cs: impl Into<Namespace<CM::ConstraintField>>,
         u: &Self::Value,
-        x: Vec<VC::ScalarVar>,
+        x: Vec<CM::ScalarVar>,
     ) -> Result<Self, SynthesisError> {
         let cs = cs.into().cs();
         Ok(Self {

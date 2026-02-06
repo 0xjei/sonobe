@@ -3,24 +3,21 @@ use ark_std::{borrow::Borrow, cfg_into_iter, cfg_iter, ops::Mul, rand::RngCore};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use sonobe_primitives::{
-    algebra::ops::bits::FromBits,
-    circuits::AssignmentsOwned,
-    commitments::GroupBasedVectorCommitment,
-    traits::SonobeField,
-    transcripts::Transcript,
+    algebra::ops::bits::FromBits, circuits::AssignmentsOwned, commitments::GroupBasedCommitment,
+    traits::SonobeField, transcripts::Transcript,
 };
 
 use crate::{
-    nova::{AbstractNova, AbstractNova2, NovaKey},
     Error, FoldingSchemeProver,
+    nova::{AbstractNova, AbstractNova2, NovaKey},
 };
 
-impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
-    FoldingSchemeProver<1, 1> for AbstractNova<VC, TF, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemeProver<1, 1> for AbstractNova<CM, TF, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn prove(
-        pk: &NovaKey<Self::Arith, VC>,
+        pk: &NovaKey<Self::Arith, CM>,
         transcript: &mut impl Transcript<TF>,
         Ws: &[impl Borrow<Self::RW>; 1],
         Us: &[impl Borrow<Self::RU>; 1],
@@ -34,7 +31,7 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
         // Compute the cross term `T` by following the optimized approach in
         // [Mova](https://eprint.iacr.org/2024/1220.pdf)'s section 5.2.
         let v = pk.arith.eval_assignments(AssignmentsOwned::from((
-            U.u + VC::Scalar::one(),
+            U.u + CM::Scalar::one(),
             cfg_iter!(U.x).zip(&u.x).map(|(a, b)| *a + b).collect(),
             cfg_iter!(W.w).zip(&w.w).map(|(a, b)| *a + b).collect(),
         )))?;
@@ -43,7 +40,7 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
             .map(|(a, b)| a - b)
             .collect::<Vec<_>>();
 
-        let (cm_t, r_t) = VC::commit(&pk.ck, &t, rng)?;
+        let (cm_t, r_t) = CM::commit(&pk.ck, &t, rng)?;
 
         let rho_bits = {
             transcript.add(&U);
@@ -51,7 +48,7 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
             transcript.add(&cm_t);
             transcript.challenge_bits(CHALLENGE_BITS)
         };
-        let rho = VC::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
 
         Ok((
             Self::RW {
@@ -72,12 +69,12 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
     }
 }
 
-impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
-    FoldingSchemeProver<2, 0> for AbstractNova<VC, TF, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemeProver<2, 0> for AbstractNova<CM, TF, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn prove(
-        pk: &NovaKey<Self::Arith, VC>,
+        pk: &NovaKey<Self::Arith, CM>,
         transcript: &mut impl Transcript<TF>,
         [W1, W2]: &[impl Borrow<Self::RW>; 2],
         [U1, U2]: &[impl Borrow<Self::RU>; 2],
@@ -101,7 +98,7 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
             .map(|((a, b), c)| a - b - c)
             .collect::<Vec<_>>();
 
-        let (cm_t, r_t) = VC::commit(&pk.ck, &t, rng)?;
+        let (cm_t, r_t) = CM::commit(&pk.ck, &t, rng)?;
 
         let rho_bits = {
             transcript.add(&U1);
@@ -109,7 +106,7 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
             transcript.add(&cm_t);
             transcript.challenge_bits(CHALLENGE_BITS)
         };
-        let rho = VC::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
         let rho_squared = rho * rho;
 
         Ok((
@@ -141,12 +138,12 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
     }
 }
 
-impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
-    FoldingSchemeProver<1, 1> for AbstractNova2<VC, TF, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemeProver<1, 1> for AbstractNova2<CM, TF, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn prove(
-        pk: &NovaKey<Self::Arith, VC>,
+        pk: &NovaKey<Self::Arith, CM>,
         transcript: &mut impl Transcript<TF>,
         Ws: &[impl Borrow<Self::RW>; 1],
         Us: &[impl Borrow<Self::RU>; 1],
@@ -160,7 +157,7 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
         // Compute the cross term `T` by following the optimized approach in
         // [Mova](https://eprint.iacr.org/2024/1220.pdf)'s section 5.2.
         let v = pk.arith.eval_assignments(AssignmentsOwned::from((
-            U.u + VC::Scalar::one(),
+            U.u + CM::Scalar::one(),
             cfg_iter!(U.x).zip(&u[..]).map(|(a, b)| *a + b).collect(),
             cfg_iter!(W.w).zip(&w[..]).map(|(a, b)| *a + b).collect(),
         )))?;
@@ -169,9 +166,9 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
             .map(|(a, b)| a - b)
             .collect::<Vec<_>>();
 
-        let (cm_w, r_w) = VC::commit(&pk.ck, w, &mut rng)?;
+        let (cm_w, r_w) = CM::commit(&pk.ck, w, &mut rng)?;
 
-        let (cm_t, r_t) = VC::commit(&pk.ck, &t, &mut rng)?;
+        let (cm_t, r_t) = CM::commit(&pk.ck, &t, &mut rng)?;
 
         let pi = (cm_w, cm_t);
 
@@ -181,7 +178,7 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
             transcript.add(&pi);
             transcript.challenge_bits(CHALLENGE_BITS)
         };
-        let rho = VC::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
 
         Ok((
             Self::RW {

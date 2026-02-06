@@ -1,24 +1,24 @@
 use ark_ff::Zero;
-use ark_relations::gr1cs::{ConstraintSystem, SynthesisError, SynthesisMode};
+use ark_relations::gr1cs::{ConstraintSystem, SynthesisError};
 use ark_std::{borrow::Borrow, marker::PhantomData, rand::RngCore};
 use sonobe_fs::{
     DeciderKey, FoldingInstance, FoldingSchemeDef, FoldingSchemeDefGadget,
-    FoldingSchemeFullVerifierGadget, FoldingSchemePartialVerifierGadget, GroupBasedFoldingSchemePrimary,
-    GroupBasedFoldingSchemeSecondary,
+    FoldingSchemeFullVerifierGadget, FoldingSchemePartialVerifierGadget,
+    GroupBasedFoldingSchemePrimary, GroupBasedFoldingSchemeSecondary,
 };
 use sonobe_primitives::{
     algebra::field::emulated::EmulatedFieldVar,
     arithmetizations::Arith,
-    circuits::{ConstraintSystemBuilder, ConstraintSystemExt, FCircuit},
-    commitments::VectorCommitmentDef,
+    circuits::{ArithExtractor, AssignmentsExtractor, FCircuit},
+    commitments::CommitmentDef,
     relations::WitnessInstanceSampler,
-    traits::{Dummy, SonobeCurve, CF1, CF2},
+    traits::{CF1, CF2, Dummy, SonobeCurve},
     transcripts::Transcript,
 };
 
 use crate::{
-    compilers::cyclefold::circuits::{AugmentedCircuit, CycleFoldCircuit, CycleFoldConfig},
     Error, IVC,
+    compilers::cyclefold::circuits::{AugmentedCircuit, CycleFoldCircuit, CycleFoldConfig},
 };
 
 pub mod adapters;
@@ -27,7 +27,7 @@ pub mod circuits;
 pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
     GroupBasedFoldingSchemePrimary<M, N>
 {
-    type CFConfig: CycleFoldConfig<C = <Self::VC as VectorCommitmentDef>::Commitment>;
+    type CFConfig: CycleFoldConfig<C = <Self::CM as CommitmentDef>::Commitment>;
 
     const N_CYCLEFOLDS: usize;
 
@@ -50,8 +50,8 @@ pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
         Vec<
             Vec<
                 EmulatedFieldVar<
-                    <Self::VC as VectorCommitmentDef>::Scalar,
-                    CF2<<Self::VC as VectorCommitmentDef>::Commitment>,
+                    <Self::CM as CommitmentDef>::Scalar,
+                    CF2<<Self::CM as CommitmentDef>::Commitment>,
                 >,
             >,
         >,
@@ -96,26 +96,26 @@ pub struct CycleFoldBasedIVC<FS1, FS2, T> {
 impl<FS1, FS2, T> IVC for CycleFoldBasedIVC<FS1, FS2, T>
 where
     FS1: FoldingSchemeCycleFoldExt<
-        1,
-        1,
-        Arith: From<ConstraintSystem<CF1<<FS1::VC as VectorCommitmentDef>::Commitment>>>,
-        Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
-        VC: VectorCommitmentDef<
-            Commitment: SonobeCurve<BaseField = <FS2::VC as VectorCommitmentDef>::Scalar>,
+            1,
+            1,
+            Arith: From<ConstraintSystem<CF1<<FS1::CM as CommitmentDef>::Commitment>>>,
+            Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
+            CM: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS2::CM as CommitmentDef>::Scalar>,
+            >,
         >,
-    >,
     FS2: GroupBasedFoldingSchemeSecondary<
-        1,
-        1,
-        Arith: From<ConstraintSystem<CF1<<FS2::VC as VectorCommitmentDef>::Commitment>>>,
-        Gadget: FoldingSchemeFullVerifierGadget<1, 1, VerifierKey = ()>,
-        VC: VectorCommitmentDef<
-            Commitment: SonobeCurve<BaseField = <FS1::VC as VectorCommitmentDef>::Scalar>,
+            1,
+            1,
+            Arith: From<ConstraintSystem<CF1<<FS2::CM as CommitmentDef>::Commitment>>>,
+            Gadget: FoldingSchemeFullVerifierGadget<1, 1, VerifierKey = ()>,
+            CM: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS1::CM as CommitmentDef>::Scalar>,
+            >,
         >,
-    >,
-    T: Transcript<CF1<<FS1::VC as VectorCommitmentDef>::Commitment>>,
+    T: Transcript<CF1<<FS1::CM as CommitmentDef>::Commitment>>,
 {
-    type Field = <FS1::VC as VectorCommitmentDef>::Scalar;
+    type Field = <FS1::CM as CommitmentDef>::Scalar;
 
     type Config = (FS1::Config, FS2::Config, T::Config);
 
@@ -144,11 +144,9 @@ where
     ) -> Result<(Self::ProverKey<FC>, Self::VerifierKey<FC>), Error> {
         let cyclefold_circuit = CycleFoldCircuit::<FS1::CFConfig>::default();
 
-        let cs = ConstraintSystemBuilder::new()
-            .with_setup_mode()
-            .with_circuit(cyclefold_circuit)
-            .synthesize()?;
-        let arith2 = FS2::Arith::from(cs);
+        let cs = ArithExtractor::new();
+        cs.execute_synthesizer(cyclefold_circuit)?;
+        let arith2 = cs.arith::<FS2::Arith>()?;
 
         let mut arith1 = FS1::Arith::default();
 
@@ -159,11 +157,9 @@ where
                 arith2_config: arith2.config(),
                 step_circuit,
             };
-            let cs = ConstraintSystemBuilder::new()
-                .with_setup_mode()
-                .with_circuit(augmented_circuit)
-                .synthesize()?;
-            let new_arith1 = FS1::Arith::from(cs);
+            let cs = ArithExtractor::new();
+            cs.execute_synthesizer(augmented_circuit)?;
+            let new_arith1 = cs.arith::<FS1::Arith>()?;
             if new_arith1.config() == arith1.config() {
                 break;
             }
@@ -192,11 +188,6 @@ where
         Proof(W, U, w, u, cf_W, cf_U): &Self::Proof<FC>,
         mut rng: impl RngCore,
     ) -> Result<(FC::State, FC::ExternalOutputs, Self::Proof<FC>), Error> {
-        let mode = SynthesisMode::Prove {
-            construct_matrices: false,
-            generate_lc_assignments: false,
-        };
-
         let hash = T::new_with_pp_hash(hash_config, *pp_hash);
         let mut transcript = hash.separate_domain("transcript".as_ref());
 
@@ -231,9 +222,8 @@ where
 
             let cf_configs = FS1::to_cyclefold_configs(&[U], &[u], &proof, challenge);
             for (i, cfg) in cf_configs.iter().enumerate() {
-                let cs = ConstraintSystem::new_ref();
-                cs.set_mode(mode);
-                cfg.verify_point_rlc(cs.clone())?;
+                let cs = AssignmentsExtractor::new();
+                cs.execute_fn(|cs| cfg.verify_point_rlc(cs))?;
 
                 let (cf_w, cf_u) = dk2.sample(cs.assignments()?, &mut rng)?;
 
@@ -250,26 +240,31 @@ where
             }
         }
 
-        let cs = ConstraintSystem::new_ref();
-        cs.set_mode(mode);
-        let (next_state, external_outputs) = augmented_circuit.compute_next_state(
-            cs.clone(),
-            *pp_hash,
-            i,
-            initial_state,
-            current_state,
-            external_inputs,
-            U,
-            u,
-            proof,
-            cf_U,
-            cf_us,
-            cf_proofs,
-        )?;
+        let cs = AssignmentsExtractor::new();
+        let (next_state, external_outputs) = cs.execute_fn(|cs| {
+            augmented_circuit.compute_next_state(
+                cs,
+                *pp_hash,
+                i,
+                initial_state,
+                current_state,
+                external_inputs,
+                U,
+                u,
+                proof,
+                cf_U,
+                cf_us,
+                cf_proofs,
+            )
+        })?;
 
         let (ww, uu) = dk1.sample(cs.assignments()?, &mut rng)?;
 
-        Ok((next_state, external_outputs, Proof(WW, UU, ww, uu, cf_WW, cf_UU)))
+        Ok((
+            next_state,
+            external_outputs,
+            Proof(WW, UU, ww, uu, cf_WW, cf_UU),
+        ))
     }
 
     #[allow(non_snake_case)]

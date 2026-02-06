@@ -1,15 +1,15 @@
 use ark_std::sync::Arc;
 use sonobe_primitives::{
     arithmetizations::Arith,
-    commitments::{CommitmentKey, GroupBasedVectorCommitment},
+    commitments::{CommitmentKey, GroupBasedCommitment},
 };
 
 use crate::{
-    protogalaxy::{ProtoGalaxy, ProtoGalaxy2},
     Error, FoldingSchemeKeyGenerator,
+    protogalaxy::{ProtoGalaxy, ProtoGalaxy2},
 };
 
-impl<VC: GroupBasedVectorCommitment> FoldingSchemeKeyGenerator for ProtoGalaxy<VC> {
+impl<CM: GroupBasedCommitment> FoldingSchemeKeyGenerator for ProtoGalaxy<CM> {
     fn generate_keys(ck: Self::PublicParam, r1cs: Self::Arith) -> Result<Self::DeciderKey, Error> {
         let ck = Arc::new(ck);
         let r1cs = Arc::new(r1cs);
@@ -22,7 +22,7 @@ impl<VC: GroupBasedVectorCommitment> FoldingSchemeKeyGenerator for ProtoGalaxy<V
     }
 }
 
-impl<VC: GroupBasedVectorCommitment> FoldingSchemeKeyGenerator for ProtoGalaxy2<VC> {
+impl<CM: GroupBasedCommitment> FoldingSchemeKeyGenerator for ProtoGalaxy2<CM> {
     fn generate_keys(ck: Self::PublicParam, r1cs: Self::Arith) -> Result<Self::DeciderKey, Error> {
         let ck = Arc::new(ck);
         let r1cs = Arc::new(r1cs);

@@ -1,5 +1,5 @@
 pub mod hypernova;
-pub mod ova;
-pub mod nova;
-pub mod protogalaxy;
 pub mod mova;
+pub mod nova;
+pub mod ova;
+pub mod protogalaxy;

@@ -7,6 +7,7 @@ pub mod protogalaxy;
 pub mod definitions;
 
 pub use self::definitions::{
+    FoldingSchemeDef, FoldingSchemeDefGadget,
     algorithms::{
         FoldingSchemeDecider, FoldingSchemeKeyGenerator, FoldingSchemeOps,
         FoldingSchemePreprocessor, FoldingSchemeProver, FoldingSchemeVerifier,
@@ -21,7 +22,6 @@ pub use self::definitions::{
         GroupBasedFoldingSchemeSecondary, GroupBasedFoldingSchemeSecondaryDef,
     },
     witnesses::{FoldingWitness, FoldingWitnessVar, PlainWitness, PlainWitnessVar},
-    FoldingSchemeDef, FoldingSchemeDefGadget,
 };
 
 #[cfg(test)]
@@ -29,12 +29,12 @@ mod tests {
     use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystem};
     use ark_std::{error::Error, rand::Rng, sync::Arc};
     use sonobe_primitives::{
-        circuits::{AssignmentsOwned, ConstraintSystemBuilder},
-        commitments::VectorCommitmentDef,
+        circuits::{ArithExtractor, AssignmentsOwned},
+        commitments::CommitmentDef,
         relations::WitnessInstanceSampler,
         transcripts::{
-            griffin::{sponge::GriffinSponge, GriffinParams},
             Transcript,
+            griffin::{GriffinParams, sponge::GriffinSponge},
         },
     };
 
@@ -43,20 +43,19 @@ mod tests {
     #[allow(non_snake_case)]
     pub fn test_folding_scheme<FS: FoldingSchemeOps<M, N>, const M: usize, const N: usize>(
         config: FS::Config,
-        circuit: impl ConstraintSynthesizer<<FS::VC as VectorCommitmentDef>::Scalar>,
-        assignments_vec: Vec<AssignmentsOwned<<FS::VC as VectorCommitmentDef>::Scalar>>,
+        circuit: impl ConstraintSynthesizer<<FS::CM as CommitmentDef>::Scalar>,
+        assignments_vec: Vec<AssignmentsOwned<<FS::CM as CommitmentDef>::Scalar>>,
         mut rng: impl Rng,
     ) -> Result<(), Box<dyn Error>>
     where
-        FS::Arith: From<ConstraintSystem<<FS::VC as VectorCommitmentDef>::Scalar>>,
+        FS::Arith: From<ConstraintSystem<<FS::CM as CommitmentDef>::Scalar>>,
     {
         let pp = FS::preprocess(config, &mut rng)?;
 
-        let cs = ConstraintSystemBuilder::new()
-            .with_setup_mode()
-            .with_circuit(circuit);
-        let cs = cs.synthesize()?;
-        let dk = FS::generate_keys(pp, cs.into())?;
+        let cs = ArithExtractor::new();
+        cs.execute_synthesizer(circuit)?;
+        let arith = cs.arith()?;
+        let dk = FS::generate_keys(pp, arith)?;
         let pk = dk.to_pk();
         let vk = dk.to_vk();
 

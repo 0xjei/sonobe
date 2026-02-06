@@ -1,7 +1,7 @@
 use ark_std::{borrow::Borrow, rand::RngCore};
 use sonobe_primitives::{relations::Relation, transcripts::Transcript};
 
-use super::{errors::Error, keys::DeciderKey, FoldingSchemeDef};
+use super::{FoldingSchemeDef, errors::Error, keys::DeciderKey};
 
 pub trait FoldingSchemePreprocessor: FoldingSchemeDef {
     /// The preprocessing method is a randomized algorithm that takes as input

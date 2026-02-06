@@ -1,9 +1,9 @@
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_r1cs_std::{
-    alloc::AllocVar,
-    fields::{fp::FpVar, FieldVar},
-    poly::polynomial::univariate::dense::DensePolynomialVar,
     GR1CSVar,
+    alloc::AllocVar,
+    fields::{FieldVar, fp::FpVar},
+    poly::polynomial::univariate::dense::DensePolynomialVar,
 };
 use ark_relations::gr1cs::SynthesisError;
 use ark_std::iter::once;
@@ -13,19 +13,19 @@ use sonobe_primitives::{
         pow::PowGadget,
         rlc::{ScalarRLC, SliceRLC},
     },
-    commitments::GroupBasedVectorCommitment,
+    commitments::GroupBasedCommitment,
     transcripts::TranscriptVar,
 };
 
-use crate::{protogalaxy::ProtoGalaxyGadget, FoldingSchemePartialVerifierGadget};
+use crate::{FoldingSchemePartialVerifierGadget, protogalaxy::ProtoGalaxyGadget};
 
-impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemePartialVerifierGadget<1, N>
-    for ProtoGalaxyGadget<VC>
+impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemePartialVerifierGadget<1, N>
+    for ProtoGalaxyGadget<CM>
 {
     #[allow(non_snake_case)]
     fn verify_hinted(
         _vk: &Self::VerifierKey,
-        transcript: &mut impl TranscriptVar<VC::Scalar>,
+        transcript: &mut impl TranscriptVar<CM::Scalar>,
         [U]: [&Self::RU; 1],
         us: [&Self::IU; N],
         proof: &Self::Proof<1, N>,

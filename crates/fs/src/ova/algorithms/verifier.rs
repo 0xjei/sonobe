@@ -2,14 +2,14 @@ use ark_std::{borrow::Borrow, cfg_iter};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use sonobe_primitives::{
-    algebra::ops::bits::FromBits, commitments::GroupBasedVectorCommitment, traits::SonobeField,
+    algebra::ops::bits::FromBits, commitments::GroupBasedCommitment, traits::SonobeField,
     transcripts::Transcript,
 };
 
-use crate::{ova::AbstractOva, Error, FoldingSchemeVerifier};
+use crate::{Error, FoldingSchemeVerifier, ova::AbstractOva};
 
-impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
-    FoldingSchemeVerifier<1, 1> for AbstractOva<VC, TF, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemeVerifier<1, 1> for AbstractOva<CM, TF, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn verify(
@@ -27,7 +27,7 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
             transcript.add(cm);
             transcript.challenge_bits(CHALLENGE_BITS)
         };
-        let rho = VC::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
 
         Ok(Self::RU {
             u: U.u + rho,

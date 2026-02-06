@@ -7,31 +7,31 @@ use sonobe_primitives::{
         rlc::{ScalarRLC, SliceRLC},
     },
     arithmetizations::ccs::CCSVariant,
-    commitments::GroupBasedVectorCommitment,
+    commitments::GroupBasedCommitment,
     sumcheck::{
-        utils::{EqPoly, VPAuxInfo},
         Error as SumCheckError, IOPSumCheck,
+        utils::{EqPoly, VPAuxInfo},
     },
     transcripts::Transcript,
 };
 
 use crate::{
-    hypernova::{HyperNova, HyperNova2},
     Error, FoldingSchemeVerifier,
+    hypernova::{HyperNova, HyperNova2},
 };
 
 impl<
-        VC: GroupBasedVectorCommitment,
-        V: CCSVariant,
-        const M: usize,
-        const N: usize,
-        const CHALLENGE_BITS: usize,
-    > FoldingSchemeVerifier<M, N> for HyperNova<VC, V, CHALLENGE_BITS>
+    CM: GroupBasedCommitment,
+    V: CCSVariant,
+    const M: usize,
+    const N: usize,
+    const CHALLENGE_BITS: usize,
+> FoldingSchemeVerifier<M, N> for HyperNova<CM, V, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn verify(
         _vk: &(),
-        transcript: &mut impl Transcript<VC::Scalar>,
+        transcript: &mut impl Transcript<CM::Scalar>,
         Us: &[impl Borrow<Self::RU>; M],
         us: &[impl Borrow<Self::IU>; N],
         proof: &Self::Proof<M, N>,
@@ -43,7 +43,7 @@ impl<
         let s = proof.sc_proof.len();
         let t = V::n_matrices();
         let S = &V::multisets_vec();
-        let c = &V::coefficients_vec::<VC::Scalar>();
+        let c = &V::coefficients_vec::<CM::Scalar>();
 
         // absorb instances to transcript
         transcript.add(&Us[..]);
@@ -86,13 +86,13 @@ impl<
             .chain(proof.thetas.chunks(t).map(|thetas| {
                 S.iter()
                     .zip(c)
-                    .map(|(S_i, &c_i)| c_i * S_i.iter().map(|&j| thetas[j]).product::<VC::Scalar>())
-                    .sum::<VC::Scalar>()
+                    .map(|(S_i, &c_i)| c_i * S_i.iter().map(|&j| thetas[j]).product::<CM::Scalar>())
+                    .sum::<CM::Scalar>()
                     * e_beta
             }))
             .zip(gamma_powers)
             .map(|(val, gamma_i)| val * gamma_i)
-            .sum::<VC::Scalar>();
+            .sum::<CM::Scalar>();
         // check that the g(r_x') from the sumcheck proof is equal to the computed c from sigmas&thetas
         (c == claimed_eval).then_some(()).ok_or_else(|| {
             SumCheckError::IncorrectEvaluation(claimed_eval.to_string(), c.to_string())
@@ -100,7 +100,7 @@ impl<
 
         // Step 6: Get the folding challenge
         let rho_bits = transcript.challenge_bits(CHALLENGE_BITS);
-        let rho = VC::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
 
         let rho_powers = rho.powers(M + N);
 
@@ -113,7 +113,7 @@ impl<
             u: Us
                 .iter()
                 .map(|u| u.u)
-                .chain([VC::Scalar::one(); N])
+                .chain([CM::Scalar::one(); N])
                 .scalar_rlc(&rho_powers),
             x: Us
                 .iter()
@@ -131,17 +131,17 @@ impl<
 }
 
 impl<
-        VC: GroupBasedVectorCommitment,
-        V: CCSVariant,
-        const M: usize,
-        const N: usize,
-        const CHALLENGE_BITS: usize,
-    > FoldingSchemeVerifier<M, N> for HyperNova2<VC, V, CHALLENGE_BITS>
+    CM: GroupBasedCommitment,
+    V: CCSVariant,
+    const M: usize,
+    const N: usize,
+    const CHALLENGE_BITS: usize,
+> FoldingSchemeVerifier<M, N> for HyperNova2<CM, V, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn verify(
         _vk: &(),
-        transcript: &mut impl Transcript<VC::Scalar>,
+        transcript: &mut impl Transcript<CM::Scalar>,
         Us: &[impl Borrow<Self::RU>; M],
         us: &[impl Borrow<Self::IU>; N],
         (cms, proof): &Self::Proof<M, N>,
@@ -153,7 +153,7 @@ impl<
         let s = proof.sc_proof.len();
         let t = V::n_matrices();
         let S = &V::multisets_vec();
-        let c = &V::coefficients_vec::<VC::Scalar>();
+        let c = &V::coefficients_vec::<CM::Scalar>();
 
         // absorb instances to transcript
         transcript.add(&Us[..]);
@@ -197,13 +197,13 @@ impl<
             .chain(proof.thetas.chunks(t).map(|thetas| {
                 S.iter()
                     .zip(c)
-                    .map(|(S_i, &c_i)| c_i * S_i.iter().map(|&j| thetas[j]).product::<VC::Scalar>())
-                    .sum::<VC::Scalar>()
+                    .map(|(S_i, &c_i)| c_i * S_i.iter().map(|&j| thetas[j]).product::<CM::Scalar>())
+                    .sum::<CM::Scalar>()
                     * e_beta
             }))
             .zip(gamma_powers)
             .map(|(val, gamma_i)| val * gamma_i)
-            .sum::<VC::Scalar>();
+            .sum::<CM::Scalar>();
         // check that the g(r_x') from the sumcheck proof is equal to the computed c from sigmas&thetas
         (c == claimed_eval).then_some(()).ok_or_else(|| {
             SumCheckError::IncorrectEvaluation(claimed_eval.to_string(), c.to_string())
@@ -211,7 +211,7 @@ impl<
 
         // Step 6: Get the folding challenge
         let rho_bits = transcript.challenge_bits(CHALLENGE_BITS);
-        let rho = VC::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
 
         let rho_powers = rho.powers(M + N);
 
@@ -224,7 +224,7 @@ impl<
             u: Us
                 .iter()
                 .map(|u| u.u)
-                .chain([VC::Scalar::one(); N])
+                .chain([CM::Scalar::one(); N])
                 .scalar_rlc(&rho_powers),
             x: Us
                 .iter()

@@ -3,19 +3,19 @@ use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar, groups::CurveVar, prelude
 use ark_relations::gr1cs::{ConstraintSystemRef, SynthesisError};
 use ark_std::{borrow::Borrow, iter::once};
 use sonobe_fs::{
-    nova::CycleFoldNova, ova::CycleFoldOva, protogalaxy::ProtoGalaxy, FoldingSchemeDefGadget,
+    FoldingSchemeDefGadget, nova::CycleFoldNova, ova::CycleFoldOva, protogalaxy::ProtoGalaxy,
 };
 use sonobe_primitives::{
     algebra::{
         field::emulated::{Bound, EmulatedFieldVar},
         ops::bits::{FromBits, FromBitsGadget, ToBitsGadgetExt},
     },
-    commitments::GroupBasedVectorCommitment,
-    traits::{SonobeCurve, CF1, CF2},
+    commitments::GroupBasedCommitment,
+    traits::{CF1, CF2, SonobeCurve},
 };
 
 use crate::compilers::cyclefold::{
-    circuits::CycleFoldConfig, CycleFoldBasedIVC, FoldingSchemeCycleFoldExt,
+    CycleFoldBasedIVC, FoldingSchemeCycleFoldExt, circuits::CycleFoldConfig,
 };
 
 /// Configuration for ProtoGalaxy's CycleFold circuit
@@ -67,12 +67,10 @@ impl<C: SonobeCurve, const N: usize> CycleFoldConfig for ProtoGalaxyCycleFoldCon
     }
 }
 
-impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeCycleFoldExt<1, N>
-    for ProtoGalaxy<VC>
-{
+impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemeCycleFoldExt<1, N> for ProtoGalaxy<CM> {
     const N_CYCLEFOLDS: usize = 1;
 
-    type CFConfig = ProtoGalaxyCycleFoldConfig<VC::Commitment, N>;
+    type CFConfig = ProtoGalaxyCycleFoldConfig<CM::Commitment, N>;
 
     #[allow(non_snake_case)]
     fn to_cyclefold_configs(
@@ -86,7 +84,7 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeCycleFoldExt<1
                 .iter()
                 .flat_map(|eval| {
                     let mut bits = eval.into_bigint().to_bits_le();
-                    bits.resize(VC::Scalar::MODULUS_BIT_SIZE as usize, false);
+                    bits.resize(CM::Scalar::MODULUS_BIT_SIZE as usize, false);
                     bits
                 })
                 .collect(),
@@ -103,35 +101,37 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeCycleFoldExt<1
         UU: <Self::Gadget as FoldingSchemeDefGadget>::RU,
         _proof: <Self::Gadget as FoldingSchemeDefGadget>::Proof<1, N>,
         lagrange_evals: <Self::Gadget as FoldingSchemeDefGadget>::Challenge,
-    ) -> Result<Vec<Vec<EmulatedFieldVar<VC::Scalar, CF2<VC::Commitment>>>>, SynthesisError> {
+    ) -> Result<Vec<Vec<EmulatedFieldVar<CM::Scalar, CF2<CM::Commitment>>>>, SynthesisError> {
         let lagrange_evals_bits = lagrange_evals
             .iter()
-            .map(|eval| eval.to_n_bits_le(VC::Scalar::MODULUS_BIT_SIZE as usize))
+            .map(|eval| eval.to_n_bits_le(CM::Scalar::MODULUS_BIT_SIZE as usize))
             .collect::<Result<Vec<_>, _>>()?
             .concat();
 
-        Ok(vec![lagrange_evals_bits
-            .chunks(CF2::<VC::Commitment>::MODULUS_BIT_SIZE as usize - 1)
-            .map(|bits| {
-                EmulatedFieldVar::from_bits_le(
-                    &[
-                        bits,
-                        &vec![
-                            Boolean::FALSE;
-                            CF2::<VC::Commitment>::MODULUS_BIT_SIZE as usize - bits.len()
-                        ][..],
-                    ]
-                    .concat(),
-                    Bound(Zero::zero(), CF2::<VC::Commitment>::MODULUS.into().into()),
+        Ok(vec![
+            lagrange_evals_bits
+                .chunks(CF2::<CM::Commitment>::MODULUS_BIT_SIZE as usize - 1)
+                .map(|bits| {
+                    EmulatedFieldVar::from_bits_le(
+                        &[
+                            bits,
+                            &vec![
+                                Boolean::FALSE;
+                                CF2::<CM::Commitment>::MODULUS_BIT_SIZE as usize - bits.len()
+                            ][..],
+                        ]
+                        .concat(),
+                        Bound(Zero::zero(), CF2::<CM::Commitment>::MODULUS.into().into()),
+                    )
+                })
+                .chain(
+                    once(U.phi)
+                        .chain(us.into_iter().map(|u| u.phi))
+                        .chain([UU.phi])
+                        .flat_map(|p| [Ok(p.x), Ok(p.y)]),
                 )
-            })
-            .chain(
-                once(U.phi)
-                    .chain(us.into_iter().map(|u| u.phi))
-                    .chain([UU.phi])
-                    .flat_map(|p| [Ok(p.x), Ok(p.y)]),
-            )
-            .collect::<Result<_, _>>()?])
+                .collect::<Result<_, _>>()?,
+        ])
     }
 }
 
@@ -150,7 +150,7 @@ mod tests {
     use sonobe_primitives::{
         circuits::utils::CircuitForTest,
         commitments::pedersen::Pedersen,
-        transcripts::griffin::{sponge::GriffinSponge, GriffinParams},
+        transcripts::griffin::{GriffinParams, sponge::GriffinSponge},
     };
 
     use super::*;

@@ -7,32 +7,32 @@ use sonobe_primitives::{
         pow::Pow,
         rlc::{ScalarRLC, SliceRLC},
     },
-    arithmetizations::{ccs::CCSVariant, Arith, ArithConfig},
-    commitments::GroupBasedVectorCommitment,
+    arithmetizations::{Arith, ArithConfig, ccs::CCSVariant},
+    commitments::GroupBasedCommitment,
     sumcheck::{
-        utils::{EqPoly, VPAuxInfo, VirtualPolynomial},
         IOPSumCheck,
+        utils::{EqPoly, VPAuxInfo, VirtualPolynomial},
     },
     transcripts::Transcript,
 };
 
 use crate::{
-    hypernova::{HyperNova, HyperNova2, HyperNovaKey, NIMFSProof},
     Error, FoldingSchemeProver,
+    hypernova::{HyperNova, HyperNova2, HyperNovaKey, NIMFSProof},
 };
 
 impl<
-        VC: GroupBasedVectorCommitment,
-        V: CCSVariant,
-        const M: usize,
-        const N: usize,
-        const CHALLENGE_BITS: usize,
-    > FoldingSchemeProver<M, N> for HyperNova<VC, V, CHALLENGE_BITS>
+    CM: GroupBasedCommitment,
+    V: CCSVariant,
+    const M: usize,
+    const N: usize,
+    const CHALLENGE_BITS: usize,
+> FoldingSchemeProver<M, N> for HyperNova<CM, V, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn prove(
-        pk: &HyperNovaKey<Self::Arith, VC>,
-        transcript: &mut impl Transcript<VC::Scalar>,
+        pk: &HyperNovaKey<Self::Arith, CM>,
+        transcript: &mut impl Transcript<CM::Scalar>,
         Ws: &[impl Borrow<Self::RW>; M],
         Us: &[impl Borrow<Self::RU>; M],
         ws: &[impl Borrow<Self::IW>; N],
@@ -49,7 +49,7 @@ impl<
         let s = ccs.config().log_constraints();
         let t = V::n_matrices();
         let S = &V::multisets_vec();
-        let c = &V::coefficients_vec::<VC::Scalar>();
+        let c = &V::coefficients_vec::<CM::Scalar>();
 
         // absorb instances to transcript
         transcript.add(&Us[..]);
@@ -118,7 +118,7 @@ impl<
 
         // Step 6: Get the folding challenge
         let rho_bits = transcript.challenge_bits(CHALLENGE_BITS);
-        let rho = VC::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
 
         let rho_powers = rho.powers(M + N);
 
@@ -144,7 +144,7 @@ impl<
                 u: Us
                     .iter()
                     .map(|u| u.u)
-                    .chain([VC::Scalar::one(); N])
+                    .chain([CM::Scalar::one(); N])
                     .scalar_rlc(&rho_powers),
                 x: Us
                     .iter()
@@ -168,17 +168,17 @@ impl<
 }
 
 impl<
-        VC: GroupBasedVectorCommitment,
-        V: CCSVariant,
-        const M: usize,
-        const N: usize,
-        const CHALLENGE_BITS: usize,
-    > FoldingSchemeProver<M, N> for HyperNova2<VC, V, CHALLENGE_BITS>
+    CM: GroupBasedCommitment,
+    V: CCSVariant,
+    const M: usize,
+    const N: usize,
+    const CHALLENGE_BITS: usize,
+> FoldingSchemeProver<M, N> for HyperNova2<CM, V, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn prove(
-        pk: &HyperNovaKey<Self::Arith, VC>,
-        transcript: &mut impl Transcript<VC::Scalar>,
+        pk: &HyperNovaKey<Self::Arith, CM>,
+        transcript: &mut impl Transcript<CM::Scalar>,
         Ws: &[impl Borrow<Self::RW>; M],
         Us: &[impl Borrow<Self::RU>; M],
         ws: &[impl Borrow<Self::IW>; N],
@@ -195,12 +195,12 @@ impl<
         let s = ccs.config().log_constraints();
         let t = V::n_matrices();
         let S = &V::multisets_vec();
-        let c = &V::coefficients_vec::<VC::Scalar>();
+        let c = &V::coefficients_vec::<CM::Scalar>();
 
-        let mut cms = [VC::Commitment::default(); N];
-        let mut rs = [VC::Randomness::default(); N];
+        let mut cms = [CM::Commitment::default(); N];
+        let mut rs = [CM::Randomness::default(); N];
         for i in 0..N {
-            let (cm, r) = VC::commit(&pk.ck, ws[i], &mut rng)?;
+            let (cm, r) = CM::commit(&pk.ck, ws[i], &mut rng)?;
             cms[i] = cm;
             rs[i] = r;
         }
@@ -273,7 +273,7 @@ impl<
 
         // Step 6: Get the folding challenge
         let rho_bits = transcript.challenge_bits(CHALLENGE_BITS);
-        let rho = VC::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
 
         let rho_powers = rho.powers(M + N);
 
@@ -295,7 +295,7 @@ impl<
                 u: Us
                     .iter()
                     .map(|u| u.u)
-                    .chain([VC::Scalar::one(); N])
+                    .chain([CM::Scalar::one(); N])
                     .scalar_rlc(&rho_powers),
                 x: Us
                     .iter()

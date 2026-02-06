@@ -1,6 +1,6 @@
 use ark_ff::{One, Zero};
 use ark_poly::{
-    univariate::DensePolynomial, DenseMultilinearExtension as MLE, DenseUVPolynomial, Polynomial,
+    DenseMultilinearExtension as MLE, DenseUVPolynomial, Polynomial, univariate::DensePolynomial,
 };
 use ark_std::{borrow::Borrow, cfg_into_iter, cfg_iter, rand::RngCore};
 #[cfg(feature = "parallel")]
@@ -9,22 +9,22 @@ use sonobe_primitives::{
     algebra::ops::{bits::FromBits, poly::MLEHelper},
     arithmetizations::Arith,
     circuits::AssignmentsOwned,
-    commitments::GroupBasedVectorCommitment,
+    commitments::GroupBasedCommitment,
     transcripts::Transcript,
 };
 
 use crate::{
-    mova::{Mova, MovaKey, MovaProof},
     Error, FoldingSchemeProver,
+    mova::{Mova, MovaKey, MovaProof},
 };
 
-impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeProver<1, 1>
-    for Mova<VC, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeProver<1, 1>
+    for Mova<CM, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn prove(
-        pk: &MovaKey<Self::Arith, VC>,
-        transcript: &mut impl Transcript<VC::Scalar>,
+        pk: &MovaKey<Self::Arith, CM>,
+        transcript: &mut impl Transcript<CM::Scalar>,
         Ws: &[impl Borrow<Self::RW>; 1],
         Us: &[impl Borrow<Self::RU>; 1],
         ws: &[impl Borrow<Self::IW>; 1],
@@ -37,7 +37,7 @@ impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeP
         // Protocol 5
 
         // Step 5.1: Commit to w & send commitment
-        let (cm_w, r_w) = VC::commit(&pk.ck, w, rng)?;
+        let (cm_w, r_w) = CM::commit(&pk.ck, w, rng)?;
 
         transcript.add(U);
         transcript.add(u);
@@ -92,7 +92,7 @@ impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeP
         // Step 7.1: Compute cross term `T`. We follow the optimized approach in
         // [Mova](https://eprint.iacr.org/2024/1220.pdf)'s section 5.2.
         let v = pk.arith.eval_assignments(AssignmentsOwned::from((
-            U.u + VC::Scalar::one(),
+            U.u + CM::Scalar::one(),
             cfg_iter!(U.x).zip(&u[..]).map(|(a, b)| *a + b).collect(),
             cfg_iter!(W.w).zip(&w[..]).map(|(a, b)| *a + b).collect(),
         )))?;
@@ -106,7 +106,7 @@ impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeP
 
         // Step 7.2: Get challenge rho
         let rho_bits = transcript.challenge_bits(CHALLENGE_BITS);
-        let rho = VC::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
 
         // Step 7.3: Compute new W and U
         Ok((

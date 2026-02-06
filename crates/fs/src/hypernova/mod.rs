@@ -1,33 +1,33 @@
 use ark_ff::{Field, PrimeField};
 use ark_poly::MultilinearExtension;
 use ark_r1cs_std::{
+    GR1CSVar,
     alloc::{AllocVar, AllocationMode},
     fields::fp::FpVar,
     prelude::Boolean,
-    GR1CSVar,
 };
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::{
-    borrow::Borrow, cfg_iter, marker::PhantomData, rand::RngCore, sync::Arc, UniformRand,
+    UniformRand, borrow::Borrow, cfg_iter, marker::PhantomData, rand::RngCore, sync::Arc,
 };
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use sonobe_primitives::{
     arithmetizations::{
-        ccs::{CCSConfig, CCSVariant, CCS},
-        r1cs::R1CSConfig,
         Arith, ArithConfig, ArithRelation, Error as ArithError,
+        ccs::{CCS, CCSConfig, CCSVariant},
+        r1cs::R1CSConfig,
     },
     circuits::{Assignments, AssignmentsOwned},
-    commitments::{GroupBasedVectorCommitment, VectorCommitmentDef, VectorCommitmentOps},
+    commitments::{CommitmentDef, CommitmentOps, GroupBasedCommitment},
     relations::{Relation, WitnessInstanceSampler},
     traits::Dummy,
 };
 
 use self::{
     instances::{
-        circuits::{CCCSInstanceVar as IUVar, LCCCSInstanceVar as RUVar},
         CCCSInstance as IU, LCCCSInstance as RU,
+        circuits::{CCCSInstanceVar as IUVar, LCCCSInstanceVar as RUVar},
     },
     witnesses::{CCCSWitness as IW, LCCCSWitness as RW},
 };
@@ -42,12 +42,12 @@ pub mod instances;
 pub mod witnesses;
 
 #[derive(Clone)]
-pub struct HyperNovaKey<A, VC: VectorCommitmentDef> {
+pub struct HyperNovaKey<A, CM: CommitmentDef> {
     arith: Arc<A>,
-    ck: Arc<VC::Key>,
+    ck: Arc<CM::Key>,
 }
 
-impl<A: Arith, VC: VectorCommitmentDef> DeciderKey for HyperNovaKey<A, VC> {
+impl<A: Arith, CM: CommitmentDef> DeciderKey for HyperNovaKey<A, CM> {
     type ProverKey = Self;
     type VerifierKey = ();
     type ArithConfig = A::Config;
@@ -65,12 +65,12 @@ impl<A: Arith, VC: VectorCommitmentDef> DeciderKey for HyperNovaKey<A, VC> {
     }
 }
 
-impl<VC: VectorCommitmentDef<Scalar: Field>, V: CCSVariant> ArithRelation<RW<VC>, RU<VC>>
-    for CCS<VC::Scalar, V>
+impl<CM: CommitmentDef<Scalar: Field>, V: CCSVariant> ArithRelation<RW<CM>, RU<CM>>
+    for CCS<CM::Scalar, V>
 {
-    type Evaluation = Vec<VC::Scalar>;
+    type Evaluation = Vec<CM::Scalar>;
 
-    fn eval_relation(&self, w: &RW<VC>, u: &RU<VC>) -> Result<Self::Evaluation, ArithError> {
+    fn eval_relation(&self, w: &RW<CM>, u: &RU<CM>) -> Result<Self::Evaluation, ArithError> {
         let z = Assignments::from((u.u, &u.x, &w.w));
         Ok(self
             .mles(z)
@@ -79,7 +79,7 @@ impl<VC: VectorCommitmentDef<Scalar: Field>, V: CCSVariant> ArithRelation<RW<VC>
             .collect())
     }
 
-    fn check_evaluation(_w: &RW<VC>, u: &RU<VC>, e: Self::Evaluation) -> Result<(), ArithError> {
+    fn check_evaluation(_w: &RW<CM>, u: &RU<CM>, e: Self::Evaluation) -> Result<(), ArithError> {
         cfg_iter!(e)
             .zip(&u.v)
             .all(|(e, v)| e == v)
@@ -90,94 +90,94 @@ impl<VC: VectorCommitmentDef<Scalar: Field>, V: CCSVariant> ArithRelation<RW<VC>
     }
 }
 
-impl<A, VC> Relation<RW<VC>, RU<VC>> for HyperNovaKey<A, VC>
+impl<A, CM> Relation<RW<CM>, RU<CM>> for HyperNovaKey<A, CM>
 where
-    A: ArithRelation<RW<VC>, RU<VC>>,
-    VC: VectorCommitmentOps,
+    A: ArithRelation<RW<CM>, RU<CM>>,
+    CM: CommitmentOps,
 {
     type Error = Error;
 
-    fn check_relation(&self, w: &RW<VC>, u: &RU<VC>) -> Result<(), Self::Error> {
+    fn check_relation(&self, w: &RW<CM>, u: &RU<CM>) -> Result<(), Self::Error> {
         self.arith.check_relation(w, u)?;
-        VC::open(&self.ck, &w.w, &w.r, &u.cm)?;
+        CM::open(&self.ck, &w.w, &w.r, &u.cm)?;
         Ok(())
     }
 }
 
-impl<A, VC> Relation<IW<VC>, IU<VC>> for HyperNovaKey<A, VC>
+impl<A, CM> Relation<IW<CM>, IU<CM>> for HyperNovaKey<A, CM>
 where
-    A: ArithRelation<Vec<VC::Scalar>, Vec<VC::Scalar>>,
-    VC: VectorCommitmentOps,
+    A: ArithRelation<Vec<CM::Scalar>, Vec<CM::Scalar>>,
+    CM: CommitmentOps,
 {
     type Error = Error;
 
-    fn check_relation(&self, w: &IW<VC>, u: &IU<VC>) -> Result<(), Self::Error> {
+    fn check_relation(&self, w: &IW<CM>, u: &IU<CM>) -> Result<(), Self::Error> {
         self.arith.check_relation(&w.w, &u.x)?;
-        VC::open(&self.ck, &w.w, &w.r, &u.cm)?;
+        CM::open(&self.ck, &w.w, &w.r, &u.cm)?;
         Ok(())
     }
 }
 
-impl<A, VC> Relation<PW<VC::Scalar>, PU<VC::Scalar>> for HyperNovaKey<A, VC>
+impl<A, CM> Relation<PW<CM::Scalar>, PU<CM::Scalar>> for HyperNovaKey<A, CM>
 where
-    A: ArithRelation<Vec<VC::Scalar>, Vec<VC::Scalar>>,
-    VC: VectorCommitmentDef,
+    A: ArithRelation<Vec<CM::Scalar>, Vec<CM::Scalar>>,
+    CM: CommitmentDef,
 {
     type Error = Error;
 
-    fn check_relation(&self, w: &PW<VC::Scalar>, u: &PU<VC::Scalar>) -> Result<(), Self::Error> {
+    fn check_relation(&self, w: &PW<CM::Scalar>, u: &PU<CM::Scalar>) -> Result<(), Self::Error> {
         self.arith.check_relation(w, u)?;
         Ok(())
     }
 }
 
-impl<A, VC: VectorCommitmentOps> WitnessInstanceSampler<IW<VC>, IU<VC>> for HyperNovaKey<A, VC> {
-    type Source = AssignmentsOwned<VC::Scalar>;
+impl<A, CM: CommitmentOps> WitnessInstanceSampler<IW<CM>, IU<CM>> for HyperNovaKey<A, CM> {
+    type Source = AssignmentsOwned<CM::Scalar>;
     type Error = Error;
 
-    fn sample(&self, z: Self::Source, rng: impl RngCore) -> Result<(IW<VC>, IU<VC>), Error> {
+    fn sample(&self, z: Self::Source, rng: impl RngCore) -> Result<(IW<CM>, IU<CM>), Error> {
         let (w, x) = (z.private, z.public);
-        let (cm, r) = VC::commit(&self.ck, &w, rng)?;
+        let (cm, r) = CM::commit(&self.ck, &w, rng)?;
         Ok((IW { w, r }, IU { cm, x }))
     }
 }
 
-impl<A, VC: VectorCommitmentDef> WitnessInstanceSampler<PW<VC::Scalar>, PU<VC::Scalar>>
-    for HyperNovaKey<A, VC>
+impl<A, CM: CommitmentDef> WitnessInstanceSampler<PW<CM::Scalar>, PU<CM::Scalar>>
+    for HyperNovaKey<A, CM>
 {
-    type Source = AssignmentsOwned<VC::Scalar>;
+    type Source = AssignmentsOwned<CM::Scalar>;
     type Error = Error;
 
     fn sample(
         &self,
         z: Self::Source,
         _rng: impl RngCore,
-    ) -> Result<(PW<VC::Scalar>, PU<VC::Scalar>), Error> {
+    ) -> Result<(PW<CM::Scalar>, PU<CM::Scalar>), Error> {
         Ok((z.private.into(), z.public.into()))
     }
 }
 
-impl<A, VC> WitnessInstanceSampler<RW<VC>, RU<VC>> for HyperNovaKey<A, VC>
+impl<A, CM> WitnessInstanceSampler<RW<CM>, RU<CM>> for HyperNovaKey<A, CM>
 where
-    A: ArithRelation<RW<VC>, RU<VC>, Evaluation = Vec<VC::Scalar>>,
-    VC: VectorCommitmentOps,
+    A: ArithRelation<RW<CM>, RU<CM>, Evaluation = Vec<CM::Scalar>>,
+    CM: CommitmentOps,
 {
     type Source = ();
     type Error = Error;
 
     #[allow(non_snake_case)]
-    fn sample(&self, _: Self::Source, mut rng: impl RngCore) -> Result<(RW<VC>, RU<VC>), Error> {
-        let u = VC::Scalar::rand(&mut rng);
+    fn sample(&self, _: Self::Source, mut rng: impl RngCore) -> Result<(RW<CM>, RU<CM>), Error> {
+        let u = CM::Scalar::rand(&mut rng);
         let x = (0..self.arith.n_public_inputs())
-            .map(|_| VC::Scalar::rand(&mut rng))
+            .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
         let w = (0..self.arith.n_witnesses())
-            .map(|_| VC::Scalar::rand(&mut rng))
+            .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
-        let (cm, r) = VC::commit(&self.ck, &w, &mut rng)?;
+        let (cm, r) = CM::commit(&self.ck, &w, &mut rng)?;
 
         let r_x = (0..self.arith.log_constraints())
-            .map(|_| VC::Scalar::rand(&mut rng))
+            .map(|_| CM::Scalar::rand(&mut rng))
             .collect();
 
         let W = RW { w, r };
@@ -216,52 +216,52 @@ impl<F: Field, const M: usize, const N: usize, V: CCSVariant> Dummy<&CCSConfig<V
     }
 }
 
-pub struct HyperNova<VC, V: CCSVariant = R1CSConfig, const CHALLENGE_BITS: usize = 128> {
-    _v: PhantomData<(VC, V)>,
+pub struct HyperNova<CM, V: CCSVariant = R1CSConfig, const CHALLENGE_BITS: usize = 128> {
+    _v: PhantomData<(CM, V)>,
 }
 
-impl<VC: GroupBasedVectorCommitment, V: CCSVariant, const CHALLENGE_BITS: usize> FoldingSchemeDef
-    for HyperNova<VC, V, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, V: CCSVariant, const CHALLENGE_BITS: usize> FoldingSchemeDef
+    for HyperNova<CM, V, CHALLENGE_BITS>
 {
-    type VC = VC;
-    type RW = RW<VC>;
-    type RU = RU<VC>;
-    type IW = IW<VC>;
-    type IU = IU<VC>;
+    type CM = CM;
+    type RW = RW<CM>;
+    type RU = RU<CM>;
+    type IW = IW<CM>;
+    type IU = IU<CM>;
 
-    type TranscriptField = VC::Scalar;
-    type Arith = CCS<VC::Scalar, V>;
+    type TranscriptField = CM::Scalar;
+    type Arith = CCS<CM::Scalar, V>;
 
     type Config = usize;
-    type PublicParam = VC::Key;
-    type DeciderKey = HyperNovaKey<Self::Arith, VC>;
+    type PublicParam = CM::Key;
+    type DeciderKey = HyperNovaKey<Self::Arith, CM>;
     type Challenge = [bool; CHALLENGE_BITS];
-    type Proof<const M: usize, const N: usize> = NIMFSProof<VC::Scalar, M, N>;
+    type Proof<const M: usize, const N: usize> = NIMFSProof<CM::Scalar, M, N>;
 }
 
 // TODO: experimental design
-pub struct HyperNova2<VC, V: CCSVariant = R1CSConfig, const CHALLENGE_BITS: usize = 128> {
-    _v: PhantomData<(VC, V)>,
+pub struct HyperNova2<CM, V: CCSVariant = R1CSConfig, const CHALLENGE_BITS: usize = 128> {
+    _v: PhantomData<(CM, V)>,
 }
 
-impl<VC: GroupBasedVectorCommitment, V: CCSVariant, const CHALLENGE_BITS: usize> FoldingSchemeDef
-    for HyperNova2<VC, V, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, V: CCSVariant, const CHALLENGE_BITS: usize> FoldingSchemeDef
+    for HyperNova2<CM, V, CHALLENGE_BITS>
 {
-    type VC = VC;
-    type RW = RW<VC>;
-    type RU = RU<VC>;
-    type IW = PW<VC::Scalar>;
-    type IU = PU<VC::Scalar>;
+    type CM = CM;
+    type RW = RW<CM>;
+    type RU = RU<CM>;
+    type IW = PW<CM::Scalar>;
+    type IU = PU<CM::Scalar>;
 
-    type TranscriptField = VC::Scalar;
-    type Arith = CCS<VC::Scalar, V>;
+    type TranscriptField = CM::Scalar;
+    type Arith = CCS<CM::Scalar, V>;
 
     type Config = usize;
-    type PublicParam = VC::Key;
-    type DeciderKey = HyperNovaKey<Self::Arith, VC>;
+    type PublicParam = CM::Key;
+    type DeciderKey = HyperNovaKey<Self::Arith, CM>;
     type Challenge = [bool; CHALLENGE_BITS];
     type Proof<const M: usize, const N: usize> =
-        ([VC::Commitment; N], NIMFSProof<VC::Scalar, M, N>);
+        ([CM::Commitment; N], NIMFSProof<CM::Scalar, M, N>);
 }
 
 #[derive(Clone)]
@@ -320,27 +320,27 @@ impl<F: PrimeField, const M: usize, const N: usize> GR1CSVar<F> for NIMFSProofVa
     }
 }
 
-pub struct HyperNovaGadget<VC, V: CCSVariant = R1CSConfig, const CHALLENGE_BITS: usize = 128> {
-    _v: PhantomData<(VC, V)>,
+pub struct HyperNovaGadget<CM, V: CCSVariant = R1CSConfig, const CHALLENGE_BITS: usize = 128> {
+    _v: PhantomData<(CM, V)>,
 }
 
-impl<VC: GroupBasedVectorCommitment, V: CCSVariant, const CHALLENGE_BITS: usize>
-    FoldingSchemeDefGadget for HyperNovaGadget<VC, V, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, V: CCSVariant, const CHALLENGE_BITS: usize> FoldingSchemeDefGadget
+    for HyperNovaGadget<CM, V, CHALLENGE_BITS>
 {
-    type Native = HyperNova<VC, V, CHALLENGE_BITS>;
+    type Native = HyperNova<CM, V, CHALLENGE_BITS>;
 
-    type VC = VC::Gadget2;
-    type RU = RUVar<VC::Gadget2>;
-    type IU = IUVar<VC::Gadget2>;
+    type CM = CM::Gadget2;
+    type RU = RUVar<CM::Gadget2>;
+    type IU = IUVar<CM::Gadget2>;
     type VerifierKey = ();
-    type Challenge = [Boolean<VC::Scalar>; CHALLENGE_BITS];
-    type Proof<const M: usize, const N: usize> = NIMFSProofVar<VC::Scalar, M, N>;
+    type Challenge = [Boolean<CM::Scalar>; CHALLENGE_BITS];
+    type Proof<const M: usize, const N: usize> = NIMFSProofVar<CM::Scalar, M, N>;
 }
 
-impl<VC: GroupBasedVectorCommitment, V: CCSVariant, const CHALLENGE_BITS: usize>
-    GroupBasedFoldingSchemePrimaryDef for HyperNova<VC, V, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, V: CCSVariant, const CHALLENGE_BITS: usize>
+    GroupBasedFoldingSchemePrimaryDef for HyperNova<CM, V, CHALLENGE_BITS>
 {
-    type Gadget = HyperNovaGadget<VC, V, CHALLENGE_BITS>;
+    type Gadget = HyperNovaGadget<CM, V, CHALLENGE_BITS>;
 }
 
 #[cfg(test)]
@@ -349,7 +349,7 @@ mod tests {
     use ark_ff::UniformRand;
     use ark_std::{error::Error, rand::Rng, test_rng};
     use sonobe_primitives::{
-        circuits::utils::{satisfying_assignments_for_test, CircuitForTest},
+        circuits::utils::{CircuitForTest, satisfying_assignments_for_test},
         commitments::pedersen::Pedersen,
     };
 

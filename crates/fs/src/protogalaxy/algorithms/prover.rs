@@ -1,7 +1,7 @@
-use ark_ff::{batch_inversion, Field, One, Zero};
+use ark_ff::{Field, One, Zero, batch_inversion};
 use ark_poly::{
-    univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain, Evaluations,
-    GeneralEvaluationDomain, Polynomial,
+    DenseUVPolynomial, EvaluationDomain, Evaluations, GeneralEvaluationDomain, Polynomial,
+    univariate::DensePolynomial,
 };
 use ark_std::{borrow::Borrow, iter::once, rand::RngCore};
 use sonobe_primitives::{
@@ -11,20 +11,20 @@ use sonobe_primitives::{
     },
     arithmetizations::{Arith, ArithConfig, ArithRelation},
     circuits::{Assignments, AssignmentsOwned},
-    commitments::GroupBasedVectorCommitment,
+    commitments::GroupBasedCommitment,
     transcripts::Transcript,
 };
 
 use crate::{
-    protogalaxy::{ProtoGalaxy, ProtoGalaxy2, ProtoGalaxyKey, ProtoGalaxyProof},
     Error, FoldingSchemeProver,
+    protogalaxy::{ProtoGalaxy, ProtoGalaxy2, ProtoGalaxyKey, ProtoGalaxyProof},
 };
 
-impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeProver<1, N> for ProtoGalaxy<VC> {
+impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemeProver<1, N> for ProtoGalaxy<CM> {
     #[allow(non_snake_case)]
     fn prove(
-        pk: &ProtoGalaxyKey<Self::Arith, VC>,
-        transcript: &mut impl Transcript<VC::Scalar>,
+        pk: &ProtoGalaxyKey<Self::Arith, CM>,
+        transcript: &mut impl Transcript<CM::Scalar>,
         Ws: &[impl Borrow<Self::RW>; 1],
         Us: &[impl Borrow<Self::RU>; 1],
         ws: &[impl Borrow<Self::IW>; N],
@@ -53,12 +53,12 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeProver<1, N> f
         let deltas = delta.repeated_squares(t);
 
         let mut eval = r1cs.eval_relation(&W.w, &U.x)?;
-        eval.resize(1 << t, VC::Scalar::default());
+        eval.resize(1 << t, CM::Scalar::default());
 
         // F(X)
         let f_poly = calc_f_from_btree(&eval, &U.betas, &deltas);
         let mut f_coeffs = f_poly.coeffs[1..].to_vec();
-        f_coeffs.resize(t, VC::Scalar::default());
+        f_coeffs.resize(t, CM::Scalar::default());
         transcript.add(&f_coeffs);
 
         let alpha = transcript.challenge_field_element();
@@ -79,9 +79,9 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeProver<1, N> f
             )
             .collect::<Vec<_>>();
 
-        let G = GeneralEvaluationDomain::<VC::Scalar>::new(d * N + 1)
+        let G = GeneralEvaluationDomain::<CM::Scalar>::new(d * N + 1)
             .ok_or(Error::DomainCreationFailure)?;
-        let H = GeneralEvaluationDomain::<VC::Scalar>::new(N + 1)
+        let H = GeneralEvaluationDomain::<CM::Scalar>::new(N + 1)
             .ok_or(Error::DomainCreationFailure)?;
 
         let omegas = H.group_gen_inv().powers(H.size());
@@ -115,7 +115,7 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeProver<1, N> f
 
         let mut invs = G
             .elements()
-            .map(|e| e - VC::Scalar::one())
+            .map(|e| e - CM::Scalar::one())
             .collect::<Vec<_>>();
         batch_inversion(&mut invs);
 
@@ -127,7 +127,7 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeProver<1, N> f
             .enumerate()
             .map(|(k, (e, inv))| {
                 if k % H.size() == 0 {
-                    return Ok(VC::Scalar::zero());
+                    return Ok(CM::Scalar::zero());
                 }
                 let z = AssignmentsOwned::from((
                     s_evals[0][k],
@@ -153,7 +153,7 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeProver<1, N> f
             return Err(Error::IndivisibleByVanishingPoly);
         }
 
-        k_poly.coeffs.resize(d * N + 1, VC::Scalar::default());
+        k_poly.coeffs.resize(d * N + 1, CM::Scalar::default());
         transcript.add(&k_poly.coeffs);
 
         let gamma = transcript.challenge_field_element();
@@ -189,13 +189,11 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeProver<1, N> f
     }
 }
 
-impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeProver<1, N>
-    for ProtoGalaxy2<VC>
-{
+impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemeProver<1, N> for ProtoGalaxy2<CM> {
     #[allow(non_snake_case)]
     fn prove(
-        pk: &ProtoGalaxyKey<Self::Arith, VC>,
-        transcript: &mut impl Transcript<VC::Scalar>,
+        pk: &ProtoGalaxyKey<Self::Arith, CM>,
+        transcript: &mut impl Transcript<CM::Scalar>,
         Ws: &[impl Borrow<Self::RW>; 1],
         Us: &[impl Borrow<Self::RU>; 1],
         ws: &[impl Borrow<Self::IW>; N],
@@ -213,10 +211,10 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeProver<1, N>
         let d = r1cs.config().degree();
         let t = r1cs.log_constraints();
 
-        let mut phis = [VC::Commitment::default(); N];
-        let mut rs = [VC::Randomness::default(); N];
+        let mut phis = [CM::Commitment::default(); N];
+        let mut rs = [CM::Randomness::default(); N];
         for i in 0..N {
-            let (cm, r) = VC::commit(&pk.ck, ws[i], &mut rng)?;
+            let (cm, r) = CM::commit(&pk.ck, ws[i], &mut rng)?;
             phis[i] = cm;
             rs[i] = r;
         }
@@ -233,12 +231,12 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeProver<1, N>
         let deltas = delta.repeated_squares(t);
 
         let mut eval = r1cs.eval_relation(&W.w, &U.x)?;
-        eval.resize(1 << t, VC::Scalar::default());
+        eval.resize(1 << t, CM::Scalar::default());
 
         // F(X)
         let f_poly = calc_f_from_btree(&eval, &U.betas, &deltas);
         let mut f_coeffs = f_poly.coeffs[1..].to_vec();
-        f_coeffs.resize(t, VC::Scalar::default());
+        f_coeffs.resize(t, CM::Scalar::default());
         transcript.add(&f_coeffs);
 
         let alpha = transcript.challenge_field_element();
@@ -251,17 +249,17 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeProver<1, N>
             .into_iter()
             .slice_rlc(&[One::one(), alpha]);
 
-        let zs = once(Assignments::from((VC::Scalar::one(), &U.x, &W.w)))
+        let zs = once(Assignments::from((CM::Scalar::one(), &U.x, &W.w)))
             .chain(
                 ws.iter()
                     .zip(us)
-                    .map(|(w, u)| Assignments::from((VC::Scalar::one(), u.as_ref(), w.as_ref()))),
+                    .map(|(w, u)| Assignments::from((CM::Scalar::one(), u.as_ref(), w.as_ref()))),
             )
             .collect::<Vec<_>>();
 
-        let G = GeneralEvaluationDomain::<VC::Scalar>::new(d * N + 1)
+        let G = GeneralEvaluationDomain::<CM::Scalar>::new(d * N + 1)
             .ok_or(Error::DomainCreationFailure)?;
-        let H = GeneralEvaluationDomain::<VC::Scalar>::new(N + 1)
+        let H = GeneralEvaluationDomain::<CM::Scalar>::new(N + 1)
             .ok_or(Error::DomainCreationFailure)?;
 
         let omegas = H.group_gen_inv().powers(H.size());
@@ -295,7 +293,7 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeProver<1, N>
 
         let mut invs = G
             .elements()
-            .map(|e| e - VC::Scalar::one())
+            .map(|e| e - CM::Scalar::one())
             .collect::<Vec<_>>();
         batch_inversion(&mut invs);
 
@@ -307,7 +305,7 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeProver<1, N>
             .enumerate()
             .map(|(k, (e, inv))| {
                 if k % H.size() == 0 {
-                    return Ok(VC::Scalar::zero());
+                    return Ok(CM::Scalar::zero());
                 }
                 let z = AssignmentsOwned::from((
                     s_evals[0][k],
@@ -333,7 +331,7 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeProver<1, N>
             return Err(Error::IndivisibleByVanishingPoly);
         }
 
-        k_poly.coeffs.resize(d * N + 1, VC::Scalar::default());
+        k_poly.coeffs.resize(d * N + 1, CM::Scalar::default());
         transcript.add(&k_poly.coeffs);
 
         let gamma = transcript.challenge_field_element();

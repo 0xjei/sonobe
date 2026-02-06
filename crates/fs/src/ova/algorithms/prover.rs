@@ -3,23 +3,21 @@ use ark_std::{borrow::Borrow, cfg_iter, rand::RngCore};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use sonobe_primitives::{
-    algebra::ops::bits::FromBits,
-    circuits::Assignments,
-    commitments::GroupBasedVectorCommitment,
-    traits::SonobeField,
-    transcripts::Transcript,
+    algebra::ops::bits::FromBits, circuits::Assignments, commitments::GroupBasedCommitment,
+    traits::SonobeField, transcripts::Transcript,
 };
 
 use crate::{
-    Error, FoldingSchemeProver, ova::{AbstractOva, OvaKey}
+    Error, FoldingSchemeProver,
+    ova::{AbstractOva, OvaKey},
 };
 
-impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
-    FoldingSchemeProver<1, 1> for AbstractOva<VC, TF, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemeProver<1, 1> for AbstractOva<CM, TF, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn prove(
-        pk: &OvaKey<Self::Arith, VC>,
+        pk: &OvaKey<Self::Arith, CM>,
         transcript: &mut impl Transcript<TF>,
         Ws: &[impl Borrow<Self::RW>; 1],
         Us: &[impl Borrow<Self::RU>; 1],
@@ -32,22 +30,22 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
 
         // Compute the cross term `T` by following the original Nova paper.
         let z1 = Assignments::from((U.u, &U.x, &W.w));
-        let z2 = Assignments::from((VC::Scalar::one(), &u[..], &w[..]));
+        let z2 = Assignments::from((CM::Scalar::one(), &u[..], &w[..]));
         let t = cfg_iter!(pk.arith.A)
             .zip(&pk.arith.B)
             .zip(&pk.arith.C)
             .map(|((a, b), c)| {
-                let az1: VC::Scalar = a.iter().map(|(val, col)| z1[*col] * val).sum();
-                let az2: VC::Scalar = a.iter().map(|(val, col)| z2[*col] * val).sum();
-                let bz1: VC::Scalar = b.iter().map(|(val, col)| z1[*col] * val).sum();
-                let bz2: VC::Scalar = b.iter().map(|(val, col)| z2[*col] * val).sum();
-                let cz1: VC::Scalar = c.iter().map(|(val, col)| z1[*col] * val).sum();
-                let cz2: VC::Scalar = c.iter().map(|(val, col)| z2[*col] * val).sum();
+                let az1: CM::Scalar = a.iter().map(|(val, col)| z1[*col] * val).sum();
+                let az2: CM::Scalar = a.iter().map(|(val, col)| z2[*col] * val).sum();
+                let bz1: CM::Scalar = b.iter().map(|(val, col)| z1[*col] * val).sum();
+                let bz2: CM::Scalar = b.iter().map(|(val, col)| z2[*col] * val).sum();
+                let cz1: CM::Scalar = c.iter().map(|(val, col)| z1[*col] * val).sum();
+                let cz2: CM::Scalar = c.iter().map(|(val, col)| z2[*col] * val).sum();
                 az1 * bz2 + az2 * bz1 - z2[0] * cz1 - z1[0] * cz2
             })
             .collect::<Vec<_>>();
 
-        let (cm, r) = VC::commit(&pk.ck, &[w, &t[..]].concat(), rng)?;
+        let (cm, r) = CM::commit(&pk.ck, &[w, &t[..]].concat(), rng)?;
 
         let rho_bits = {
             transcript.add(&U);
@@ -55,7 +53,7 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
             transcript.add(&cm);
             transcript.challenge_bits(CHALLENGE_BITS)
         };
-        let rho = VC::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
 
         Ok((
             Self::RW {

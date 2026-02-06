@@ -1,25 +1,25 @@
 use ark_ff::{One, Zero};
 use ark_r1cs_std::{
-    alloc::AllocVar, fields::fp::FpVar, poly::polynomial::univariate::dense::DensePolynomialVar,
-    GR1CSVar,
+    GR1CSVar, alloc::AllocVar, fields::fp::FpVar,
+    poly::polynomial::univariate::dense::DensePolynomialVar,
 };
 use ark_relations::gr1cs::SynthesisError;
 use num_bigint::BigInt;
 use sonobe_primitives::{
     algebra::{field::emulated::Bound, ops::bits::FromBitsGadget},
-    commitments::GroupBasedVectorCommitment,
+    commitments::GroupBasedCommitment,
     transcripts::TranscriptVar,
 };
 
-use crate::{mova::MovaGadget, FoldingSchemePartialVerifierGadget};
+use crate::{FoldingSchemePartialVerifierGadget, mova::MovaGadget};
 
-impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize>
-    FoldingSchemePartialVerifierGadget<1, 1> for MovaGadget<VC, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemePartialVerifierGadget<1, 1>
+    for MovaGadget<CM, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn verify_hinted(
         _vk: &Self::VerifierKey,
-        transcript: &mut impl TranscriptVar<VC::Scalar>,
+        transcript: &mut impl TranscriptVar<CM::Scalar>,
         [U]: [&Self::RU; 1],
         [u]: [&Self::IU; 1],
         proof: &Self::Proof<1, 1>,

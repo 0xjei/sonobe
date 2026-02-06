@@ -1,9 +1,9 @@
 use ark_r1cs_std::{
+    GR1CSVar,
     alloc::AllocVar,
     eq::EqGadget,
-    fields::{fp::FpVar, FieldVar},
+    fields::{FieldVar, fp::FpVar},
     prelude::Boolean,
-    GR1CSVar,
 };
 use ark_relations::gr1cs::SynthesisError;
 use sonobe_primitives::{
@@ -12,7 +12,7 @@ use sonobe_primitives::{
         rlc::{ScalarRLC, SliceRLC},
     },
     arithmetizations::ccs::CCSVariant,
-    commitments::GroupBasedVectorCommitment,
+    commitments::GroupBasedCommitment,
     sumcheck::{
         circuits::IOPSumCheckGadget,
         utils::{EqPolyVar, VPAuxInfo},
@@ -20,20 +20,20 @@ use sonobe_primitives::{
     transcripts::TranscriptVar,
 };
 
-use crate::{hypernova::HyperNovaGadget, FoldingSchemePartialVerifierGadget};
+use crate::{FoldingSchemePartialVerifierGadget, hypernova::HyperNovaGadget};
 
 impl<
-        VC: GroupBasedVectorCommitment,
-        V: CCSVariant,
-        const M: usize,
-        const N: usize,
-        const CHALLENGE_BITS: usize,
-    > FoldingSchemePartialVerifierGadget<M, N> for HyperNovaGadget<VC, V, CHALLENGE_BITS>
+    CM: GroupBasedCommitment,
+    V: CCSVariant,
+    const M: usize,
+    const N: usize,
+    const CHALLENGE_BITS: usize,
+> FoldingSchemePartialVerifierGadget<M, N> for HyperNovaGadget<CM, V, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn verify_hinted(
         _vk: &Self::VerifierKey,
-        transcript: &mut impl TranscriptVar<VC::Scalar>,
+        transcript: &mut impl TranscriptVar<CM::Scalar>,
         Us: [&Self::RU; M],
         us: [&Self::IU; N],
         proof: &Self::Proof<M, N>,
@@ -42,7 +42,7 @@ impl<
         let s = proof.sc_proof.len();
         let t = V::n_matrices();
         let S = &V::multisets_vec();
-        let c = &V::coefficients_vec::<VC::Scalar>();
+        let c = &V::coefficients_vec::<CM::Scalar>();
 
         // absorb instances to transcript
         transcript.add(&Us[..])?;

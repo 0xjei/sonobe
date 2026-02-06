@@ -1,7 +1,7 @@
 use ark_ff::One;
 use ark_poly::{
-    univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain,
-    Polynomial,
+    DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,
+    univariate::DensePolynomial,
 };
 use ark_std::{borrow::Borrow, iter::once};
 use sonobe_primitives::{
@@ -9,22 +9,20 @@ use sonobe_primitives::{
         pow::Pow,
         rlc::{ScalarRLC, SliceRLC},
     },
-    commitments::GroupBasedVectorCommitment,
+    commitments::GroupBasedCommitment,
     transcripts::Transcript,
 };
 
 use crate::{
-    protogalaxy::{ProtoGalaxy, ProtoGalaxy2},
     Error, FoldingSchemeVerifier,
+    protogalaxy::{ProtoGalaxy, ProtoGalaxy2},
 };
 
-impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeVerifier<1, N>
-    for ProtoGalaxy<VC>
-{
+impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemeVerifier<1, N> for ProtoGalaxy<CM> {
     #[allow(non_snake_case)]
     fn verify(
         _vk: &(),
-        transcript: &mut impl Transcript<VC::Scalar>,
+        transcript: &mut impl Transcript<CM::Scalar>,
         Us: &[impl Borrow<Self::RU>; 1],
         us: &[impl Borrow<Self::IU>; N],
         proof: &Self::Proof<1, N>,
@@ -78,13 +76,11 @@ impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeVerifier<1, N>
     }
 }
 
-impl<VC: GroupBasedVectorCommitment, const N: usize> FoldingSchemeVerifier<1, N>
-    for ProtoGalaxy2<VC>
-{
+impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemeVerifier<1, N> for ProtoGalaxy2<CM> {
     #[allow(non_snake_case)]
     fn verify(
         _vk: &(),
-        transcript: &mut impl Transcript<VC::Scalar>,
+        transcript: &mut impl Transcript<CM::Scalar>,
         Us: &[impl Borrow<Self::RU>; 1],
         us: &[impl Borrow<Self::IU>; N],
         (phis, proof): &Self::Proof<1, N>,

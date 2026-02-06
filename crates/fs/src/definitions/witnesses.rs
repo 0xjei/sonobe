@@ -1,19 +1,19 @@
-use ark_r1cs_std::{alloc::AllocVar, GR1CSVar};
+use ark_r1cs_std::{GR1CSVar, alloc::AllocVar};
 use ark_std::fmt::Debug;
 use sonobe_primitives::{
     arithmetizations::ArithConfig,
-    commitments::{VectorCommitmentDef, VectorCommitmentDefGadget},
+    commitments::{CommitmentDef, CommitmentDefGadget},
     traits::Dummy,
 };
 
 use super::utils::TaggedVec;
 
-pub trait FoldingWitness<VC: VectorCommitmentDef>: Debug {
+pub trait FoldingWitness<CM: CommitmentDef>: Debug {
     const N_OPENINGS: usize;
 
     /// Returns the reference to all openings contained in the witness, each
     /// being a tuple of the values being committed to and the randomness.
-    fn openings(&self) -> Vec<(&[VC::Scalar], &VC::Randomness)>;
+    fn openings(&self) -> Vec<(&[CM::Scalar], &CM::Randomness)>;
 }
 
 pub type PlainWitness<V> = TaggedVec<V, 'w'>;
@@ -24,23 +24,23 @@ impl<V: Default + Clone, A: ArithConfig> Dummy<&A> for PlainWitness<V> {
     }
 }
 
-impl<VC: VectorCommitmentDef> FoldingWitness<VC> for PlainWitness<VC::Scalar> {
+impl<CM: CommitmentDef> FoldingWitness<CM> for PlainWitness<CM::Scalar> {
     const N_OPENINGS: usize = 0;
 
-    fn openings(&self) -> Vec<(&[VC::Scalar], &VC::Randomness)> {
+    fn openings(&self) -> Vec<(&[CM::Scalar], &CM::Randomness)> {
         vec![]
     }
 }
 
-pub trait FoldingWitnessVar<VC: VectorCommitmentDefGadget>:
-    AllocVar<Self::Value, VC::ConstraintField>
-    + GR1CSVar<VC::ConstraintField, Value: FoldingWitness<VC::Native>>
+pub trait FoldingWitnessVar<CM: CommitmentDefGadget>:
+    AllocVar<Self::Value, CM::ConstraintField>
+    + GR1CSVar<CM::ConstraintField, Value: FoldingWitness<CM::Native>>
 {
 }
 
-impl<VC: VectorCommitmentDefGadget, T> FoldingWitnessVar<VC> for T where
-    T: AllocVar<Self::Value, VC::ConstraintField>
-        + GR1CSVar<VC::ConstraintField, Value: FoldingWitness<VC::Native>>
+impl<CM: CommitmentDefGadget, T> FoldingWitnessVar<CM> for T where
+    T: AllocVar<Self::Value, CM::ConstraintField>
+        + GR1CSVar<CM::ConstraintField, Value: FoldingWitness<CM::Native>>
 {
 }
 

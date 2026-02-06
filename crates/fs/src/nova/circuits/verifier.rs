@@ -1,29 +1,26 @@
 use ark_ff::{One, Zero};
-use ark_r1cs_std::{
-    alloc::AllocVar, groups::CurveVar, GR1CSVar,
-};
+use ark_r1cs_std::{GR1CSVar, alloc::AllocVar, groups::CurveVar};
 use ark_relations::gr1cs::SynthesisError;
 use num_bigint::BigInt;
 use sonobe_primitives::{
     algebra::{field::emulated::Bound, ops::bits::FromBitsGadget},
-    commitments::{GroupBasedVectorCommitment, VectorCommitmentDef, VectorCommitmentDefGadget},
+    commitments::{CommitmentDef, CommitmentDefGadget, GroupBasedCommitment},
     transcripts::TranscriptVar,
 };
 
 use crate::{
-    nova::AbstractNovaGadget, FoldingSchemeFullVerifierGadget,
-    FoldingSchemePartialVerifierGadget,
+    FoldingSchemeFullVerifierGadget, FoldingSchemePartialVerifierGadget, nova::AbstractNovaGadget,
 };
 
-impl<VC, const CHALLENGE_BITS: usize> FoldingSchemePartialVerifierGadget<1, 1>
-    for AbstractNovaGadget<VC, CHALLENGE_BITS>
+impl<CM, const CHALLENGE_BITS: usize> FoldingSchemePartialVerifierGadget<1, 1>
+    for AbstractNovaGadget<CM, CHALLENGE_BITS>
 where
-    VC: VectorCommitmentDefGadget<Native: GroupBasedVectorCommitment>,
+    CM: CommitmentDefGadget<Native: GroupBasedCommitment>,
 {
     #[allow(non_snake_case)]
     fn verify_hinted(
         _vk: &Self::VerifierKey,
-        transcript: &mut impl TranscriptVar<VC::ConstraintField>,
+        transcript: &mut impl TranscriptVar<CM::ConstraintField>,
         [U]: [&Self::RU; 1],
         [u]: [&Self::IU; 1],
         proof: &Self::Proof<1, 1>,
@@ -34,7 +31,7 @@ where
             transcript.add(proof)?;
             transcript.challenge_bits(CHALLENGE_BITS)?
         };
-        let rho = VC::ScalarVar::from_bits_le(
+        let rho = CM::ScalarVar::from_bits_le(
             &rho_bits,
             Bound(
                 BigInt::zero(),
@@ -47,14 +44,14 @@ where
                 u: (U.u.clone() + &rho)
                     .try_into()
                     .map_err(|_| SynthesisError::Unsatisfiable)?,
-                cm_e: VC::CommitmentVar::new_witness(
+                cm_e: CM::CommitmentVar::new_witness(
                     U.cm_e.cs().or(proof.cs()).or(rho.cs()),
                     || {
                         Ok(U.cm_e.value().unwrap_or_default()
                             + proof.value().unwrap_or_default() * rho.value().unwrap_or_default())
                     },
                 )?,
-                cm_w: VC::CommitmentVar::new_witness(
+                cm_w: CM::CommitmentVar::new_witness(
                     U.cm_w.cs().or(u.cm_w.cs()).or(rho.cs()),
                     || {
                         Ok(U.cm_w.value().unwrap_or_default()
@@ -73,15 +70,15 @@ where
     }
 }
 
-impl<VC, const CHALLENGE_BITS: usize> FoldingSchemePartialVerifierGadget<2, 0>
-    for AbstractNovaGadget<VC, CHALLENGE_BITS>
+impl<CM, const CHALLENGE_BITS: usize> FoldingSchemePartialVerifierGadget<2, 0>
+    for AbstractNovaGadget<CM, CHALLENGE_BITS>
 where
-    VC: VectorCommitmentDefGadget<Native: GroupBasedVectorCommitment>,
+    CM: CommitmentDefGadget<Native: GroupBasedCommitment>,
 {
     #[allow(non_snake_case)]
     fn verify_hinted(
         _vk: &Self::VerifierKey,
-        transcript: &mut impl TranscriptVar<VC::ConstraintField>,
+        transcript: &mut impl TranscriptVar<CM::ConstraintField>,
         [U1, U2]: [&Self::RU; 2],
         _: [&Self::IU; 0],
         proof: &Self::Proof<2, 0>,
@@ -92,7 +89,7 @@ where
             transcript.add(proof)?;
             transcript.challenge_bits(CHALLENGE_BITS)?
         };
-        let rho = VC::ScalarVar::from_bits_le(
+        let rho = CM::ScalarVar::from_bits_le(
             &rho_bits,
             Bound(
                 BigInt::zero(),
@@ -105,7 +102,7 @@ where
                 u: (U2.u.clone() * &rho + &U1.u)
                     .try_into()
                     .map_err(|_| SynthesisError::Unsatisfiable)?,
-                cm_e: VC::CommitmentVar::new_witness(
+                cm_e: CM::CommitmentVar::new_witness(
                     U1.cm_e.cs().or(U2.cm_e.cs()).or(proof.cs()).or(rho.cs()),
                     || {
                         let rho = rho.value().unwrap_or_default();
@@ -114,7 +111,7 @@ where
                             + U2.cm_e.value().unwrap_or_default() * rho * rho)
                     },
                 )?,
-                cm_w: VC::CommitmentVar::new_witness(
+                cm_w: CM::CommitmentVar::new_witness(
                     U1.cm_w.cs().or(U2.cm_w.cs()).or(rho.cs()),
                     || {
                         Ok(U1.cm_w.value().unwrap_or_default()
@@ -134,17 +131,16 @@ where
     }
 }
 
-impl<VC, const CHALLENGE_BITS: usize> FoldingSchemeFullVerifierGadget<1, 1>
-    for AbstractNovaGadget<VC, CHALLENGE_BITS>
+impl<CM, const CHALLENGE_BITS: usize> FoldingSchemeFullVerifierGadget<1, 1>
+    for AbstractNovaGadget<CM, CHALLENGE_BITS>
 where
-    VC: VectorCommitmentDefGadget<Native: GroupBasedVectorCommitment>,
-    VC::CommitmentVar:
-        CurveVar<<VC::Native as VectorCommitmentDef>::Commitment, VC::ConstraintField>,
+    CM: CommitmentDefGadget<Native: GroupBasedCommitment>,
+    CM::CommitmentVar: CurveVar<<CM::Native as CommitmentDef>::Commitment, CM::ConstraintField>,
 {
     #[allow(non_snake_case)]
     fn verify(
         _vk: &Self::VerifierKey,
-        transcript: &mut impl TranscriptVar<VC::ConstraintField>,
+        transcript: &mut impl TranscriptVar<CM::ConstraintField>,
         [U]: [&Self::RU; 1],
         [u]: [&Self::IU; 1],
         proof: &Self::Proof<1, 1>,
@@ -155,7 +151,7 @@ where
             transcript.add(proof)?;
             transcript.challenge_bits(CHALLENGE_BITS)?
         };
-        let rho = VC::ScalarVar::from_bits_le(
+        let rho = CM::ScalarVar::from_bits_le(
             &rho_bits,
             Bound(
                 BigInt::zero(),

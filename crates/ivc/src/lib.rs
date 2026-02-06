@@ -123,7 +123,7 @@ pub trait Decider {
     ) -> Result<Self::Proof, Error>;
 
     fn verify(vk: &Self::VerifierKey, x: &Self::Instance, proof: &Self::Proof)
-        -> Result<(), Error>;
+    -> Result<(), Error>;
 }
 
 #[cfg(test)]

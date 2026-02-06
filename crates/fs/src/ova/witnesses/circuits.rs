@@ -1,24 +1,24 @@
 use ark_r1cs_std::{
-    alloc::{AllocVar, AllocationMode},
     GR1CSVar,
+    alloc::{AllocVar, AllocationMode},
 };
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::borrow::Borrow;
-use sonobe_primitives::commitments::VectorCommitmentDefGadget;
+use sonobe_primitives::commitments::CommitmentDefGadget;
 
 use super::RunningWitness;
 
 #[derive(Debug, PartialEq)]
-pub struct RunningWitnessVar<VC: VectorCommitmentDefGadget> {
-    pub w: Vec<VC::ScalarVar>,
-    pub r: VC::RandomnessVar,
+pub struct RunningWitnessVar<CM: CommitmentDefGadget> {
+    pub w: Vec<CM::ScalarVar>,
+    pub r: CM::RandomnessVar,
 }
 
-impl<VC: VectorCommitmentDefGadget> AllocVar<RunningWitness<VC::Native>, VC::ConstraintField>
-    for RunningWitnessVar<VC>
+impl<CM: CommitmentDefGadget> AllocVar<RunningWitness<CM::Native>, CM::ConstraintField>
+    for RunningWitnessVar<CM>
 {
-    fn new_variable<T: Borrow<RunningWitness<VC::Native>>>(
-        cs: impl Into<Namespace<VC::ConstraintField>>,
+    fn new_variable<T: Borrow<RunningWitness<CM::Native>>>(
+        cs: impl Into<Namespace<CM::ConstraintField>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
         mode: AllocationMode,
     ) -> Result<Self, SynthesisError> {
@@ -32,10 +32,10 @@ impl<VC: VectorCommitmentDefGadget> AllocVar<RunningWitness<VC::Native>, VC::Con
     }
 }
 
-impl<VC: VectorCommitmentDefGadget> GR1CSVar<VC::ConstraintField> for RunningWitnessVar<VC> {
-    type Value = RunningWitness<VC::Native>;
+impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for RunningWitnessVar<CM> {
+    type Value = RunningWitness<CM::Native>;
 
-    fn cs(&self) -> ConstraintSystemRef<VC::ConstraintField> {
+    fn cs(&self) -> ConstraintSystemRef<CM::ConstraintField> {
         self.w.cs().or(self.r.cs())
     }
 

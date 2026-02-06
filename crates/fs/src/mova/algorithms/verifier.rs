@@ -1,21 +1,20 @@
-use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial, Polynomial};
+use ark_poly::{DenseUVPolynomial, Polynomial, univariate::DensePolynomial};
 use ark_std::{borrow::Borrow, cfg_iter};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use sonobe_primitives::{
-    algebra::ops::bits::FromBits, commitments::GroupBasedVectorCommitment,
-    transcripts::Transcript,
+    algebra::ops::bits::FromBits, commitments::GroupBasedCommitment, transcripts::Transcript,
 };
 
-use crate::{mova::Mova, Error, FoldingSchemeVerifier};
+use crate::{Error, FoldingSchemeVerifier, mova::Mova};
 
-impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeVerifier<1, 1>
-    for Mova<VC, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeVerifier<1, 1>
+    for Mova<CM, CHALLENGE_BITS>
 {
     #[allow(non_snake_case)]
     fn verify(
         _vk: &(),
-        transcript: &mut impl Transcript<VC::Scalar>,
+        transcript: &mut impl Transcript<CM::Scalar>,
         Us: &[impl Borrow<Self::RU>; 1],
         us: &[impl Borrow<Self::IU>; 1],
         proof: &Self::Proof<1, 1>,
@@ -37,7 +36,7 @@ impl<VC: GroupBasedVectorCommitment, const CHALLENGE_BITS: usize> FoldingSchemeV
         transcript.add(&proof.t);
 
         let rho_bits = transcript.challenge_bits(CHALLENGE_BITS);
-        let rho = VC::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Scalar::from_bits_le(&rho_bits);
 
         Ok(Self::RU {
             r_e: U

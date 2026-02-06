@@ -1,14 +1,14 @@
 use ark_std::sync::Arc;
 use sonobe_primitives::{
     arithmetizations::Arith,
-    commitments::{CommitmentKey, GroupBasedVectorCommitment},
+    commitments::{CommitmentKey, GroupBasedCommitment},
     traits::SonobeField,
 };
 
-use crate::{ova::AbstractOva, Error, FoldingSchemeKeyGenerator};
+use crate::{Error, FoldingSchemeKeyGenerator, ova::AbstractOva};
 
-impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
-    FoldingSchemeKeyGenerator for AbstractOva<VC, TF, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemeKeyGenerator for AbstractOva<CM, TF, CHALLENGE_BITS>
 {
     fn generate_keys(ck: Self::PublicParam, r1cs: Self::Arith) -> Result<Self::DeciderKey, Error> {
         let ck = Arc::new(ck);

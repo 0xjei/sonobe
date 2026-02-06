@@ -1,17 +1,17 @@
 use ark_std::sync::Arc;
 use sonobe_primitives::{
     arithmetizations::Arith,
-    commitments::{CommitmentKey, GroupBasedVectorCommitment},
+    commitments::{CommitmentKey, GroupBasedCommitment},
     traits::SonobeField,
 };
 
 use crate::{
-    nova::{AbstractNova, AbstractNova2},
     Error, FoldingSchemeKeyGenerator,
+    nova::{AbstractNova, AbstractNova2},
 };
 
-impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
-    FoldingSchemeKeyGenerator for AbstractNova<VC, TF, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemeKeyGenerator for AbstractNova<CM, TF, CHALLENGE_BITS>
 {
     fn generate_keys(ck: Self::PublicParam, r1cs: Self::Arith) -> Result<Self::DeciderKey, Error> {
         let ck = Arc::new(ck);
@@ -25,8 +25,8 @@ impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usiz
     }
 }
 
-impl<VC: GroupBasedVectorCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
-    FoldingSchemeKeyGenerator for AbstractNova2<VC, TF, CHALLENGE_BITS>
+impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
+    FoldingSchemeKeyGenerator for AbstractNova2<CM, TF, CHALLENGE_BITS>
 {
     fn generate_keys(ck: Self::PublicParam, r1cs: Self::Arith) -> Result<Self::DeciderKey, Error> {
         let ck = Arc::new(ck);
