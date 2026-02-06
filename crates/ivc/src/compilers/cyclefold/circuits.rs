@@ -2,11 +2,9 @@ use ark_ff::{BigInteger, One, PrimeField, Zero};
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::AllocVar,
-    boolean::Boolean,
     convert::ToConstraintFieldGadget,
     eq::EqGadget,
     fields::{FieldVar, fp::FpVar},
-    groups::CurveVar,
 };
 use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use ark_std::marker::PhantomData;
@@ -17,14 +15,10 @@ use sonobe_fs::{
 use sonobe_primitives::{
     algebra::Val,
     arithmetizations::Arith,
-    circuits::{ConstraintSystemExt, FCircuit},
-    commitments::{CommitmentDef, CommitmentDefGadget},
-    relations::WitnessInstanceSampler,
-    traits::{CF1, CF2, Dummy, SonobeCurve, SonobeField},
-    transcripts::{
-        Transcript, TranscriptGadget,
-        griffin::{GriffinParams, sponge::GriffinSpongeVar},
-    },
+    circuits::FCircuit,
+    commitments::CommitmentDef,
+    traits::{CF2, Dummy, SonobeCurve},
+    transcripts::{Transcript, TranscriptGadget},
 };
 
 use crate::compilers::cyclefold::FoldingSchemeCycleFoldExt;
@@ -45,22 +39,22 @@ pub struct AugmentedCircuit<
 impl<'a, FS1, FS2, FC, T> AugmentedCircuit<'a, FS1, FS2, FC, T>
 where
     FS1: FoldingSchemeCycleFoldExt<
-        1,
-        1,
-        Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
-        VC: CommitmentDef<
-            Commitment: SonobeCurve<BaseField = <FS2::VC as CommitmentDef>::Scalar>,
+            1,
+            1,
+            Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
+            CM: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS2::CM as CommitmentDef>::Scalar>,
+            >,
         >,
-    >,
     FS2: GroupBasedFoldingSchemeSecondary<
-        1,
-        1,
-        Gadget: FoldingSchemeFullVerifierGadget<1, 1, VerifierKey = ()>,
-        VC: CommitmentDef<
-            Commitment: SonobeCurve<BaseField = <FS1::VC as CommitmentDef>::Scalar>,
+            1,
+            1,
+            Gadget: FoldingSchemeFullVerifierGadget<1, 1, VerifierKey = ()>,
+            CM: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS1::CM as CommitmentDef>::Scalar>,
+            >,
         >,
-    >,
-    FC: FCircuit<Field = <FS1::VC as CommitmentDef>::Scalar>,
+    FC: FCircuit<Field = <FS1::CM as CommitmentDef>::Scalar>,
     T: Transcript<FC::Field>,
 {
     #[allow(non_snake_case)]
@@ -162,22 +156,22 @@ where
 impl<'a, FS1, FS2, FC, T> ConstraintSynthesizer<FC::Field> for AugmentedCircuit<'a, FS1, FS2, FC, T>
 where
     FS1: FoldingSchemeCycleFoldExt<
-        1,
-        1,
-        Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
-        VC: CommitmentDef<
-            Commitment: SonobeCurve<BaseField = <FS2::VC as CommitmentDef>::Scalar>,
+            1,
+            1,
+            Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
+            CM: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS2::CM as CommitmentDef>::Scalar>,
+            >,
         >,
-    >,
     FS2: GroupBasedFoldingSchemeSecondary<
-        1,
-        1,
-        Gadget: FoldingSchemeFullVerifierGadget<1, 1, VerifierKey = ()>,
-        VC: CommitmentDef<
-            Commitment: SonobeCurve<BaseField = <FS1::VC as CommitmentDef>::Scalar>,
+            1,
+            1,
+            Gadget: FoldingSchemeFullVerifierGadget<1, 1, VerifierKey = ()>,
+            CM: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS1::CM as CommitmentDef>::Scalar>,
+            >,
         >,
-    >,
-    FC: FCircuit<Field = <FS1::VC as CommitmentDef>::Scalar>,
+    FC: FCircuit<Field = <FS1::CM as CommitmentDef>::Scalar>,
     T: Transcript<FC::Field>,
 {
     fn generate_constraints(
@@ -233,7 +227,7 @@ pub trait CycleFoldConfig: Sized + Default {
     }
 
     fn verify_point_rlc(&self, cs: ConstraintSystemRef<CF2<Self::C>>)
-        -> Result<(), SynthesisError>;
+    -> Result<(), SynthesisError>;
 }
 
 #[derive(Debug, Clone, Default)]

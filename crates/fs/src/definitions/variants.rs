@@ -1,5 +1,5 @@
 use sonobe_primitives::{
-    commitments::{GroupBasedCommitment, CommitmentDef},
+    commitments::{CommitmentDef, GroupBasedCommitment},
     traits::CF2,
 };
 
@@ -10,14 +10,11 @@ use crate::{
 
 pub trait GroupBasedFoldingSchemePrimaryDef:
     FoldingSchemeDef<
-    VC: GroupBasedCommitment,
-    TranscriptField = <<Self as FoldingSchemeDef>::VC as CommitmentDef>::Scalar,
->
+        CM: GroupBasedCommitment,
+        TranscriptField = <<Self as FoldingSchemeDef>::CM as CommitmentDef>::Scalar,
+    >
 {
-    type Gadget: FoldingSchemeDefGadget<
-        Native = Self,
-        VC = <Self::VC as GroupBasedCommitment>::Gadget2,
-    >;
+    type Gadget: FoldingSchemeDefGadget<Native = Self, CM = <Self::CM as GroupBasedCommitment>::Gadget2>;
 }
 
 pub trait GroupBasedFoldingSchemePrimary<const M: usize, const N: usize>:
@@ -33,14 +30,11 @@ impl<FS, const M: usize, const N: usize> GroupBasedFoldingSchemePrimary<M, N> fo
 
 pub trait GroupBasedFoldingSchemeSecondaryDef:
     FoldingSchemeDef<
-    VC: GroupBasedCommitment,
-    TranscriptField = CF2<<<Self as FoldingSchemeDef>::VC as CommitmentDef>::Commitment>,
->
+        CM: GroupBasedCommitment,
+        TranscriptField = CF2<<<Self as FoldingSchemeDef>::CM as CommitmentDef>::Commitment>,
+    >
 {
-    type Gadget: FoldingSchemeDefGadget<
-        Native = Self,
-        VC = <Self::VC as GroupBasedCommitment>::Gadget1,
-    >;
+    type Gadget: FoldingSchemeDefGadget<Native = Self, CM = <Self::CM as GroupBasedCommitment>::Gadget1>;
 }
 
 pub trait GroupBasedFoldingSchemeSecondary<const M: usize, const N: usize>:
