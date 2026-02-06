@@ -6,7 +6,7 @@
 use ark_ff::PrimeField;
 use ark_r1cs_std::{
     eq::EqGadget,
-    fields::{fp::FpVar, FieldVar},
+    fields::{FieldVar, fp::FpVar},
     poly::polynomial::univariate::dense::DensePolynomialVar,
 };
 use ark_relations::gr1cs::SynthesisError;
@@ -56,21 +56,21 @@ impl IOPSumCheckGadget {
 mod tests {
     use ark_bn254::Fr;
     use ark_crypto_primitives::sponge::{
-        poseidon::{constraints::PoseidonSpongeVar, PoseidonSponge},
         CryptographicSponge,
+        poseidon::{PoseidonSponge, constraints::PoseidonSpongeVar},
     };
     use ark_ff::{One, Zero};
     use ark_poly::{
-        univariate::DensePolynomial, DenseMultilinearExtension, DenseUVPolynomial,
-        MultilinearExtension, Polynomial,
+        DenseMultilinearExtension, DenseUVPolynomial, MultilinearExtension, Polynomial,
+        univariate::DensePolynomial,
     };
-    use ark_r1cs_std::{alloc::AllocVar, GR1CSVar};
+    use ark_r1cs_std::{GR1CSVar, alloc::AllocVar};
     use ark_relations::gr1cs::ConstraintSystem;
     use ark_std::{error::Error, test_rng};
 
     use super::*;
     use crate::{
-        sumcheck::{utils::VirtualPolynomial, IOPSumCheck},
+        sumcheck::{IOPSumCheck, utils::VirtualPolynomial},
         transcripts::poseidon::poseidon_canonical_config,
     };
 

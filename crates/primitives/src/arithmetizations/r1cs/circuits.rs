@@ -1,7 +1,7 @@
 use ark_ff::PrimeField;
 use ark_r1cs_std::alloc::{AllocVar, AllocationMode};
 use ark_relations::gr1cs::{Namespace, SynthesisError};
-use ark_std::{borrow::Borrow, One};
+use ark_std::{One, borrow::Borrow};
 
 use super::R1CS;
 use crate::{

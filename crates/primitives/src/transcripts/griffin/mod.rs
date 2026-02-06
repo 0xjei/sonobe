@@ -1,14 +1,14 @@
 use ark_ff::{LegendreSymbol, PrimeField};
 use ark_r1cs_std::{
-    alloc::AllocVar,
-    fields::{fp::FpVar, FieldVar},
     GR1CSVar,
+    alloc::AllocVar,
+    fields::{FieldVar, fp::FpVar},
 };
 use ark_relations::gr1cs::SynthesisError;
 use num_bigint::BigUint;
 use sha3::{
-    digest::{ExtendableOutput, Update, XofReader},
     Shake128, Shake128Reader,
+    digest::{ExtendableOutput, Update, XofReader},
 };
 
 pub mod sponge;

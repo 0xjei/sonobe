@@ -1,5 +1,5 @@
 use ark_ff::{Field, PrimeField};
-use ark_r1cs_std::fields::{fp::FpVar, FieldVar};
+use ark_r1cs_std::fields::{FieldVar, fp::FpVar};
 
 pub trait Pow: Sized {
     /// Compute `self^0, self^1, ..., self^{n-1}`
