@@ -24,6 +24,9 @@ sonobe-primitives = { workspace = true }
 ark-bn254 = { workspace = true, features = ["curve", "r1cs"] }
 ark-pallas = { workspace = true, features = ["curve", "r1cs"] }
 
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+
 [features]
 default = ["parallel"]
 parallel = [
