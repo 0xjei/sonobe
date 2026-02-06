@@ -32,7 +32,7 @@ pub trait FoldingSchemeProver<const M: usize, const N: usize>: FoldingSchemeDef 
     /// Here, the randomness source is controlled by `transcript`. The returned
     /// intermediate randomness is useful for the construction of CycleFold
     /// circuits in our CycleFold-based folding-to-IVC compiler.
-    #[allow(non_snake_case)]
+    #[allow(non_snake_case, clippy::type_complexity)]
     fn prove(
         pk: &<Self::DeciderKey as DeciderKey>::ProverKey,
         transcript: &mut impl Transcript<Self::TranscriptField>,
