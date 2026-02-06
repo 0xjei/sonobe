@@ -48,9 +48,7 @@ impl<V: Absorbable, const TAG: char> Absorbable for TaggedVec<V, TAG> {
     }
 }
 
-impl<F: PrimeField, V: AbsorbableVar<F>, const TAG: char> AbsorbableVar<F>
-    for TaggedVec<V, TAG>
-{
+impl<F: PrimeField, V: AbsorbableVar<F>, const TAG: char> AbsorbableVar<F> for TaggedVec<V, TAG> {
     fn absorb_into(&self, dest: &mut Vec<FpVar<F>>) -> Result<(), SynthesisError> {
         self.0.absorb_into(dest)
     }
