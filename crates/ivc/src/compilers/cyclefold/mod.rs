@@ -38,7 +38,7 @@ pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
         rho: Self::Challenge,
     ) -> Vec<Self::CFConfig>;
 
-    #[allow(non_snake_case)]
+    #[allow(non_snake_case, clippy::type_complexity)]
     fn to_cyclefold_inputs(
         Us: [<Self::Gadget as FoldingSchemeDefGadget>::RU; M],
         us: [<Self::Gadget as FoldingSchemeDefGadget>::IU; N],
@@ -95,14 +95,14 @@ pub struct CycleFoldBasedIVC<FS1, FS2, T> {
 impl<FS1, FS2, T> IVC for CycleFoldBasedIVC<FS1, FS2, T>
 where
     FS1: FoldingSchemeCycleFoldExt<
-                1,
-                1,
-                Arith: From<ConstraintSystem<CF1<<FS1::CM as CommitmentDef>::Commitment>>>,
-                Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
-                CM: CommitmentDef<
-                    Commitment: SonobeCurve<BaseField = <FS2::CM as CommitmentDef>::Scalar>,
-                >,
+            1,
+            1,
+            Arith: From<ConstraintSystem<CF1<<FS1::CM as CommitmentDef>::Commitment>>>,
+            Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
+            CM: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS2::CM as CommitmentDef>::Scalar>,
             >,
+        >,
     FS2: GroupBasedFoldingSchemeSecondary<
             1,
             1,
