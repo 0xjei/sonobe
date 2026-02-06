@@ -66,7 +66,9 @@ mod tests {
     };
     use ark_r1cs_std::{GR1CSVar, alloc::AllocVar};
     use ark_relations::gr1cs::ConstraintSystem;
-    use ark_std::{error::Error, test_rng};
+    use ark_std::{error::Error, rand::thread_rng};
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::*;
     use crate::{
@@ -76,7 +78,7 @@ mod tests {
 
     #[test]
     fn test_sum_check_circuit() -> Result<(), Box<dyn Error>> {
-        let mut rng = test_rng();
+        let mut rng = thread_rng();
         let poseidon_config = poseidon_canonical_config::<Fr>();
         for num_vars in 1..15 {
             let mut transcript_p = PoseidonSponge::new(&poseidon_config);

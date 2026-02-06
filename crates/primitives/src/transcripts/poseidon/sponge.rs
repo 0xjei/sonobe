@@ -87,7 +87,9 @@ pub mod tests {
         groups::{CurveVar, curves::short_weierstrass::ProjectiveVar},
     };
     use ark_relations::gr1cs::ConstraintSystem;
-    use ark_std::{error::Error, str::FromStr, test_rng};
+    use ark_std::{error::Error, rand::thread_rng, str::FromStr};
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use crate::{
         algebra::{group::emulated::EmulatedAffineVar, ops::bits::FromBits},
@@ -120,7 +122,7 @@ pub mod tests {
         // use 'native' transcript
         let config = poseidon_canonical_config::<Fq>();
         let mut tr = PoseidonSponge::<Fq>::new(&config);
-        let rng = &mut test_rng();
+        let rng = &mut thread_rng();
 
         let p = G1::rand(rng);
         tr.add(&p);
@@ -143,7 +145,7 @@ pub mod tests {
         // use 'native' transcript
         let config = poseidon_canonical_config::<Fr>();
         let mut tr = PoseidonSponge::<Fr>::new(&config);
-        let rng = &mut test_rng();
+        let rng = &mut thread_rng();
 
         let p = G1::rand(rng);
         tr.add(&p);

@@ -208,7 +208,9 @@ pub fn compute_lagrange_interpolated_poly<F: PrimeField>(p_i: &[F]) -> DensePoly
 mod tests {
     use ark_pallas::Fr;
     use ark_poly::{DenseUVPolynomial, Polynomial, univariate::DensePolynomial};
-    use ark_std::UniformRand;
+    use ark_std::{UniformRand, rand::thread_rng};
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::*;
 
@@ -351,7 +353,7 @@ mod tests {
 
     #[test]
     fn test_compute_lagrange_interpolated_poly() {
-        let mut prng = ark_std::test_rng();
+        let mut prng = thread_rng();
         for degree in 1..30 {
             let poly = DensePolynomial::<Fr>::rand(degree, &mut prng);
             // range (which is exclusive) is from 0 to degree + 1, since we need degree + 1 evaluations
@@ -371,7 +373,7 @@ mod tests {
 
     #[test]
     fn test_interpolation() {
-        let mut prng = ark_std::test_rng();
+        let mut prng = thread_rng();
 
         // test a polynomial with 20 known points, i.e., with degree 19
         let poly = DensePolynomial::<Fr>::rand(20 - 1, &mut prng);

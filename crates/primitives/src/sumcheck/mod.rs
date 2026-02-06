@@ -212,7 +212,9 @@ pub mod tests {
     use ark_ff::Field;
     use ark_pallas::Fr;
     use ark_poly::MultilinearExtension;
-    use ark_std::{One, Zero, test_rng};
+    use ark_std::{One, Zero, rand::thread_rng};
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::*;
     use crate::transcripts::poseidon::poseidon_canonical_config;
@@ -221,7 +223,7 @@ pub mod tests {
     pub fn sumcheck_poseidon() -> Result<(), Error> {
         let n_vars = 10;
 
-        let mut rng = test_rng();
+        let mut rng = thread_rng();
         let poly_mle = DenseMultilinearExtension::rand(n_vars, &mut rng);
         let virtual_poly = VirtualPolynomial::new_from_mle(poly_mle, Fr::ONE);
 
