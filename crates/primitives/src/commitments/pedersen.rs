@@ -349,14 +349,19 @@ impl<C: SonobeCurve> CommitmentOpsGadget for PedersenGadget<C, true> {
 #[cfg(test)]
 mod tests {
     use ark_bn254::G1Projective;
-    use ark_std::{error::Error, rand::Rng, test_rng};
+    use ark_std::{
+        error::Error,
+        rand::{Rng, thread_rng},
+    };
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::*;
     use crate::commitments::tests::test_commitment_correctness;
 
     #[test]
     fn test_pedersen_commitment() -> Result<(), Box<dyn Error>> {
-        let mut rng = test_rng();
+        let mut rng = thread_rng();
         for i in 0..10 {
             let len = rng.gen_range((1 << i)..(1 << (i + 1)));
             test_commitment_correctness::<Pedersen<G1Projective, false>>(&mut rng, len)?;

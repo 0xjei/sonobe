@@ -249,7 +249,9 @@ pub mod tests {
     use ark_bn254::Fr;
     use ark_ff::UniformRand;
     use ark_relations::gr1cs::ConstraintSynthesizer;
-    use ark_std::{error::Error, test_rng};
+    use ark_std::{error::Error, rand::thread_rng};
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::*;
     use crate::circuits::{
@@ -259,7 +261,7 @@ pub mod tests {
 
     #[test]
     fn test_satisfiability() -> Result<(), Box<dyn Error>> {
-        let mut rng = test_rng();
+        let mut rng = thread_rng();
         let circuit = CircuitForTest::<Fr> {
             x: Fr::rand(&mut rng),
         };
@@ -272,7 +274,7 @@ pub mod tests {
 
     #[test]
     fn test_constraint_extraction() -> Result<(), Box<dyn Error>> {
-        let mut rng = test_rng();
+        let mut rng = thread_rng();
         let circuit = CircuitForTest::<Fr> {
             x: Fr::rand(&mut rng),
         };
@@ -284,7 +286,7 @@ pub mod tests {
 
     #[test]
     fn test_witness_extraction() -> Result<(), Box<dyn Error>> {
-        let mut rng = test_rng();
+        let mut rng = thread_rng();
         let x = Fr::rand(&mut rng);
         let circuit = CircuitForTest::<Fr> { x };
 

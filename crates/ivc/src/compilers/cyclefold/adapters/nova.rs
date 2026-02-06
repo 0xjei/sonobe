@@ -210,19 +210,21 @@ mod tests {
     use ark_bn254::{Fr, G1Projective as C1};
     use ark_ff::UniformRand;
     use ark_grumpkin::Projective as C2;
-    use ark_std::{error::Error, sync::Arc, test_rng};
+    use ark_std::{error::Error, rand::thread_rng, sync::Arc};
     use sonobe_primitives::{
         circuits::utils::CircuitForTest,
         commitments::pedersen::Pedersen,
         transcripts::griffin::{GriffinParams, sponge::GriffinSponge},
     };
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::*;
     use crate::tests::test_ivc;
 
     #[test]
     fn test_nova_ova() -> Result<(), Box<dyn Error>> {
-        let mut rng = test_rng();
+        let mut rng = thread_rng();
 
         test_ivc::<NovaOvaIVC<Pedersen<C1, true>, Pedersen<C2, true>, GriffinSponge<_>>, _>(
             (65536, (2048, 2048), Arc::new(GriffinParams::new(16, 5, 9))),
@@ -238,7 +240,7 @@ mod tests {
 
     #[test]
     fn test_nova_nova() -> Result<(), Box<dyn Error>> {
-        let mut rng = test_rng();
+        let mut rng = thread_rng();
 
         test_ivc::<NovaNovaIVC<Pedersen<C1, true>, Pedersen<C2, true>, GriffinSponge<_>>, _>(
             (65536, 2048, Arc::new(GriffinParams::new(16, 5, 9))),

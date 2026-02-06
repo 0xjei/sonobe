@@ -312,11 +312,16 @@ impl<CM: GroupBasedCommitment> GroupBasedFoldingSchemePrimaryDef for ProtoGalaxy
 mod tests {
     use ark_bn254::{Fr, G1Projective};
     use ark_ff::UniformRand;
-    use ark_std::{error::Error, rand::Rng, test_rng};
+    use ark_std::{
+        error::Error,
+        rand::{Rng, thread_rng},
+    };
     use sonobe_primitives::{
         circuits::utils::{CircuitForTest, satisfying_assignments_for_test},
         commitments::pedersen::Pedersen,
     };
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::*;
     use crate::tests::test_folding_scheme;
@@ -373,7 +378,7 @@ mod tests {
 
     #[test]
     fn test_protogalaxy() -> Result<(), Box<dyn Error>> {
-        let mut rng = test_rng();
+        let mut rng = thread_rng();
         test_protogalaxy_opt::<1>(10, &mut rng)?;
         test_protogalaxy_opt::<3>(10, &mut rng)?;
         test_protogalaxy_opt::<7>(10, &mut rng)?;
