@@ -1,5 +1,5 @@
 use ark_ff::PrimeField;
-use ark_r1cs_std::{alloc::AllocVar, GR1CSVar};
+use ark_r1cs_std::{GR1CSVar, alloc::AllocVar};
 
 use crate::traits::SonobeField;
 

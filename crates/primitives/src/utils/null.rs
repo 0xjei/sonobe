@@ -1,7 +1,7 @@
 use ark_ff::Field;
 use ark_r1cs_std::{
-    alloc::{AllocVar, AllocationMode},
     GR1CSVar,
+    alloc::{AllocVar, AllocationMode},
 };
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::{

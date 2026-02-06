@@ -1,13 +1,13 @@
 use ark_crypto_primitives::sponge::DuplexSpongeMode;
 use ark_ff::{BigInteger, PrimeField};
 use ark_r1cs_std::{
-    fields::{fp::FpVar, FieldVar},
+    fields::{FieldVar, fp::FpVar},
     prelude::{Boolean, ToBitsGadget},
 };
 use ark_relations::gr1cs::SynthesisError;
 use ark_std::sync::Arc;
 
-use crate::transcripts::{griffin::GriffinParams, AbsorbableGadget, Transcript, TranscriptVar};
+use crate::transcripts::{AbsorbableGadget, Transcript, TranscriptVar, griffin::GriffinParams};
 
 #[derive(Clone)]
 pub struct GriffinSponge<F: PrimeField> {
@@ -350,14 +350,14 @@ impl<F: PrimeField> TranscriptVar<F> for GriffinSpongeVar<F> {
 
 #[cfg(test)]
 pub mod tests {
-    use ark_bn254::{constraints::GVar, g1::Config, Fq, Fr, G1Projective as G1};
+    use ark_bn254::{Fq, Fr, G1Projective as G1, constraints::GVar, g1::Config};
     use ark_ec::PrimeGroup;
     use ark_ff::UniformRand;
     use ark_r1cs_std::{
+        GR1CSVar,
         alloc::AllocVar,
         fields::fp::FpVar,
-        groups::{curves::short_weierstrass::ProjectiveVar, CurveVar},
-        GR1CSVar,
+        groups::{CurveVar, curves::short_weierstrass::ProjectiveVar},
     };
     use ark_relations::gr1cs::ConstraintSystem;
     use ark_std::{error::Error, test_rng};

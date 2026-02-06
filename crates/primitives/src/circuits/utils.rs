@@ -8,7 +8,8 @@ use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystemRef, Synthesis
 use super::Assignments;
 use crate::{
     arithmetizations::r1cs::{R1CS, R1CSConfig},
-    circuits::FCircuit, traits::SonobeField,
+    circuits::FCircuit,
+    traits::SonobeField,
 };
 
 pub struct CircuitForTest<F: PrimeField> {

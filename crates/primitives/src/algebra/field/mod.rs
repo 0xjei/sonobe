@@ -1,5 +1,5 @@
 use ark_ff::{BigInteger, Fp, FpConfig, PrimeField};
-use ark_r1cs_std::fields::{fp::FpVar, FieldVar};
+use ark_r1cs_std::fields::{FieldVar, fp::FpVar};
 use ark_relations::gr1cs::SynthesisError;
 use ark_std::{
     any::TypeId,
@@ -8,14 +8,14 @@ use ark_std::{
 };
 
 use crate::{
-    algebra::{field::emulated::EmulatedFieldVar, Val},
+    algebra::{Val, field::emulated::EmulatedFieldVar},
     traits::{Inputize, InputizeEmulated},
     transcripts::{Absorbable, AbsorbableGadget},
 };
 
 pub mod emulated;
 
-/// `Field` trait is a wrapper around `PrimeField` that also includes the
+/// `SonobeField` trait is a wrapper around `PrimeField` that also includes the
 /// necessary bounds for the field to be used conveniently in folding schemes.
 pub trait SonobeField:
     PrimeField<BasePrimeField = Self>
