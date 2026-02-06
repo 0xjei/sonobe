@@ -37,26 +37,45 @@ concurrency:
 jobs:
   test:
     if: github.event.pull_request.draft == false
-    name: Test (${{ matrix.features }})
+    name: Test ${{ matrix.target }} (${{ matrix.features }})
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        features:
-          - default
-          - no-default
         include:
-          - features: default
+          # x64: both parallel and no-parallel
+          - target: x86_64-unknown-linux-gnu
+            features: parallel
+            args: "--features parallel"
+          - target: x86_64-unknown-linux-gnu
+            features: no-parallel
             args: ""
-          - features: no-default
-            args: "--no-default-features"
+          # wasm: no-parallel only
+          - target: wasm32-unknown-unknown
+            features: no-parallel
+            args: ""
+          - target: wasm32-wasip2
+            features: no-parallel
+            args: ""
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
-      - name: Run tests
-        run: cargo test --release --workspace ${{ matrix.args }}
-      - name: Run Doc-tests
-        run: cargo test --doc ${{ matrix.args }}
+      - name: Install wasm-bindgen-cli
+        if: matrix.target == 'wasm32-unknown-unknown'
+        run: cargo install wasm-bindgen-cli
+      - name: Install wasmtime-cli
+        if: matrix.target == 'wasm32-wasip2'
+        run: cargo install wasmtime-cli
+      - name: Test sonobe-primitives
+        run: cargo test --release -p sonobe-primitives --target ${{ matrix.target }} ${{ matrix.args }}
+      - name: Test sonobe-fs
+        run: cargo test --release -p sonobe-fs --target ${{ matrix.target }} ${{ matrix.args }}
+      - name: Test sonobe-ivc
+        run: cargo test --release -p sonobe-ivc --target ${{ matrix.target }} ${{ matrix.args }}
+      - name: Test documentation examples
+        run: cargo test --doc --target ${{ matrix.target }} ${{ matrix.args }}
 
   build:
     if: github.event.pull_request.draft == false
@@ -67,19 +86,19 @@ jobs:
         target:
           - x86_64-unknown-linux-gnu
           - wasm32-unknown-unknown
-          - wasm32-wasip1
+          - wasm32-wasip2
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
-      - name: Build sonobe-primitives for ${{ matrix.target }}
-        run: cargo build -p sonobe-primitives --no-default-features --target ${{ matrix.target }} --features parallel
-      - name: Build sonobe-fs for ${{ matrix.target }}
-        run: cargo build -p sonobe-fs --no-default-features --target ${{ matrix.target }} --features parallel
-      - name: Build sonobe-ivc for ${{ matrix.target }}
-        run: cargo build -p sonobe-ivc --no-default-features --target ${{ matrix.target }} --features parallel
+      - name: Build sonobe-primitives
+        run: cargo build -p sonobe-primitives --target ${{ matrix.target }}
+      - name: Build sonobe-fs
+        run: cargo build -p sonobe-fs --target ${{ matrix.target }}
+      - name: Build sonobe-ivc
+        run: cargo build -p sonobe-ivc --target ${{ matrix.target }}
 
   fmt:
     if: github.event.pull_request.draft == false
@@ -104,7 +123,7 @@ jobs:
         target:
           - x86_64-unknown-linux-gnu
           - wasm32-unknown-unknown
-          - wasm32-wasip1
+          - wasm32-wasip2
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
