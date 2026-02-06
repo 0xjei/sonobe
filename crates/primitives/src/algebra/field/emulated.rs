@@ -1147,14 +1147,16 @@ mod tests {
     use ark_ff::Field;
     use ark_pallas::{Fq, Fr};
     use ark_relations::gr1cs::ConstraintSystem;
-    use ark_std::{UniformRand, error::Error, test_rng};
+    use ark_std::{UniformRand, error::Error, rand::thread_rng};
     use num_bigint::RandBigInt;
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::*;
 
     #[test]
     fn test_alloc() -> Result<(), Box<dyn Error>> {
-        let rng = &mut test_rng();
+        let rng = &mut thread_rng();
 
         let size = 1024;
         let mut lbs = vec![BigInt::zero()];
@@ -1211,7 +1213,7 @@ mod tests {
 
         let size = 2048;
 
-        let rng = &mut test_rng();
+        let rng = &mut thread_rng();
         let a = rng.gen_bigint(size as u64);
         let b = rng.gen_bigint(size as u64);
         let ab = &a * &b;
@@ -1282,7 +1284,7 @@ mod tests {
     fn test_mul_fq() -> Result<(), Box<dyn Error>> {
         let cs = ConstraintSystem::<Fr>::new_ref();
 
-        let rng = &mut test_rng();
+        let rng = &mut thread_rng();
         let a = Fq::rand(rng);
         let b = Fq::rand(rng);
         let ab = a * b;
@@ -1307,7 +1309,7 @@ mod tests {
     fn test_pow() -> Result<(), Box<dyn Error>> {
         let cs = ConstraintSystem::<Fr>::new_ref();
 
-        let rng = &mut test_rng();
+        let rng = &mut thread_rng();
 
         let a = Fq::rand(rng);
 
@@ -1329,7 +1331,7 @@ mod tests {
 
         let len = 1000;
 
-        let rng = &mut test_rng();
+        let rng = &mut thread_rng();
         let a = (0..len).map(|_| Fq::rand(rng)).collect::<Vec<Fq>>();
         let b = (0..len).map(|_| Fq::rand(rng)).collect::<Vec<Fq>>();
         let c = a.iter().zip(b.iter()).map(|(a, b)| a * b).sum::<Fq>();

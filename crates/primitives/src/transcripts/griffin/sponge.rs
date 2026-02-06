@@ -360,7 +360,9 @@ pub mod tests {
         groups::{CurveVar, curves::short_weierstrass::ProjectiveVar},
     };
     use ark_relations::gr1cs::ConstraintSystem;
-    use ark_std::{error::Error, test_rng};
+    use ark_std::{error::Error, rand::thread_rng};
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::*;
     use crate::algebra::{group::emulated::EmulatedAffineVar, ops::bits::FromBits};
@@ -370,7 +372,7 @@ pub mod tests {
         // use 'native' transcript
         let config = Arc::new(GriffinParams::<Fq>::new(3, 5, 12));
         let mut tr = GriffinSponge::<Fq>::new(&config);
-        let rng = &mut test_rng();
+        let rng = &mut thread_rng();
 
         let p = G1::rand(rng);
         tr.add(&p);
@@ -393,7 +395,7 @@ pub mod tests {
         // use 'native' transcript
         let config = Arc::new(GriffinParams::<Fr>::new(3, 5, 12));
         let mut tr = GriffinSponge::<Fr>::new(&config);
-        let rng = &mut test_rng();
+        let rng = &mut thread_rng();
 
         let p = G1::rand(rng);
         tr.add(&p);

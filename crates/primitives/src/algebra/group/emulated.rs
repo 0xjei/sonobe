@@ -138,7 +138,9 @@ mod tests {
     use ark_pallas::{Fq, Fr, PallasConfig, Projective};
     use ark_r1cs_std::groups::curves::short_weierstrass::ProjectiveVar;
     use ark_relations::gr1cs::ConstraintSystem;
-    use ark_std::{UniformRand, error::Error};
+    use ark_std::{UniformRand, error::Error, rand::thread_rng};
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::*;
     use crate::{
@@ -160,7 +162,7 @@ mod tests {
         let cs = ConstraintSystem::<Fr>::new_ref();
 
         // check that point_to_nonnative_limbs returns the expected values
-        let mut rng = ark_std::test_rng();
+        let mut rng = thread_rng();
         let p = Projective::rand(&mut rng);
         let p_var = EmulatedAffineVar::<Fr, Projective>::new_witness(cs.clone(), || Ok(p))?;
         assert_eq!(p_var.to_absorbable()?.value()?, p.to_absorbable());
@@ -170,7 +172,7 @@ mod tests {
     #[test]
     fn test_inputize() -> Result<(), Box<dyn Error>> {
         // check that point_to_nonnative_limbs returns the expected values
-        let mut rng = ark_std::test_rng();
+        let mut rng = thread_rng();
         let p = Projective::rand(&mut rng);
 
         let cs = ConstraintSystem::<Fr>::new_ref();
