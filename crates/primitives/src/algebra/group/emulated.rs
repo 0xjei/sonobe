@@ -1,12 +1,12 @@
-use ark_ec::{short_weierstrass::SWFlags, AffineRepr};
+use ark_ec::{AffineRepr, short_weierstrass::SWFlags};
 use ark_ff::Zero;
 use ark_r1cs_std::{
+    GR1CSVar,
     alloc::{AllocVar, AllocationMode},
     eq::EqGadget,
     fields::fp::FpVar,
     prelude::Boolean,
     select::CondSelectGadget,
-    GR1CSVar,
 };
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_serialize::{CanonicalSerialize, CanonicalSerializeWithFlags};
@@ -18,9 +18,13 @@ use crate::{
     transcripts::AbsorbableGadget,
 };
 
-/// NonNativeAffineVar represents an elliptic curve point in Affine representation in the non-native
-/// field, over the constraint field. It is not intended to perform operations, but just to contain
-/// the affine coordinates in order to perform hash operations of the point.
+/// `EmulatedAffineVar` defines an in-circuit elliptic curve point in its affine
+/// representation, where the coordinates are non-native field variables in the
+/// curve's base field `Target::BaseField`, emulated over the constraint field
+/// `Base`.
+///
+/// It is not intended to perform operations, but just to record the coordinates
+/// in order to perform hash operations of the point.
 #[derive(Debug, Clone)]
 pub struct EmulatedAffineVar<Base: SonobeField, Target: SonobeCurve> {
     pub x: EmulatedFieldVar<Base, Target::BaseField>,
@@ -134,7 +138,7 @@ mod tests {
     use ark_pallas::{Fq, Fr, PallasConfig, Projective};
     use ark_r1cs_std::groups::curves::short_weierstrass::ProjectiveVar;
     use ark_relations::gr1cs::ConstraintSystem;
-    use ark_std::{error::Error, UniformRand};
+    use ark_std::{UniformRand, error::Error};
 
     use super::*;
     use crate::{

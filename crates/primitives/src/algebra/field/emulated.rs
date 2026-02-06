@@ -1,12 +1,12 @@
 use ark_ff::{BigInteger, One, PrimeField, Zero};
 use ark_r1cs_std::{
+    GR1CSVar,
     alloc::{AllocVar, AllocationMode},
     boolean::Boolean,
     convert::ToBitsGadget,
-    fields::{fp::FpVar, FieldVar},
+    fields::{FieldVar, fp::FpVar},
     prelude::EqGadget,
     select::CondSelectGadget,
-    GR1CSVar,
 };
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::{
@@ -566,32 +566,32 @@ impl<Base: SonobeField, Target: SonobeField, const LHS_ALIGNED: bool>
     }
 }
 
-impl<Base: SonobeField, Target: SonobeField>
-    EquivalenceGadget<IntVarInner<Base, Target, true>> for IntVarInner<Base, Target, true>
+impl<Base: SonobeField, Target: SonobeField> EquivalenceGadget<IntVarInner<Base, Target, true>>
+    for IntVarInner<Base, Target, true>
 {
     fn enforce_equivalent(&self, other: &Self) -> Result<(), SynthesisError> {
         self.enforce_equal(other)
     }
 }
 
-impl<Base: SonobeField, Target: SonobeField>
-    EquivalenceGadget<IntVarInner<Base, Target, true>> for IntVarInner<Base, Target, false>
+impl<Base: SonobeField, Target: SonobeField> EquivalenceGadget<IntVarInner<Base, Target, true>>
+    for IntVarInner<Base, Target, false>
 {
     fn enforce_equivalent(&self, other: &Self) -> Result<(), SynthesisError> {
         self.enforce_congruent(other)
     }
 }
 
-impl<Base: SonobeField, Target: SonobeField>
-    EquivalenceGadget<IntVarInner<Base, Target, false>> for IntVarInner<Base, Target, true>
+impl<Base: SonobeField, Target: SonobeField> EquivalenceGadget<IntVarInner<Base, Target, false>>
+    for IntVarInner<Base, Target, true>
 {
     fn enforce_equivalent(&self, other: &Self) -> Result<(), SynthesisError> {
         self.enforce_congruent(other)
     }
 }
 
-impl<Base: SonobeField, Target: SonobeField>
-    EquivalenceGadget<IntVarInner<Base, Target, false>> for IntVarInner<Base, Target, false>
+impl<Base: SonobeField, Target: SonobeField> EquivalenceGadget<IntVarInner<Base, Target, false>>
+    for IntVarInner<Base, Target, false>
 {
     fn enforce_equivalent(&self, other: &Self) -> Result<(), SynthesisError> {
         self.enforce_congruent(other)
@@ -1147,7 +1147,7 @@ mod tests {
     use ark_ff::Field;
     use ark_pallas::{Fq, Fr};
     use ark_relations::gr1cs::ConstraintSystem;
-    use ark_std::{error::Error, test_rng, UniformRand};
+    use ark_std::{UniformRand, error::Error, test_rng};
     use num_bigint::RandBigInt;
 
     use super::*;

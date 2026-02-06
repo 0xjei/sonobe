@@ -1,5 +1,5 @@
 use ark_ff::UniformRand;
-use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar, select::CondSelectGadget, GR1CSVar};
+use ark_r1cs_std::{GR1CSVar, alloc::AllocVar, fields::fp::FpVar, select::CondSelectGadget};
 use ark_relations::gr1cs::SynthesisError;
 use ark_std::{
     fmt::Debug,
@@ -11,12 +11,12 @@ use thiserror::Error;
 
 use crate::{
     algebra::{
-        field::{emulated::EmulatedFieldVar, TwoStageFieldVar},
+        Val,
+        field::{TwoStageFieldVar, emulated::EmulatedFieldVar},
         group::emulated::EmulatedAffineVar,
         ops::bits::FromBitsGadget,
-        Val,
     },
-    traits::{SonobeCurve, SonobeField, CF1, CF2},
+    traits::{CF1, CF2, SonobeCurve, SonobeField},
     transcripts::{Absorbable, AbsorbableGadget},
 };
 
@@ -26,7 +26,9 @@ pub mod pedersen;
 #[derive(Debug, Error)]
 pub enum Error {
     // Commitment errors
-    #[error("The message being committed to has length {1}, exceeding the maximum supported length ({0})")]
+    #[error(
+        "The message being committed to has length {1}, exceeding the maximum supported length ({0})"
+    )]
     MessageTooLong(usize, usize),
     #[error("Blinding factor not 0 for Commitment without hiding")]
     BlindingNotZero,
@@ -40,7 +42,7 @@ pub trait CommitmentKey: Clone {
     fn max_scalars_len(&self) -> usize;
 }
 
-pub trait VectorCommitmentDef: 'static + Clone + Debug + PartialEq + Eq {
+pub trait CommitmentDef: 'static + Clone + Debug + PartialEq + Eq {
     const IS_HIDING: bool;
 
     type Key: CommitmentKey;
@@ -62,7 +64,7 @@ pub trait VectorCommitmentDef: 'static + Clone + Debug + PartialEq + Eq {
         + Sum;
 }
 
-pub trait VectorCommitmentOps: VectorCommitmentDef {
+pub trait CommitmentOps: CommitmentDef {
     fn generate_key(len: usize, rng: impl RngCore) -> Result<Self::Key, Error>;
 
     fn commit(
@@ -79,28 +81,28 @@ pub trait VectorCommitmentOps: VectorCommitmentDef {
     ) -> Result<(), Error>;
 }
 
-pub trait VectorCommitmentDefGadget: Clone {
+pub trait CommitmentDefGadget: Clone {
     type ConstraintField: SonobeField;
 
     type KeyVar;
     type ScalarVar: AbsorbableGadget<Self::ConstraintField>
         + CondSelectGadget<Self::ConstraintField>
         + FromBitsGadget<Self::ConstraintField>
-        + AllocVar<<Self::Native as VectorCommitmentDef>::Scalar, Self::ConstraintField>
-        + GR1CSVar<Self::ConstraintField, Value = <Self::Native as VectorCommitmentDef>::Scalar>
+        + AllocVar<<Self::Native as CommitmentDef>::Scalar, Self::ConstraintField>
+        + GR1CSVar<Self::ConstraintField, Value = <Self::Native as CommitmentDef>::Scalar>
         + TwoStageFieldVar;
     type CommitmentVar: Clone
         + AbsorbableGadget<Self::ConstraintField>
         + CondSelectGadget<Self::ConstraintField>
-        + AllocVar<<Self::Native as VectorCommitmentDef>::Commitment, Self::ConstraintField>
-        + GR1CSVar<Self::ConstraintField, Value = <Self::Native as VectorCommitmentDef>::Commitment>;
-    type RandomnessVar: AllocVar<<Self::Native as VectorCommitmentDef>::Randomness, Self::ConstraintField>
-        + GR1CSVar<Self::ConstraintField, Value = <Self::Native as VectorCommitmentDef>::Randomness>;
+        + AllocVar<<Self::Native as CommitmentDef>::Commitment, Self::ConstraintField>
+        + GR1CSVar<Self::ConstraintField, Value = <Self::Native as CommitmentDef>::Commitment>;
+    type RandomnessVar: AllocVar<<Self::Native as CommitmentDef>::Randomness, Self::ConstraintField>
+        + GR1CSVar<Self::ConstraintField, Value = <Self::Native as CommitmentDef>::Randomness>;
 
-    type Native: VectorCommitmentDef;
+    type Native: CommitmentDef;
 }
 
-pub trait VectorCommitmentOpsGadget: VectorCommitmentDefGadget {
+pub trait CommitmentOpsGadget: CommitmentDefGadget {
     fn open(
         ck: &Self::KeyVar,
         v: &[Self::ScalarVar],
@@ -109,25 +111,23 @@ pub trait VectorCommitmentOpsGadget: VectorCommitmentDefGadget {
     ) -> Result<(), SynthesisError>;
 }
 
-pub trait GroupBasedVectorCommitment:
-    VectorCommitmentDef<
-        Commitment: SonobeCurve,
-        Scalar = CF1<<Self as VectorCommitmentDef>::Commitment>,
-    > + VectorCommitmentOps
+pub trait GroupBasedCommitment:
+    CommitmentDef<Commitment: SonobeCurve, Scalar = CF1<<Self as CommitmentDef>::Commitment>>
+    + CommitmentOps
 {
-    type Gadget1: VectorCommitmentOpsGadget
-        + VectorCommitmentDefGadget<
+    type Gadget1: CommitmentOpsGadget
+        + CommitmentDefGadget<
             ConstraintField = CF2<Self::Commitment>,
             ScalarVar = EmulatedFieldVar<CF2<Self::Commitment>, Self::Scalar>,
             CommitmentVar = <Self::Commitment as Val>::Var,
             Native = Self,
         >;
-    type Gadget2: VectorCommitmentDefGadget<
-        ConstraintField = Self::Scalar,
-        ScalarVar = FpVar<Self::Scalar>,
-        CommitmentVar = EmulatedAffineVar<Self::Scalar, Self::Commitment>,
-        Native = Self,
-    >;
+    type Gadget2: CommitmentDefGadget<
+            ConstraintField = Self::Scalar,
+            ScalarVar = FpVar<Self::Scalar>,
+            CommitmentVar = EmulatedAffineVar<Self::Scalar, Self::Commitment>,
+            Native = Self,
+        >;
 }
 
 #[cfg(test)]
@@ -137,17 +137,17 @@ mod tests {
 
     use super::*;
 
-    pub fn test_commitment_correctness<VC: VectorCommitmentOps>(
+    pub fn test_commitment_correctness<CM: CommitmentOps>(
         mut rng: impl RngCore,
         len: usize,
     ) -> Result<(), Box<dyn Error>> {
         let v = (0..len)
-            .map(|_| VC::Scalar::rand(&mut rng))
+            .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
 
-        let ck = VC::generate_key(len, &mut rng)?;
-        let (cm, r) = VC::commit(&ck, &v, &mut rng)?;
-        VC::open(&ck, &v, &r, &cm)?;
+        let ck = CM::generate_key(len, &mut rng)?;
+        let (cm, r) = CM::commit(&ck, &v, &mut rng)?;
+        CM::open(&ck, &v, &r, &cm)?;
         Ok(())
     }
 }

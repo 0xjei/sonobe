@@ -1,6 +1,6 @@
 use ark_ff::{Field, PrimeField, Zero};
 use ark_poly::{DenseMultilinearExtension, EvaluationDomain, GeneralEvaluationDomain};
-use ark_r1cs_std::fields::{fp::FpVar, FieldVar};
+use ark_r1cs_std::fields::{FieldVar, fp::FpVar};
 use ark_relations::gr1cs::SynthesisError;
 use ark_std::log2;
 
@@ -25,7 +25,7 @@ pub trait EvaluationDomainGadget<F: PrimeField> {
     ) -> Result<Vec<FpVar<F>>, SynthesisError>;
 
     fn evaluate_vanishing_polynomial_var(&self, tau: &FpVar<F>)
-        -> Result<FpVar<F>, SynthesisError>;
+    -> Result<FpVar<F>, SynthesisError>;
 }
 
 impl<F: PrimeField> EvaluationDomainGadget<F> for GeneralEvaluationDomain<F> {

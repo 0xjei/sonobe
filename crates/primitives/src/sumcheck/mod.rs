@@ -11,7 +11,7 @@
 
 use ark_ff::PrimeField;
 use ark_poly::{
-    univariate::DensePolynomial, DenseMultilinearExtension, DenseUVPolynomial, Polynomial,
+    DenseMultilinearExtension, DenseUVPolynomial, Polynomial, univariate::DensePolynomial,
 };
 use ark_std::{cfg_chunks, cfg_into_iter, fmt::Debug};
 #[cfg(feature = "parallel")]
@@ -19,8 +19,8 @@ use rayon::prelude::*;
 use thiserror::Error;
 
 use self::utils::{
-    barycentric_weights, compute_lagrange_interpolated_poly, extrapolate, VPAuxInfo,
-    VirtualPolynomial,
+    VPAuxInfo, VirtualPolynomial, barycentric_weights, compute_lagrange_interpolated_poly,
+    extrapolate,
 };
 use crate::transcripts::{Absorbable, Transcript};
 
@@ -211,7 +211,7 @@ pub mod tests {
     use ark_ff::Field;
     use ark_pallas::Fr;
     use ark_poly::MultilinearExtension;
-    use ark_std::{test_rng, One, Zero};
+    use ark_std::{One, Zero, test_rng};
 
     use super::*;
     use crate::transcripts::poseidon::poseidon_canonical_config;

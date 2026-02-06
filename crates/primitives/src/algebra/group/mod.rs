@@ -1,17 +1,17 @@
 use ark_ec::{
-    short_weierstrass::{Projective, SWCurveConfig},
     AffineRepr, CurveGroup, PrimeGroup,
+    short_weierstrass::{Projective, SWCurveConfig},
 };
 use ark_ff::{Field, One, PrimeField, Zero};
 use ark_r1cs_std::{
     convert::ToConstraintFieldGadget,
     fields::fp::FpVar,
-    groups::{curves::short_weierstrass::ProjectiveVar, CurveVar},
+    groups::{CurveVar, curves::short_weierstrass::ProjectiveVar},
 };
 use ark_relations::gr1cs::SynthesisError;
 
 use crate::{
-    algebra::{field::SonobeField, group::emulated::EmulatedAffineVar, Val},
+    algebra::{Val, field::SonobeField, group::emulated::EmulatedAffineVar},
     traits::{Dummy, Inputize, InputizeEmulated},
     transcripts::{Absorbable, AbsorbableGadget},
 };
@@ -21,7 +21,7 @@ pub mod emulated;
 pub type CF1<C> = <C as PrimeGroup>::ScalarField;
 pub type CF2<C> = <<C as CurveGroup>::BaseField as Field>::BasePrimeField;
 
-/// `Curve` trait is a wrapper around `CurveGroup` that also includes the
+/// `SonobeCurve` trait is a wrapper around `CurveGroup` that also includes the
 /// necessary bounds for the curve to be used conveniently in folding schemes.
 pub trait SonobeCurve:
     CurveGroup<ScalarField: SonobeField, BaseField: SonobeField, Config: SWCurveConfig>
@@ -30,7 +30,7 @@ pub trait SonobeCurve:
     + InputizeEmulated<Self::ScalarField>
     + Val<
         Var: CurveVar<Self, Self::BaseField> + AbsorbableGadget<Self::BaseField>,
-        EmulatedVar<Self::ScalarField> = EmulatedAffineVar<Self::ScalarField, Self>
+        EmulatedVar<Self::ScalarField> = EmulatedAffineVar<Self::ScalarField, Self>,
     >
 {
 }

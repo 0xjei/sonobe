@@ -1,12 +1,11 @@
 use ark_ff::{Field, PrimeField};
-use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar, GR1CSVar};
+use ark_r1cs_std::{GR1CSVar, alloc::AllocVar, fields::fp::FpVar};
 use ark_relations::gr1cs::{
     ConstraintSynthesizer, ConstraintSystem, ConstraintSystemRef, SynthesisError, SynthesisMode,
 };
 use ark_std::{
     fmt::Debug,
-    marker::PhantomData,
-    ops::{Index, IndexMut},
+    ops::{Deref, Index, IndexMut},
 };
 
 use crate::transcripts::{Absorbable, AbsorbableGadget};
@@ -95,82 +94,78 @@ impl<F, V: AsRef<[F]> + AsMut<[F]>> IndexMut<usize> for Assignments<F, V> {
     }
 }
 
-pub struct ConstraintSystemBuilder<F, C> {
-    _f: PhantomData<F>,
-    mode: SynthesisMode,
-    circuit: C,
+pub struct ConstraintSystemExt<F: Field, const ARITH_ENABLED: bool, const ASSIGNMENTS_ENABLED: bool>
+{
+    cs: ConstraintSystemRef<F>,
 }
+impl<F: Field, const ARITH_ENABLED: bool, const ASSIGNMENTS_ENABLED: bool> Deref
+    for ConstraintSystemExt<F, ARITH_ENABLED, ASSIGNMENTS_ENABLED>
+{
+    type Target = ConstraintSystemRef<F>;
 
-impl ConstraintSystemBuilder<(), ()> {
-    pub fn new() -> Self {
-        Self {
-            _f: PhantomData,
-            mode: SynthesisMode::Prove {
-                construct_matrices: true,
-                generate_lc_assignments: true,
-            },
-            circuit: (),
-        }
+    fn deref(&self) -> &Self::Target {
+        &self.cs
     }
 }
 
-impl Default for ConstraintSystemBuilder<(), ()> {
+impl<F: Field, const ARITH_ENABLED: bool, const ASSIGNMENTS_ENABLED: bool>
+    ConstraintSystemExt<F, ARITH_ENABLED, ASSIGNMENTS_ENABLED>
+{
+    pub fn new() -> Self {
+        let cs = ConstraintSystem::<F>::new_ref();
+        let mode = if ASSIGNMENTS_ENABLED {
+            SynthesisMode::Prove {
+                construct_matrices: ARITH_ENABLED,
+                generate_lc_assignments: ARITH_ENABLED,
+            }
+        } else {
+            SynthesisMode::Setup
+        };
+        cs.set_mode(mode);
+        Self { cs }
+    }
+
+    pub fn execute_synthesizer(
+        &self,
+        circuit: impl ConstraintSynthesizer<F>,
+    ) -> Result<(), SynthesisError> {
+        self.execute_fn(|cs| circuit.generate_constraints(cs))
+    }
+
+    pub fn execute_fn<R>(
+        &self,
+        circuit: impl FnOnce(ConstraintSystemRef<F>) -> Result<R, SynthesisError>,
+    ) -> Result<R, SynthesisError> {
+        let result = circuit(self.cs.clone())?;
+        if ARITH_ENABLED {
+            self.cs.finalize();
+        }
+        Ok(result)
+    }
+}
+
+impl<F: Field, const ARITH_ENABLED: bool, const ASSIGNMENTS_ENABLED: bool> Default
+    for ConstraintSystemExt<F, ARITH_ENABLED, ASSIGNMENTS_ENABLED>
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<X, Y> ConstraintSystemBuilder<X, Y> {
-    pub fn with_setup_mode(self) -> Self {
-        Self {
-            _f: PhantomData,
-            mode: SynthesisMode::Setup,
-            circuit: self.circuit,
-        }
-    }
+pub type ArithExtractor<F> = ConstraintSystemExt<F, true, false>;
+pub type AssignmentsExtractor<F> = ConstraintSystemExt<F, false, true>;
 
-    pub fn with_prove_mode(self) -> Self {
-        Self {
-            _f: PhantomData,
-            mode: SynthesisMode::Prove {
-                construct_matrices: true,
-                generate_lc_assignments: true,
-            },
-            circuit: self.circuit,
-        }
-    }
-
-    pub fn with_circuit<F: Field, C: ConstraintSynthesizer<F>>(
-        self,
-        circuit: C,
-    ) -> ConstraintSystemBuilder<F, C> {
-        ConstraintSystemBuilder {
-            _f: PhantomData,
-            mode: self.mode,
-            circuit,
-        }
+impl<F: Field> ArithExtractor<F> {
+    pub fn arith<A: From<ConstraintSystem<F>>>(self) -> Result<A, SynthesisError> {
+        Ok(self.cs.into_inner().unwrap().into())
     }
 }
 
-impl<F: Field, C: ConstraintSynthesizer<F>> ConstraintSystemBuilder<F, C> {
-    pub fn synthesize(self) -> Result<ConstraintSystem<F>, SynthesisError> {
-        let cs = ConstraintSystem::<F>::new_ref();
-        cs.set_mode(self.mode);
-        self.circuit.generate_constraints(cs.clone())?;
-        cs.finalize();
-        Ok(cs.into_inner().unwrap())
-    }
-}
-
-pub trait ConstraintSystemExt<F> {
-    fn assignments(&self) -> Result<Assignments<F, Vec<F>>, SynthesisError>;
-}
-
-impl<F: Field> ConstraintSystemExt<F> for ConstraintSystemRef<F> {
-    fn assignments(&self) -> Result<Assignments<F, Vec<F>>, SynthesisError> {
-        let witness = self.witness_assignment()?.to_vec();
+impl<F: Field> AssignmentsExtractor<F> {
+    pub fn assignments(self) -> Result<Assignments<F, Vec<F>>, SynthesisError> {
+        let witness = self.cs.witness_assignment()?.to_vec();
         // skip the first element which is '1'
-        let instance = self.instance_assignment()?[1..].to_vec();
+        let instance = self.cs.instance_assignment()?[1..].to_vec();
 
         Ok((F::one(), instance, witness).into())
     }

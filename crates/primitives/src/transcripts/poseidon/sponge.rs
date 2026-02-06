@@ -1,7 +1,7 @@
 use ark_crypto_primitives::sponge::{
-    constraints::CryptographicSpongeVar,
-    poseidon::{constraints::PoseidonSpongeVar, PoseidonConfig, PoseidonSponge},
     Absorb, CryptographicSponge, FieldBasedCryptographicSponge,
+    constraints::CryptographicSpongeVar,
+    poseidon::{PoseidonConfig, PoseidonSponge, constraints::PoseidonSpongeVar},
 };
 use ark_ff::PrimeField;
 use ark_r1cs_std::{boolean::Boolean, fields::fp::FpVar};
@@ -76,15 +76,15 @@ impl<F: PrimeField> TranscriptVar<F> for PoseidonSpongeVar<F> {
 
 #[cfg(test)]
 pub mod tests {
-    use ark_bn254::{constraints::GVar, g1::Config, Fq, Fr, G1Projective as G1};
-    use ark_crypto_primitives::sponge::poseidon::{constraints::PoseidonSpongeVar, PoseidonSponge};
+    use ark_bn254::{Fq, Fr, G1Projective as G1, constraints::GVar, g1::Config};
+    use ark_crypto_primitives::sponge::poseidon::{PoseidonSponge, constraints::PoseidonSpongeVar};
     use ark_ec::PrimeGroup;
     use ark_ff::UniformRand;
     use ark_r1cs_std::{
+        GR1CSVar,
         alloc::AllocVar,
         fields::fp::FpVar,
-        groups::{curves::short_weierstrass::ProjectiveVar, CurveVar},
-        GR1CSVar,
+        groups::{CurveVar, curves::short_weierstrass::ProjectiveVar},
     };
     use ark_relations::gr1cs::ConstraintSystem;
     use ark_std::{error::Error, str::FromStr, test_rng};

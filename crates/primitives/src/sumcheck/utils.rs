@@ -10,9 +10,9 @@
 //! This module defines our main mathematical object `VirtualPolynomial`; and
 //! various functions associated with it.
 
-use ark_ff::{batch_inversion, Field, PrimeField};
-use ark_poly::{univariate::DensePolynomial, DenseMultilinearExtension, DenseUVPolynomial};
-use ark_r1cs_std::fields::{fp::FpVar, FieldVar};
+use ark_ff::{Field, PrimeField, batch_inversion};
+use ark_poly::{DenseMultilinearExtension, DenseUVPolynomial, univariate::DensePolynomial};
+use ark_r1cs_std::fields::{FieldVar, fp::FpVar};
 use ark_serialize::CanonicalSerialize;
 use ark_std::cfg_into_iter;
 #[cfg(feature = "parallel")]
@@ -207,7 +207,7 @@ pub fn compute_lagrange_interpolated_poly<F: PrimeField>(p_i: &[F]) -> DensePoly
 #[cfg(test)]
 mod tests {
     use ark_pallas::Fr;
-    use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial, Polynomial};
+    use ark_poly::{DenseUVPolynomial, Polynomial, univariate::DensePolynomial};
     use ark_std::UniformRand;
 
     use super::*;
