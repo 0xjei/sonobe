@@ -25,8 +25,11 @@ ark-grumpkin = { workspace = true, features = ["r1cs"] }
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
 
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dev-dependencies]
+wasm-bindgen-test = { workspace = true }
+
 [features]
-default = ["parallel"]
+default = []
 parallel = [
     "sonobe-fs/parallel",
 ]
