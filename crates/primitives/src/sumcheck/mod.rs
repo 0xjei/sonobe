@@ -41,6 +41,7 @@ pub enum Error {
 pub struct IOPSumCheck;
 
 impl IOPSumCheck {
+    #[allow(clippy::type_complexity)]
     pub fn prove<F: PrimeField + Absorbable>(
         mut poly: VirtualPolynomial<F>,
         transcript: &mut impl Transcript<F>,

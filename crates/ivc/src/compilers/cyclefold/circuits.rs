@@ -56,7 +56,7 @@ where
     FC: FCircuit<Field = <FS1::CM as CommitmentDef>::Scalar>,
     T: Transcript<FC::Field>,
 {
-    #[allow(non_snake_case)]
+    #[allow(non_snake_case, clippy::too_many_arguments)]
     pub fn compute_next_state(
         &self,
         cs: ConstraintSystemRef<FC::Field>,

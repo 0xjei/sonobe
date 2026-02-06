@@ -29,11 +29,13 @@ pub trait IVC {
 
     fn preprocess(config: Self::Config, rng: impl RngCore) -> Result<Self::PublicParam, Error>;
 
+    #[allow(clippy::type_complexity)]
     fn generate_keys<FC: FCircuit<Field = Self::Field>>(
         pp: Self::PublicParam,
         step_circuit: &FC,
     ) -> Result<(Self::ProverKey<FC>, Self::VerifierKey<FC>), Error>;
 
+    #[allow(clippy::type_complexity, clippy::too_many_arguments)]
     fn prove<FC: FCircuit<Field = Self::Field>>(
         pk: &Self::ProverKey<FC>,
         step_circuit: &FC,
@@ -74,7 +76,7 @@ impl<'a, FC: FCircuit<Field = I::Field>, I: IVC> IVCStatefulProver<'a, FC, I> {
             i: 0,
             current_state: initial_state.clone(),
             initial_state,
-            current_proof: I::Proof::dummy(&pk),
+            current_proof: I::Proof::dummy(pk),
             pk,
         })
     }
@@ -85,8 +87,8 @@ impl<'a, FC: FCircuit<Field = I::Field>, I: IVC> IVCStatefulProver<'a, FC, I> {
         rng: impl RngCore,
     ) -> Result<FC::ExternalOutputs, Error> {
         let (next_state, external_outputs, next_proof) = I::prove(
-            &self.pk,
-            &self.step_circuit,
+            self.pk,
+            self.step_circuit,
             self.i,
             &self.initial_state,
             &self.current_state,

@@ -39,7 +39,7 @@ pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
         rho: Self::Challenge,
     ) -> Vec<Self::CFConfig>;
 
-    #[allow(non_snake_case)]
+    #[allow(non_snake_case, clippy::type_complexity)]
     fn to_cyclefold_inputs(
         Us: [<Self::Gadget as FoldingSchemeDefGadget>::RU; M],
         us: [<Self::Gadget as FoldingSchemeDefGadget>::IU; N],

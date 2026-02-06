@@ -458,8 +458,7 @@ impl<F: SonobeField, Cfg, const LHS_ALIGNED: bool> IntVarInner<F, Cfg, LHS_ALIGN
                 min(&x_bound.0, &y_bound.0).bits(),
                 max(&x_bound.1, &y_bound.1).bits(),
             ) as usize)
-                .checked_sub(step)
-                .unwrap_or_default();
+                .saturating_sub(step);
 
             (&diff + F::from(BigUint::one() << bits)).enforce_bit_length(bits + 1)?;
 
@@ -937,6 +936,7 @@ impl<F: SonobeField, Cfg> AllocVar<(BigInt, Bound), F> for IntVarInner<F, Cfg, t
         // For other cases, we additionally check:
         // * `var <= ub`
         // * `var >= lb`
+        #[allow(clippy::if_same_then_else)]
         if lb.is_zero() && ub + BigInt::one() == BigInt::one() << len {
         } else if BigInt::one() - lb == BigInt::one() << len && ub.is_zero() {
         } else if BigInt::one() - lb == BigInt::one() << len
