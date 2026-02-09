@@ -1,3 +1,5 @@
+//! Proof verification for Nova.
+
 use ark_std::{borrow::Borrow, cfg_iter, ops::Mul};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;

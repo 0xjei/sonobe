@@ -21,6 +21,8 @@ pub enum Error {
     /// synthesis.
     #[error(transparent)]
     SynthesisError(#[from] SynthesisError),
+    /// [`Error::Unsupported`] indicates that a certain use case is not
+    /// supported.
     #[error("Unsupported use case: {0}")]
     Unsupported(String),
     /// [`Error::DomainCreationFailure`] indicates a failure in creating

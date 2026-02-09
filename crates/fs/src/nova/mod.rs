@@ -1,3 +1,8 @@
+//! This module implements the Nova folding scheme, which is introduced in this
+//! [paper].
+//!
+//! [paper]: https://eprint.iacr.org/2021/370.pdf
+
 use ark_r1cs_std::boolean::Boolean;
 use ark_std::{UniformRand, marker::PhantomData, rand::RngCore, sync::Arc};
 use sonobe_primitives::{
@@ -28,6 +33,7 @@ pub mod circuits;
 pub mod instances;
 pub mod witnesses;
 
+/// [`NovaKey`] is Nova's decider key.
 #[derive(Clone)]
 pub struct NovaKey<A, CM: CommitmentDef> {
     arith: Arc<A>,
@@ -160,13 +166,18 @@ where
 // From [Srinath Setty](https://microsoft.com/en-us/research/people/srinath/): In Nova, soundness
 // error ≤ 2/|S|, where S is the subset of the field F from which the challenges are drawn. In this
 // case, we keep the size of S close to 2^128.
+/// [`AbstractNova`] implements the Nova folding scheme which can operate on
+/// both the primary and secondary curves.
 pub struct AbstractNova<CM, TF, const CHALLENGE_BITS: usize = 128> {
     _t: PhantomData<(CM, TF)>,
 }
 
+/// [`Nova`] is the main Nova folding scheme on the primary curve.
 pub type Nova<CM, const CHALLENGE_BITS: usize = 128> =
     AbstractNova<CM, <CM as CommitmentDef>::Scalar, CHALLENGE_BITS>;
 
+/// [`CycleFoldNova`] is the Nova folding scheme on the secondary curve which
+/// can be used as the folding scheme for folding CycleFold instances.
 pub type CycleFoldNova<CM, const CHALLENGE_BITS: usize = 128> =
     AbstractNova<CM, CF2<<CM as CommitmentDef>::Commitment>, CHALLENGE_BITS>;
 
@@ -193,14 +204,22 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> Fol
 // From [Srinath Setty](https://microsoft.com/en-us/research/people/srinath/): In Nova, soundness
 // error ≤ 2/|S|, where S is the subset of the field F from which the challenges are drawn. In this
 // case, we keep the size of S close to 2^128.
-// TODO: experimental design
+/// [`AbstractNova2`] implements the Nova folding scheme which can operate on
+/// both the primary and secondary curves.
+///
+/// This design is experimental, following the definition of accumulation
+/// schemes where the incoming witnesses and instances are simply plain vectors
+/// in the circuit's assignments.
 pub struct AbstractNova2<CM, TF, const CHALLENGE_BITS: usize = 128> {
     _t: PhantomData<(CM, TF)>,
 }
 
+/// [`Nova2`] is the main Nova folding scheme on the primary curve.
 pub type Nova2<CM, const CHALLENGE_BITS: usize = 128> =
     AbstractNova2<CM, <CM as CommitmentDef>::Scalar, CHALLENGE_BITS>;
 
+/// [`CycleFoldNova2`] is the Nova folding scheme on the secondary curve which
+/// can be used as the folding scheme for folding CycleFold instances.
 pub type CycleFoldNova2<CM, const CHALLENGE_BITS: usize = 128> =
     AbstractNova2<CM, CF2<<CM as CommitmentDef>::Commitment>, CHALLENGE_BITS>;
 
@@ -223,6 +242,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> Fol
     type Proof<const M: usize, const N: usize> = (CM::Commitment, CM::Commitment);
 }
 
+/// [`AbstractNovaGadget`] is the in-circuit gadget for [`AbstractNova`].
 pub struct AbstractNovaGadget<CM, const CHALLENGE_BITS: usize = 128> {
     _vc: PhantomData<CM>,
 }
