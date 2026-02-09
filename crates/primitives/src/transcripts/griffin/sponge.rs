@@ -1,3 +1,5 @@
+//! Implementation of transcript traits for Griffin sponge.
+
 use ark_crypto_primitives::sponge::DuplexSpongeMode;
 use ark_ff::{BigInteger, PrimeField};
 use ark_r1cs_std::{
@@ -7,23 +9,24 @@ use ark_r1cs_std::{
 use ark_relations::gr1cs::SynthesisError;
 use ark_std::sync::Arc;
 
-use crate::transcripts::{AbsorbableGadget, Transcript, TranscriptVar, griffin::GriffinParams};
+use crate::transcripts::{
+    AbsorbableVar, Transcript, TranscriptGadget,
+    griffin::{Griffin, GriffinGadget, GriffinParams},
+};
 
+/// [`GriffinSponge`] is a duplex sponge built on the Griffin permutation.
+///
+/// The implementation mirrors arkworks' [`ark_crypto_primitives::sponge::poseidon::PoseidonSponge`].
 #[derive(Clone)]
 pub struct GriffinSponge<F: PrimeField> {
-    /// Sponge Config
-    pub griffin: Arc<GriffinParams<F>>,
-
-    // Sponge State
-    /// Current sponge's state (current elements in the permutation block)
-    pub state: Vec<F>,
-    /// Current mode (whether its absorbing or squeezing)
-    pub mode: DuplexSpongeMode,
+    params: Arc<GriffinParams<F>>,
+    state: Vec<F>,
+    mode: DuplexSpongeMode,
 }
 
 impl<F: PrimeField> GriffinSponge<F> {
     fn permute(&mut self) {
-        self.griffin.permute(&mut self.state);
+        Griffin::permute(&self.params, &mut self.state);
     }
 
     // Absorbs everything in elements, this does not end in an absorption.
@@ -32,9 +35,9 @@ impl<F: PrimeField> GriffinSponge<F> {
 
         loop {
             // if we can finish in this call
-            if rate_start_index + remaining_elements.len() <= self.griffin.rate {
+            if rate_start_index + remaining_elements.len() <= self.params.rate {
                 for (i, element) in remaining_elements.iter().enumerate() {
-                    self.state[self.griffin.capacity + i + rate_start_index] += element;
+                    self.state[self.params.capacity + i + rate_start_index] += element;
                 }
                 self.mode = DuplexSpongeMode::Absorbing {
                     next_absorb_index: rate_start_index + remaining_elements.len(),
@@ -43,13 +46,13 @@ impl<F: PrimeField> GriffinSponge<F> {
                 return;
             }
             // otherwise absorb (rate - rate_start_index) elements
-            let num_elements_absorbed = self.griffin.rate - rate_start_index;
+            let num_elements_absorbed = self.params.rate - rate_start_index;
             for (i, element) in remaining_elements
                 .iter()
                 .enumerate()
                 .take(num_elements_absorbed)
             {
-                self.state[self.griffin.capacity + i + rate_start_index] += element;
+                self.state[self.params.capacity + i + rate_start_index] += element;
             }
             self.permute();
             // the input elements got truncated by num elements absorbed
@@ -63,10 +66,10 @@ impl<F: PrimeField> GriffinSponge<F> {
         let mut output_remaining = output;
         loop {
             // if we can finish in this call
-            if rate_start_index + output_remaining.len() <= self.griffin.rate {
+            if rate_start_index + output_remaining.len() <= self.params.rate {
                 output_remaining.clone_from_slice(
-                    &self.state[self.griffin.capacity + rate_start_index
-                        ..(self.griffin.capacity + output_remaining.len() + rate_start_index)],
+                    &self.state[self.params.capacity + rate_start_index
+                        ..(self.params.capacity + output_remaining.len() + rate_start_index)],
                 );
                 self.mode = DuplexSpongeMode::Squeezing {
                     next_squeeze_index: rate_start_index + output_remaining.len(),
@@ -74,10 +77,10 @@ impl<F: PrimeField> GriffinSponge<F> {
                 return;
             }
             // otherwise squeeze (rate - rate_start_index) elements
-            let num_elements_squeezed = self.griffin.rate - rate_start_index;
+            let num_elements_squeezed = self.params.rate - rate_start_index;
             output_remaining[..num_elements_squeezed].clone_from_slice(
-                &self.state[self.griffin.capacity + rate_start_index
-                    ..(self.griffin.capacity + num_elements_squeezed + rate_start_index)],
+                &self.state[self.params.capacity + rate_start_index
+                    ..(self.params.capacity + num_elements_squeezed + rate_start_index)],
             );
 
             // Repeat with updated output slices
@@ -92,21 +95,19 @@ impl<F: PrimeField> GriffinSponge<F> {
     }
 }
 
+/// [`GriffinSpongeVar`] is the in-circuit variable of [`GriffinSponge`].
+///
+/// The implementation mirrors arkworks' [`ark_crypto_primitives::sponge::poseidon::constraints::PoseidonSpongeVar`].
 #[derive(Clone)]
 pub struct GriffinSpongeVar<F: PrimeField> {
-    /// Sponge Parameters
-    pub griffin: Arc<GriffinParams<F>>,
-
-    // Sponge State
-    /// The sponge's state
-    pub state: Vec<FpVar<F>>,
-    /// The mode
-    pub mode: DuplexSpongeMode,
+    params: Arc<GriffinParams<F>>,
+    state: Vec<FpVar<F>>,
+    mode: DuplexSpongeMode,
 }
 
 impl<F: PrimeField> GriffinSpongeVar<F> {
     fn permute(&mut self) -> Result<(), SynthesisError> {
-        self.state = self.griffin.permute_gadget(&self.state)?;
+        self.state = GriffinGadget::permute(&self.params, &self.state)?;
         Ok(())
     }
 
@@ -118,9 +119,9 @@ impl<F: PrimeField> GriffinSpongeVar<F> {
         let mut remaining_elements = elements;
         loop {
             // if we can finish in this call
-            if rate_start_index + remaining_elements.len() <= self.griffin.rate {
+            if rate_start_index + remaining_elements.len() <= self.params.rate {
                 for (i, element) in remaining_elements.iter().enumerate() {
-                    self.state[self.griffin.capacity + i + rate_start_index] += element;
+                    self.state[self.params.capacity + i + rate_start_index] += element;
                 }
                 self.mode = DuplexSpongeMode::Absorbing {
                     next_absorb_index: rate_start_index + remaining_elements.len(),
@@ -129,13 +130,13 @@ impl<F: PrimeField> GriffinSpongeVar<F> {
                 return Ok(());
             }
             // otherwise absorb (rate - rate_start_index) elements
-            let num_elements_absorbed = self.griffin.rate - rate_start_index;
+            let num_elements_absorbed = self.params.rate - rate_start_index;
             for (i, element) in remaining_elements
                 .iter()
                 .enumerate()
                 .take(num_elements_absorbed)
             {
-                self.state[self.griffin.capacity + i + rate_start_index] += element;
+                self.state[self.params.capacity + i + rate_start_index] += element;
             }
             self.permute()?;
             // the input elements got truncated by num elements absorbed
@@ -153,10 +154,10 @@ impl<F: PrimeField> GriffinSpongeVar<F> {
         let mut remaining_output = output;
         loop {
             // if we can finish in this call
-            if rate_start_index + remaining_output.len() <= self.griffin.rate {
+            if rate_start_index + remaining_output.len() <= self.params.rate {
                 remaining_output.clone_from_slice(
-                    &self.state[self.griffin.capacity + rate_start_index
-                        ..(self.griffin.capacity + remaining_output.len() + rate_start_index)],
+                    &self.state[self.params.capacity + rate_start_index
+                        ..(self.params.capacity + remaining_output.len() + rate_start_index)],
                 );
                 self.mode = DuplexSpongeMode::Squeezing {
                     next_squeeze_index: rate_start_index + remaining_output.len(),
@@ -164,10 +165,10 @@ impl<F: PrimeField> GriffinSpongeVar<F> {
                 return Ok(());
             }
             // otherwise squeeze (rate - rate_start_index) elements
-            let num_elements_squeezed = self.griffin.rate - rate_start_index;
+            let num_elements_squeezed = self.params.rate - rate_start_index;
             remaining_output[..num_elements_squeezed].clone_from_slice(
-                &self.state[self.griffin.capacity + rate_start_index
-                    ..(self.griffin.capacity + num_elements_squeezed + rate_start_index)],
+                &self.state[self.params.capacity + rate_start_index
+                    ..(self.params.capacity + num_elements_squeezed + rate_start_index)],
             );
 
             // Repeat with updated output slices and rate start index
@@ -184,7 +185,7 @@ impl<F: PrimeField> GriffinSpongeVar<F> {
 
 impl<F: PrimeField> Transcript<F> for GriffinSponge<F> {
     type Config = Arc<GriffinParams<F>>;
-    type Var = GriffinSpongeVar<F>;
+    type Gadget = GriffinSpongeVar<F>;
 
     fn new(parameters: &Arc<GriffinParams<F>>) -> Self {
         let state = vec![F::zero(); parameters.rate + parameters.capacity];
@@ -193,7 +194,7 @@ impl<F: PrimeField> Transcript<F> for GriffinSponge<F> {
         };
 
         Self {
-            griffin: parameters.clone(),
+            params: parameters.clone(),
             state,
             mode,
         }
@@ -207,7 +208,7 @@ impl<F: PrimeField> Transcript<F> for GriffinSponge<F> {
         match self.mode {
             DuplexSpongeMode::Absorbing { next_absorb_index } => {
                 let mut absorb_index = next_absorb_index;
-                if absorb_index == self.griffin.rate {
+                if absorb_index == self.params.rate {
                     self.permute();
                     absorb_index = 0;
                 }
@@ -249,7 +250,7 @@ impl<F: PrimeField> Transcript<F> for GriffinSponge<F> {
             }
             DuplexSpongeMode::Squeezing { next_squeeze_index } => {
                 let mut squeeze_index = next_squeeze_index;
-                if squeeze_index == self.griffin.rate {
+                if squeeze_index == self.params.rate {
                     self.permute();
                     squeeze_index = 0;
                 }
@@ -261,8 +262,8 @@ impl<F: PrimeField> Transcript<F> for GriffinSponge<F> {
     }
 }
 
-impl<F: PrimeField> TranscriptVar<F> for GriffinSpongeVar<F> {
-    type Native = GriffinSponge<F>;
+impl<F: PrimeField> TranscriptGadget<F> for GriffinSpongeVar<F> {
+    type Widget = GriffinSponge<F>;
 
     fn new(parameters: &Arc<GriffinParams<F>>) -> Self
     where
@@ -275,17 +276,22 @@ impl<F: PrimeField> TranscriptVar<F> for GriffinSpongeVar<F> {
         };
 
         Self {
-            griffin: parameters.clone(),
+            params: parameters.clone(),
             state,
             mode,
         }
     }
 
-    fn add<A: AbsorbableGadget<F> + ?Sized>(
+    fn add<A: AbsorbableVar<F> + ?Sized>(
         &mut self,
         input: &A,
     ) -> Result<&mut Self, SynthesisError> {
-        let input = input.to_absorbable()?;
+        let input = {
+            let mut result = Vec::new();
+            input.absorb_into(&mut result)?;
+            result
+        };
+
         if input.is_empty() {
             return Ok(self);
         }
@@ -293,7 +299,7 @@ impl<F: PrimeField> TranscriptVar<F> for GriffinSpongeVar<F> {
         match self.mode {
             DuplexSpongeMode::Absorbing { next_absorb_index } => {
                 let mut absorb_index = next_absorb_index;
-                if absorb_index == self.griffin.rate {
+                if absorb_index == self.params.rate {
                     self.permute()?;
                     absorb_index = 0;
                 }
@@ -336,7 +342,7 @@ impl<F: PrimeField> TranscriptVar<F> for GriffinSpongeVar<F> {
             }
             DuplexSpongeMode::Squeezing { next_squeeze_index } => {
                 let mut squeeze_index = next_squeeze_index;
-                if squeeze_index == self.griffin.rate {
+                if squeeze_index == self.params.rate {
                     self.permute()?;
                     squeeze_index = 0;
                 }
@@ -349,15 +355,12 @@ impl<F: PrimeField> TranscriptVar<F> for GriffinSpongeVar<F> {
 }
 
 #[cfg(test)]
-pub mod tests {
-    use ark_bn254::{Fq, Fr, G1Projective as G1, constraints::GVar, g1::Config};
-    use ark_ec::PrimeGroup;
+mod tests {
+    use ark_bn254::{Fq, Fr, G1Projective as G1, g1::Config};
     use ark_ff::UniformRand;
     use ark_r1cs_std::{
-        GR1CSVar,
-        alloc::AllocVar,
-        fields::fp::FpVar,
-        groups::{CurveVar, curves::short_weierstrass::ProjectiveVar},
+        GR1CSVar, alloc::AllocVar, fields::fp::FpVar,
+        groups::curves::short_weierstrass::ProjectiveVar,
     };
     use ark_relations::gr1cs::ConstraintSystem;
     use ark_std::{error::Error, rand::thread_rng};
@@ -365,110 +368,97 @@ pub mod tests {
     use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::*;
-    use crate::algebra::{group::emulated::EmulatedAffineVar, ops::bits::FromBits};
+    use crate::algebra::group::emulated::EmulatedAffineVar;
 
     #[test]
-    fn test_transcript_and_transcriptvar_absorb_native_point() -> Result<(), Box<dyn Error>> {
-        // use 'native' transcript
-        let config = Arc::new(GriffinParams::<Fq>::new(3, 5, 12));
-        let mut tr = GriffinSponge::<Fq>::new(&config);
-        let rng = &mut thread_rng();
-
-        let p = G1::rand(rng);
-        tr.add(&p);
-        let c = tr.challenge_field_element();
-
-        // use 'gadget' transcript
-        let cs = ConstraintSystem::<Fq>::new_ref();
-        let mut tr_var = GriffinSpongeVar::<Fq>::new(&config);
-        let p_var = ProjectiveVar::<Config, FpVar<Fq>>::new_witness(cs, || Ok(p))?;
-        tr_var.add(&p_var)?;
-        let c_var = tr_var.challenge_field_element()?;
-
-        // assert that native & gadget transcripts return the same challenge
-        assert_eq!(c, c_var.value()?);
-        Ok(())
-    }
-
-    #[test]
-    fn test_transcript_and_transcriptvar_absorb_nonnative_point() -> Result<(), Box<dyn Error>> {
-        // use 'native' transcript
-        let config = Arc::new(GriffinParams::<Fr>::new(3, 5, 12));
-        let mut tr = GriffinSponge::<Fr>::new(&config);
-        let rng = &mut thread_rng();
-
-        let p = G1::rand(rng);
-        tr.add(&p);
-        let c = tr.challenge_field_element();
-
-        // use 'gadget' transcript
-        let cs = ConstraintSystem::<Fr>::new_ref();
-        let mut tr_var = GriffinSpongeVar::<Fr>::new(&config);
-        let p_var = EmulatedAffineVar::new_witness(cs, || Ok(p))?;
-        tr_var.add(&p_var)?;
-        let c_var = tr_var.challenge_field_element()?;
-
-        // assert that native & gadget transcripts return the same challenge
-        assert_eq!(c, c_var.value()?);
-        Ok(())
-    }
-
-    #[test]
-    fn test_transcript_and_transcriptvar_get_challenge() -> Result<(), Box<dyn Error>> {
-        // use 'native' transcript
+    fn test_challenge_field_element() -> Result<(), Box<dyn Error>> {
+        // Create a transcript outside of the circuit
         let config = Arc::new(GriffinParams::<Fr>::new(3, 5, 12));
         let mut tr = GriffinSponge::<Fr>::new(&config);
         tr.add(&Fr::from(42_u32));
         let c = tr.challenge_field_element();
 
-        // use 'gadget' transcript
+        // Create a transcript inside of the circuit
         let cs = ConstraintSystem::<Fr>::new_ref();
         let mut tr_var = GriffinSpongeVar::<Fr>::new(&config);
         let v = FpVar::<Fr>::new_witness(cs.clone(), || Ok(Fr::from(42_u32)))?;
         tr_var.add(&v)?;
         let c_var = tr_var.challenge_field_element()?;
 
-        // assert that native & gadget transcripts return the same challenge
+        // Assert that in-circuit and out-of-circuit transcripts return the same
+        // challenge
         assert_eq!(c, c_var.value()?);
         Ok(())
     }
 
     #[test]
-    fn test_transcript_and_transcriptvar_nbits() -> Result<(), Box<dyn Error>> {
+    fn test_challenge_bits() -> Result<(), Box<dyn Error>> {
         let nbits = 128;
 
-        // use 'native' transcript
+        // Create a transcript outside of the circuit
         let config = Arc::new(GriffinParams::<Fq>::new(3, 5, 12));
         let mut tr = GriffinSponge::<Fq>::new(&config);
         tr.add(&Fq::from(42_u32));
+        let c = tr.challenge_bits(nbits);
 
-        // get challenge from native transcript
-        let c_bits = tr.challenge_bits(nbits);
-
-        // use 'gadget' transcript
+        // Create a transcript inside of the circuit
         let cs = ConstraintSystem::<Fq>::new_ref();
         let mut tr_var = GriffinSpongeVar::<Fq>::new(&config);
         let v = FpVar::<Fq>::new_witness(cs.clone(), || Ok(Fq::from(42_u32)))?;
         tr_var.add(&v)?;
-
-        // get challenge from circuit transcript
         let c_var = tr_var.challenge_bits(nbits)?;
 
-        let p = G1::generator();
-        let p_var = GVar::new_witness(cs.clone(), || Ok(p))?;
+        // Assert that in-circuit and out-of-circuit transcripts return the same
+        // challenge
+        assert_eq!(c, c_var.value()?);
+        Ok(())
+    }
 
-        // multiply point P by the challenge in different formats, to ensure that we get the same
-        // result natively and in-circuit
-        let c = Fr::from_bits_le(&c_bits);
+    #[test]
+    fn test_absorb_canonical_point() -> Result<(), Box<dyn Error>> {
+        // Create a transcript outside of the circuit
+        let config = Arc::new(GriffinParams::<Fq>::new(3, 5, 12));
+        let mut tr = GriffinSponge::<Fq>::new(&config);
+        let rng = &mut thread_rng();
 
-        // check that native c*P and in-circuit c*P using scalar_mul_le are equal
-        assert_eq!(p * c, p_var.scalar_mul_le(c_var.iter())?.value()?);
-        // check that native c*P using mul_bits_be and in-circuit c*P using scalar_mul_le are equal
-        // (notice the .rev to convert the LE to BE)
-        assert_eq!(
-            p.mul_bits_be(c_bits.into_iter().rev()),
-            p_var.scalar_mul_le(c_var.iter())?.value()?
-        );
+        let p = G1::rand(rng);
+        tr.add(&p);
+        let c = tr.challenge_field_element();
+
+        // Create a transcript inside of the circuit
+        let cs = ConstraintSystem::<Fq>::new_ref();
+        let mut tr_var = GriffinSpongeVar::<Fq>::new(&config);
+        let p_var = ProjectiveVar::<Config, FpVar<Fq>>::new_witness(cs, || Ok(p))?;
+        tr_var.add(&p_var)?;
+        let c_var = tr_var.challenge_field_element()?;
+
+        // Assert that in-circuit and out-of-circuit transcripts return the same
+        // challenge
+        assert_eq!(c, c_var.value()?);
+        Ok(())
+    }
+
+    #[test]
+    fn test_absorb_emulated_point() -> Result<(), Box<dyn Error>> {
+        // Create a transcript outside of the circuit
+        let config = Arc::new(GriffinParams::<Fr>::new(3, 5, 12));
+        let mut tr = GriffinSponge::<Fr>::new(&config);
+        let rng = &mut thread_rng();
+
+        let p = G1::rand(rng);
+        tr.add(&p);
+        let c = tr.challenge_field_element();
+
+        // Create a transcript inside of the circuit
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let mut tr_var = GriffinSpongeVar::<Fr>::new(&config);
+        let p_var = EmulatedAffineVar::new_witness(cs, || Ok(p))?;
+        tr_var.add(&p_var)?;
+        let c_var = tr_var.challenge_field_element()?;
+
+        // Assert that in-circuit and out-of-circuit transcripts return the same
+        // challenge
+        assert_eq!(c, c_var.value()?);
         Ok(())
     }
 }

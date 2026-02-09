@@ -1,3 +1,6 @@
+//! This module defines extension traits for field elements and their in-circuit
+//! counterparts, along with some common implementations.
+
 use ark_ff::{BigInteger, Fp, FpConfig, PrimeField};
 use ark_r1cs_std::fields::{FieldVar, fp::FpVar};
 use ark_relations::gr1cs::SynthesisError;
@@ -10,12 +13,12 @@ use ark_std::{
 use crate::{
     algebra::{Val, field::emulated::EmulatedFieldVar},
     traits::{Inputize, InputizeEmulated},
-    transcripts::{Absorbable, AbsorbableGadget},
+    transcripts::{Absorbable, AbsorbableVar},
 };
 
 pub mod emulated;
 
-/// `SonobeField` trait is a wrapper around `PrimeField` that also includes the
+/// [`SonobeField`] trait is a wrapper around [`PrimeField`] that also includes
 /// necessary bounds for the field to be used conveniently in folding schemes.
 pub trait SonobeField:
     PrimeField<BasePrimeField = Self>
@@ -23,33 +26,36 @@ pub trait SonobeField:
     + Inputize<Self>
     + Val<Var: FieldVar<Self, Self>, EmulatedVar<Self> = EmulatedFieldVar<Self, Self>>
 {
+    /// [`SonobeField::BITS_PER_LIMB`] defines the bit length of each limb when
+    /// representing field elements as limbs in an emulated field variable.
     const BITS_PER_LIMB: usize;
 }
 
 impl<P: FpConfig<N>, const N: usize> SonobeField for Fp<P, N> {
     // For a `F` with order > 250 bits, 55 is chosen for optimizing the most
     // expensive part `Az∘Bz` when checking the R1CS relation for CycleFold.
-    // Consider using `NonNativeUintVar` to represent the base field `Fq`.
-    // Since 250 / 55 = 4.46, the `NonNativeUintVar` has 5 limbs.
-    // Now, the multiplication of two `NonNativeUintVar`s has 9 limbs, and
+    // Consider using `EmulatedFieldVar` to represent the base field `Fq`.
+    // Since 250 / 55 = 4.46, the `EmulatedFieldVar` has 5 limbs.
+    // Now, the multiplication of two `EmulatedFieldVar`s has 9 limbs, and
     // each limb has at most 2^{55 * 2} * 5 = 112.3 bits.
     // For a 1400x1400 matrix `A`, the multiplication of `A`'s row and `z`
-    // is the sum of 1400 `NonNativeUintVar`s, each with 9 limbs.
+    // is the sum of 1400 `EmulatedFieldVar`s, each with 9 limbs.
     // Thus, the maximum bit length of limbs of each element in `Az` is
     // 2^{55 * 2} * 5 * 1400 = 122.7 bits.
     // Finally, in the hadamard product of `Az` and `Bz`, every element has
     // 17 limbs, whose maximum bit length is (2^{55 * 2} * 5 * 1400)^2 * 9
-    // = 248.7 bits and is less than the native field `Fr`.
+    // = 248.7 bits and is less than the constraint field `Fr`.
     // Thus, 55 allows us to compute `Az∘Bz` without the expensive alignment
     // operation.
     //
     // TODO: either make it a global const, or compute an optimal value
     // based on the modulus size.
-    const BITS_PER_LIMB: usize = 55; // TODO: make this configurable
+    // TODO: make this configurable
+    const BITS_PER_LIMB: usize = 55;
 }
 
 impl<P: FpConfig<N>, const N: usize> Val for Fp<P, N> {
-    type ConstraintField = Self;
+    type PreferredConstraintField = Self;
     type Var = FpVar<Self>;
 
     type EmulatedVar<F: SonobeField> = EmulatedFieldVar<F, Self>;
@@ -78,7 +84,7 @@ impl<P: FpConfig<N>, const N: usize> Absorbable for Fp<P, N> {
     }
 }
 
-impl<F: PrimeField> AbsorbableGadget<F> for FpVar<F> {
+impl<F: PrimeField> AbsorbableVar<F> for FpVar<F> {
     fn absorb_into(&self, dest: &mut Vec<FpVar<F>>) -> Result<(), SynthesisError> {
         dest.push(self.clone());
         Ok(())
@@ -86,16 +92,12 @@ impl<F: PrimeField> AbsorbableGadget<F> for FpVar<F> {
 }
 
 impl<P: FpConfig<N>, const N: usize> Inputize<Self> for Fp<P, N> {
-    /// Returns the internal representation in the same order as how the value
-    /// is allocated in `FpVar::new_input`.
     fn inputize(&self) -> Vec<Self> {
         vec![*self]
     }
 }
 
 impl<F: SonobeField, P: SonobeField> InputizeEmulated<F> for P {
-    /// Returns the internal representation in the same order as how the value
-    /// is allocated in `NonNativeUintVar::new_input`.
     fn inputize_emulated(&self) -> Vec<F> {
         self.into_bigint()
             .to_bits_le()
@@ -105,6 +107,17 @@ impl<F: SonobeField, P: SonobeField> InputizeEmulated<F> for P {
     }
 }
 
+/// [`TwoStageFieldVar`] abstracts over field variables that support a
+/// two-stage arithmetic model.
+///
+/// In this model, we consider two stages of in-circuit variables for field
+/// elements when performing arithmetic operations:
+/// 1. Before the operations, we have the standard field variable type, i.e.,
+///    the implementor of this trait.
+/// 2. During the operations, we use [`TwoStageFieldVar::Intermediate`] to hold
+///    the intermediate results.
+///    Therefore, the [`Add`] and [`Mul`] operations between two field variables
+///    yield an intermediate variable.
 pub trait TwoStageFieldVar:
     Clone
     + Add<Output = Self::Intermediate>
@@ -112,6 +125,14 @@ pub trait TwoStageFieldVar:
     + Mul<Output = Self::Intermediate>
     + for<'a> Mul<&'a Self, Output = Self::Intermediate>
 {
+    /// The intermediate variable type used during arithmetic operations.
+    ///
+    /// We require this type to support conversions from and to the original
+    /// field variable type.
+    ///
+    /// In addition, to allow chaining operations without excessive conversions,
+    /// we require this type to support [`Add`] and [`Mul`] operations with both
+    /// itself and the original field variable type.
     type Intermediate: Clone
         + From<Self>
         + TryInto<Self>
@@ -125,6 +146,7 @@ pub trait TwoStageFieldVar:
         + for<'a> Mul<&'a Self, Output = Self::Intermediate>;
 }
 
+// Operations over the canonical variable `FpVar` always yield another `FpVar`.
 impl<F: PrimeField> TwoStageFieldVar for FpVar<F> {
     type Intermediate = Self;
 }

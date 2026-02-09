@@ -1,13 +1,34 @@
-// code forked from:
-// https://github.com/EspressoSystems/hyperplonk/tree/main/subroutines/src/poly_iop/sum_check
+//! This module implements the sumcheck protocol and its in-circuit gadgets for
+//! verification.
+//!
+//! The code is forked from HyperPlonk's sumcheck [implementation] and modified
+//! to fit Sonobe's design & use case.
+//!
+//! [implementation]: https://github.com/EspressoSystems/hyperplonk/tree/main/subroutines/src/poly_iop/sum_check
+
+// Below we attach HyperPlonk's original license notice.
 //
-// Copyright (c) 2023 Espresso Systems (espressosys.com)
-// This file is part of the HyperPlonk library.
-
-// You should have received a copy of the MIT License
-// along with the HyperPlonk library. If not, see <https://mit-license.org/>.
-
-//! This module implements the sum check protocol.
+// The MIT License (MIT)
+//
+// Copyright (c) 2022 Espresso Systems (espressosys.com)
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 use ark_ff::PrimeField;
 use ark_poly::{
@@ -27,20 +48,57 @@ use crate::transcripts::{Absorbable, Transcript};
 pub mod circuits;
 pub mod utils;
 
+/// [`Error`] enumerates possible errors during the sumcheck protocol.
 #[derive(Debug, Error)]
 pub enum Error {
+    /// [`Error::IncorrectEvaluation`] indicates that the evaluation does not
+    /// match the claimed value.
     #[error("Incorrect evaluation: claimed {0}, got {1}")]
     IncorrectEvaluation(String, String),
+    /// [`Error::UnexpectedProofLength`] indicates that the proof length does
+    /// not match the expected length.
     #[error("Incorrect proof length: expected {0}, got {1}")]
     UnexpectedProofLength(usize, usize),
+    /// [`Error::UnexpectedPolynomialDegree`] indicates that the polynomial
+    /// degree exceeds the expected degree.
     #[error("Unexpected polynomial degree: expected at most {0}, got {1}")]
     UnexpectedPolynomialDegree(usize, usize),
 }
 
+/// [`SumCheck`] implements the sumcheck protocol.
+///
+/// In the sumcheck protocol, a prover wants to convince a verifier that the sum
+/// of a multilinear polynomial `f` over the Boolean hypercube equals a claimed
+/// value `z`, i.e., `∑_{x_1, ..., x_n ∈ {0,1}} f(x_1, ..., x_n) = z`, without
+/// having the verifier evaluate the sum themselves.
+///
+/// To this end, the prover and verifier engage in `n` rounds of interaction.
+/// In each round `i`, we consider a variant of the original problem: given
+/// polynomial `f_i` of `n - i + 1` variables `x_i, ..., x_n` and a claim `z_i`,
+/// check if `∑_{x_i, ..., x_n ∈ {0,1}} f_i(x_i, ..., x_n) = z_i`.
+/// The prover and the verifier's goal is to reduce this problem to the next
+/// round's problem, where the new polynomial and claim are defined as:
+/// - `f_{i+1}(x_{i+1}, ..., x_n) = f_i(r_i, x_{i+1}, ..., x_n)` for a random
+///   `r_i`
+/// - `z_{i+1} = ∑_{x_{i+1}, ..., x_n ∈ {0,1}} f_i(r_i, x_{i+1}, ..., x_n)`
+///
+/// Such a reduction is achieved by the following steps:
+/// 1. The prover sends to the verifier the univariate polynomial
+///    `g_i(x_i) = ∑_{x_{i+1}, ..., x_n ∈ {0,1}} f_i(x_i, x_{i+1}, ..., x_n)`.
+/// 2. The verifier checks if the current claim `z_i = g_i(0) + g_i(1)`.
+/// 3. The verifier sends to the prover a random challenge `r_i`.
+/// 4. Both parties prepares for the next round's polynomial
+///    `f_{i+1}(x_{i+1}, ..., x_n) = f_i(r_i, x_{i+1}, ..., x_n)` and claim
+///    `z_{i+1} = g_i(r_i)`, until the last round where all variables are fixed.
 #[derive(Clone, Debug, Default, Copy, PartialEq, Eq)]
-pub struct IOPSumCheck;
+pub struct SumCheck;
 
-impl IOPSumCheck {
+impl SumCheck {
+    /// [`SumCheck::prove`] runs the prover of the sumcheck protocol over a
+    /// [`VirtualPolynomial`] `poly = f` with the given `transcript`.
+    /// It returns the proof (i.e., round polynomials `g_1, ..., g_n`),
+    /// Fiat-Shamir challenges `r_1, ..., r_n`, and the final "polynomial" with
+    /// all variables fixed (i.e., the evaluation `f_{n+1} = f(r_1, ..., r_n)`).
     #[allow(clippy::type_complexity)]
     pub fn prove<F: PrimeField + Absorbable>(
         mut poly: VirtualPolynomial<F>,
@@ -61,7 +119,7 @@ impl IOPSumCheck {
             let mut products_sum = vec![F::ZERO; poly.aux_info.max_degree + 1];
 
             // Step 2: generate sum for the partial evaluated polynomial:
-            // f(r_1, ... r_m,, x_{m+1}... x_n)
+            // `f_i(x_i, ..., x_n) = f(r_1, ... r_{i-1}, x_i, ..., x_n)`
 
             poly.products.iter().for_each(|(coefficient, products)| {
                 #[cfg(feature = "parallel")]
@@ -155,6 +213,12 @@ impl IOPSumCheck {
         Ok((prover_msgs, challenges, poly.flattened_ml_extensions))
     }
 
+    /// [`SumCheck::verify`] runs the verifier of the sumcheck protocol given
+    /// the claimed sum `claimed_sum = z`, the proof `proofs` (i.e., round
+    /// polynomials `g_1, ..., g_n`), the auxiliary info `aux_info`, and the
+    /// transcript `transcript`.
+    /// It returns the final evaluation `z_{n+1} = f(r_1, ..., r_n)` and the
+    /// Fiat-Shamir challenges `r_1, ..., r_n`.
     pub fn verify<F: PrimeField + Absorbable>(
         mut claimed_sum: F,
         proofs: &[Vec<F>],
@@ -186,7 +250,7 @@ impl IOPSumCheck {
             let eval_at_one = coeffs.iter().sum::<F>();
 
             // the deferred check during the interactive phase:
-            // 1. check if the received 'P(0) + P(1) = claimed_sum`.
+            // 1. check if the received 'g_i(0) + g_i(1) = z_i`.
             if eval_at_zero + eval_at_one != claimed_sum {
                 return Err(Error::IncorrectEvaluation(
                     claimed_sum.to_string(),
@@ -197,7 +261,7 @@ impl IOPSumCheck {
             transcript.add(coeffs);
             let challenge = transcript.challenge_field_element();
 
-            // 2. set `expected` to `P(r)`
+            // 2. set next `z_{i+1}` to `g_i(r_i)`
             claimed_sum = DensePolynomial::from_coefficients_slice(coeffs).evaluate(&challenge);
             challenges.push(challenge);
         }
@@ -207,7 +271,7 @@ impl IOPSumCheck {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use ark_crypto_primitives::sponge::poseidon::PoseidonSponge;
     use ark_ff::Field;
     use ark_pallas::Fr;
@@ -220,40 +284,42 @@ pub mod tests {
     use crate::transcripts::poseidon::poseidon_canonical_config;
 
     #[test]
-    pub fn sumcheck_poseidon() -> Result<(), Error> {
+    fn test_sumcheck() -> Result<(), Error> {
         let n_vars = 10;
 
         let mut rng = thread_rng();
         let poly_mle = DenseMultilinearExtension::rand(n_vars, &mut rng);
-        let virtual_poly = VirtualPolynomial::new_from_mle(poly_mle, Fr::ONE);
 
-        sumcheck_poseidon_opt(virtual_poly)?;
+        test_sumcheck_opt(poly_mle)?;
 
         // test with zero poly
         let poly_mle = DenseMultilinearExtension::from_evaluations_vec(
             n_vars,
             vec![Fr::zero(); 2usize.pow(n_vars as u32)],
         );
-        let virtual_poly = VirtualPolynomial::new_from_mle(poly_mle, Fr::ONE);
-        sumcheck_poseidon_opt(virtual_poly)?;
+        test_sumcheck_opt(poly_mle)?;
         Ok(())
     }
 
-    fn sumcheck_poseidon_opt(virtual_poly: VirtualPolynomial<Fr>) -> Result<(), Error> {
+    fn test_sumcheck_opt(poly_mle: DenseMultilinearExtension<Fr>) -> Result<(), Error> {
+        let virtual_poly = VirtualPolynomial::new_from_mle(poly_mle, Fr::ONE);
+
         let aux_info = virtual_poly.aux_info.clone();
         let poseidon_config = poseidon_canonical_config::<Fr>();
 
         // sum-check prove
         let mut transcript_p: PoseidonSponge<Fr> = PoseidonSponge::<Fr>::new(&poseidon_config);
-        let (proofs, _, _) = IOPSumCheck::prove(virtual_poly, &mut transcript_p)?;
+        let (proofs, challenges_p, eval_p) = SumCheck::prove(virtual_poly, &mut transcript_p)?;
 
         // sum-check verify
         let poly = DensePolynomial::from_coefficients_slice(&proofs[0]);
         let claimed_sum = poly.evaluate(&Fr::one()) + poly.evaluate(&Fr::zero());
         let mut transcript_v: PoseidonSponge<Fr> = PoseidonSponge::<Fr>::new(&poseidon_config);
-        let res_verify = IOPSumCheck::verify(claimed_sum, &proofs, &aux_info, &mut transcript_v);
+        let (eval_v, challenges_v) =
+            SumCheck::verify(claimed_sum, &proofs, &aux_info, &mut transcript_v)?;
 
-        assert!(res_verify.is_ok());
+        assert_eq!(eval_p[0].evaluate(&vec![]), eval_v);
+        assert_eq!(challenges_p, challenges_v);
         Ok(())
     }
 }

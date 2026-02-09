@@ -1,3 +1,5 @@
+//! Implementation of transcript traits for arkworks' Poseidon sponge.
+
 use ark_crypto_primitives::sponge::{
     Absorb, CryptographicSponge, FieldBasedCryptographicSponge,
     constraints::CryptographicSpongeVar,
@@ -8,11 +10,11 @@ use ark_r1cs_std::{boolean::Boolean, fields::fp::FpVar};
 use ark_relations::gr1cs::{ConstraintSystemRef, SynthesisError};
 use ark_std::mem::transmute_copy;
 
-use crate::transcripts::{AbsorbableGadget, Transcript, TranscriptVar};
+use crate::transcripts::{AbsorbableVar, Transcript, TranscriptGadget};
 
 impl<F: PrimeField> Transcript<F> for PoseidonSponge<F> {
     type Config = PoseidonConfig<F>;
-    type Var = PoseidonSpongeVar<F>;
+    type Gadget = PoseidonSpongeVar<F>;
 
     fn new(config: &Self::Config) -> Self {
         CryptographicSponge::new(config)
@@ -47,8 +49,8 @@ impl<F: PrimeField> Transcript<F> for PoseidonSponge<F> {
     }
 }
 
-impl<F: PrimeField> TranscriptVar<F> for PoseidonSpongeVar<F> {
-    type Native = PoseidonSponge<F>;
+impl<F: PrimeField> TranscriptGadget<F> for PoseidonSpongeVar<F> {
+    type Widget = PoseidonSponge<F>;
 
     fn new(config: &PoseidonConfig<F>) -> Self
     where
@@ -57,11 +59,14 @@ impl<F: PrimeField> TranscriptVar<F> for PoseidonSpongeVar<F> {
         CryptographicSpongeVar::new(ConstraintSystemRef::None, config)
     }
 
-    fn add<A: AbsorbableGadget<F> + ?Sized>(
+    fn add<A: AbsorbableVar<F> + ?Sized>(
         &mut self,
         input: &A,
     ) -> Result<&mut Self, SynthesisError> {
-        self.absorb(&input.to_absorbable()?)?;
+        let mut result = Vec::new();
+        input.absorb_into(&mut result)?;
+
+        self.absorb(&result)?;
         Ok(self)
     }
 
@@ -75,16 +80,13 @@ impl<F: PrimeField> TranscriptVar<F> for PoseidonSpongeVar<F> {
 }
 
 #[cfg(test)]
-pub mod tests {
-    use ark_bn254::{Fq, Fr, G1Projective as G1, constraints::GVar, g1::Config};
+mod tests {
+    use ark_bn254::{Fq, Fr, G1Projective as G1, g1::Config};
     use ark_crypto_primitives::sponge::poseidon::{PoseidonSponge, constraints::PoseidonSpongeVar};
-    use ark_ec::PrimeGroup;
     use ark_ff::UniformRand;
     use ark_r1cs_std::{
-        GR1CSVar,
-        alloc::AllocVar,
-        fields::fp::FpVar,
-        groups::{CurveVar, curves::short_weierstrass::ProjectiveVar},
+        GR1CSVar, alloc::AllocVar, fields::fp::FpVar,
+        groups::curves::short_weierstrass::ProjectiveVar,
     };
     use ark_relations::gr1cs::ConstraintSystem;
     use ark_std::{error::Error, rand::thread_rng, str::FromStr};
@@ -92,8 +94,8 @@ pub mod tests {
     use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use crate::{
-        algebra::{group::emulated::EmulatedAffineVar, ops::bits::FromBits},
-        transcripts::{Transcript, TranscriptVar, poseidon::poseidon_canonical_config},
+        algebra::group::emulated::EmulatedAffineVar,
+        transcripts::{Transcript, TranscriptGadget, poseidon::poseidon_canonical_config},
     };
 
     // Test with value taken from https://github.com/iden3/circomlibjs/blob/43cc582b100fc3459cf78d903a6f538e5d7f38ee/test/poseidon.js#L32
@@ -118,107 +120,94 @@ pub mod tests {
     }
 
     #[test]
-    fn test_transcript_and_transcriptvar_absorb_native_point() -> Result<(), Box<dyn Error>> {
-        // use 'native' transcript
-        let config = poseidon_canonical_config::<Fq>();
-        let mut tr = PoseidonSponge::<Fq>::new(&config);
-        let rng = &mut thread_rng();
-
-        let p = G1::rand(rng);
-        tr.add(&p);
-        let c = tr.challenge_field_element();
-
-        // use 'gadget' transcript
-        let cs = ConstraintSystem::<Fq>::new_ref();
-        let mut tr_var = PoseidonSpongeVar::<Fq>::new(&config);
-        let p_var = ProjectiveVar::<Config, FpVar<Fq>>::new_witness(cs, || Ok(p))?;
-        tr_var.add(&p_var)?;
-        let c_var = tr_var.challenge_field_element()?;
-
-        // assert that native & gadget transcripts return the same challenge
-        assert_eq!(c, c_var.value()?);
-        Ok(())
-    }
-
-    #[test]
-    fn test_transcript_and_transcriptvar_absorb_nonnative_point() -> Result<(), Box<dyn Error>> {
-        // use 'native' transcript
-        let config = poseidon_canonical_config::<Fr>();
-        let mut tr = PoseidonSponge::<Fr>::new(&config);
-        let rng = &mut thread_rng();
-
-        let p = G1::rand(rng);
-        tr.add(&p);
-        let c = tr.challenge_field_element();
-
-        // use 'gadget' transcript
-        let cs = ConstraintSystem::<Fr>::new_ref();
-        let mut tr_var = PoseidonSpongeVar::<Fr>::new(&config);
-        let p_var = EmulatedAffineVar::new_witness(cs, || Ok(p))?;
-        tr_var.add(&p_var)?;
-        let c_var = tr_var.challenge_field_element()?;
-
-        // assert that native & gadget transcripts return the same challenge
-        assert_eq!(c, c_var.value()?);
-        Ok(())
-    }
-
-    #[test]
-    fn test_transcript_and_transcriptvar_get_challenge() -> Result<(), Box<dyn Error>> {
-        // use 'native' transcript
+    fn test_challenge_field_element() -> Result<(), Box<dyn Error>> {
+        // Create a transcript outside of the circuit
         let config = poseidon_canonical_config::<Fr>();
         let mut tr = PoseidonSponge::<Fr>::new(&config);
         tr.add(&Fr::from(42_u32));
         let c = tr.challenge_field_element();
 
-        // use 'gadget' transcript
+        // Create a transcript inside of the circuit
         let cs = ConstraintSystem::<Fr>::new_ref();
         let mut tr_var = PoseidonSpongeVar::<Fr>::new(&config);
         let v = FpVar::<Fr>::new_witness(cs.clone(), || Ok(Fr::from(42_u32)))?;
         tr_var.add(&v)?;
         let c_var = tr_var.challenge_field_element()?;
 
-        // assert that native & gadget transcripts return the same challenge
+        // Assert that in-circuit and out-of-circuit transcripts return the same
+        // challenge
         assert_eq!(c, c_var.value()?);
         Ok(())
     }
 
     #[test]
-    fn test_transcript_and_transcriptvar_nbits() -> Result<(), Box<dyn Error>> {
+    fn test_challenge_bits() -> Result<(), Box<dyn Error>> {
         let nbits = 128;
 
-        // use 'native' transcript
+        // Create a transcript outside of the circuit
         let config = poseidon_canonical_config::<Fq>();
         let mut tr = PoseidonSponge::<Fq>::new(&config);
         tr.add(&Fq::from(42_u32));
+        let c = tr.challenge_bits(nbits);
 
-        // get challenge from native transcript
-        let c_bits = tr.challenge_bits(nbits);
-
-        // use 'gadget' transcript
+        // Create a transcript inside of the circuit
         let cs = ConstraintSystem::<Fq>::new_ref();
         let mut tr_var = PoseidonSpongeVar::<Fq>::new(&config);
         let v = FpVar::<Fq>::new_witness(cs.clone(), || Ok(Fq::from(42_u32)))?;
         tr_var.add(&v)?;
-
-        // get challenge from circuit transcript
         let c_var = tr_var.challenge_bits(nbits)?;
 
-        let p = G1::generator();
-        let p_var = GVar::new_witness(cs.clone(), || Ok(p))?;
+        // Assert that in-circuit and out-of-circuit transcripts return the same
+        // challenge
+        assert_eq!(c, c_var.value()?);
+        Ok(())
+    }
 
-        // multiply point P by the challenge in different formats, to ensure that we get the same
-        // result natively and in-circuit
-        let c = Fr::from_bits_le(&c_bits);
+    #[test]
+    fn test_absorb_canonical_point() -> Result<(), Box<dyn Error>> {
+        // Create a transcript outside of the circuit
+        let config = poseidon_canonical_config::<Fq>();
+        let mut tr = PoseidonSponge::<Fq>::new(&config);
+        let rng = &mut thread_rng();
 
-        // check that native c*P and in-circuit c*P using scalar_mul_le are equal
-        assert_eq!(p * c, p_var.scalar_mul_le(c_var.iter())?.value()?);
-        // check that native c*P using mul_bits_be and in-circuit c*P using scalar_mul_le are equal
-        // (notice the .rev to convert the LE to BE)
-        assert_eq!(
-            p.mul_bits_be(c_bits.into_iter().rev()),
-            p_var.scalar_mul_le(c_var.iter())?.value()?
-        );
+        let p = G1::rand(rng);
+        tr.add(&p);
+        let c = tr.challenge_field_element();
+
+        // Create a transcript inside of the circuit
+        let cs = ConstraintSystem::<Fq>::new_ref();
+        let mut tr_var = PoseidonSpongeVar::<Fq>::new(&config);
+        let p_var = ProjectiveVar::<Config, FpVar<Fq>>::new_witness(cs, || Ok(p))?;
+        tr_var.add(&p_var)?;
+        let c_var = tr_var.challenge_field_element()?;
+
+        // Assert that in-circuit and out-of-circuit transcripts return the same
+        // challenge
+        assert_eq!(c, c_var.value()?);
+        Ok(())
+    }
+
+    #[test]
+    fn test_absorb_emulated_point() -> Result<(), Box<dyn Error>> {
+        // Create a transcript outside of the circuit
+        let config = poseidon_canonical_config::<Fr>();
+        let mut tr = PoseidonSponge::<Fr>::new(&config);
+        let rng = &mut thread_rng();
+
+        let p = G1::rand(rng);
+        tr.add(&p);
+        let c = tr.challenge_field_element();
+
+        // Create a transcript inside of the circuit
+        let cs = ConstraintSystem::<Fr>::new_ref();
+        let mut tr_var = PoseidonSpongeVar::<Fr>::new(&config);
+        let p_var = EmulatedAffineVar::new_witness(cs, || Ok(p))?;
+        tr_var.add(&p_var)?;
+        let c_var = tr_var.challenge_field_element()?;
+
+        // Assert that in-circuit and out-of-circuit transcripts return the same
+        // challenge
+        assert_eq!(c, c_var.value()?);
         Ok(())
     }
 }
