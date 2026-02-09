@@ -1,3 +1,5 @@
+//! Preprocessing for Nova.
+
 use ark_std::rand::RngCore;
 use sonobe_primitives::{commitments::GroupBasedCommitment, traits::SonobeField};
 

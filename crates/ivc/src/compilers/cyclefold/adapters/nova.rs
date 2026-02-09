@@ -1,3 +1,5 @@
+//! Nova CycleFold adapter that bridges Nova into the CycleFold IVC compiler.
+
 use ark_ff::{PrimeField, Zero};
 use ark_r1cs_std::{
     GR1CSVar, alloc::AllocVar, fields::fp::FpVar, groups::CurveVar, prelude::Boolean,
@@ -22,7 +24,7 @@ use crate::compilers::cyclefold::{
     CycleFoldBasedIVC, FoldingSchemeCycleFoldExt, circuits::CycleFoldCircuit,
 };
 
-/// Configuration for Nova's CycleFold circuit
+/// [`NovaCycleFoldCircuit`] defines CycleFold circuit for Nova.
 pub struct NovaCycleFoldCircuit<C, const CHALLENGE_BITS: usize> {
     r: Vec<bool>,
     points: Vec<C>,
@@ -193,6 +195,8 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
     }
 }
 
+/// [`NovaNovaIVC`] defines a CycleFold-based IVC using Nova as the primary
+/// folding scheme and Nova as the secondary folding scheme.
 pub type NovaNovaIVC<VC1, VC2, T, const CHALLENGE_BITS: usize = 128> =
     CycleFoldBasedIVC<Nova<VC1, CHALLENGE_BITS>, CycleFoldNova<VC2, CHALLENGE_BITS>, T>;
 
