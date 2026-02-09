@@ -1,3 +1,5 @@
+//! In-circuit variables for Nova instances.
+
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::{AllocVar, AllocationMode},
@@ -12,11 +14,17 @@ use sonobe_primitives::{commitments::CommitmentDefGadget, transcripts::Absorbabl
 use super::{IncomingInstance, RunningInstance};
 use crate::FoldingInstanceVar;
 
+/// [`RunningInstanceVar`] defines Nova's running instance variable.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RunningInstanceVar<CM: CommitmentDefGadget> {
+    /// [`RunningInstanceVar::cm_e`] is the error term commitment.
     pub cm_e: CM::CommitmentVar,
+    /// [`RunningInstanceVar::u`] is the constant term.
     pub u: CM::ScalarVar,
+    /// [`RunningInstanceVar::cm_w`] is the witness commitment.
     pub cm_w: CM::CommitmentVar,
+    /// [`RunningInstanceVar::x`] is the vector of public inputs (to the
+    /// circuit).
     pub x: Vec<CM::ScalarVar>,
 }
 
@@ -120,9 +128,13 @@ impl<CM: CommitmentDefGadget> FoldingInstanceVar<CM> for RunningInstanceVar<CM> 
     }
 }
 
+/// [`IncomingInstanceVar`] defines Nova's incoming instance variable.
 #[derive(Clone, Debug, PartialEq)]
 pub struct IncomingInstanceVar<CM: CommitmentDefGadget> {
+    /// [`IncomingInstanceVar::cm_w`] is the witness commitment.
     pub cm_w: CM::CommitmentVar,
+    /// [`IncomingInstanceVar::x`] is the vector of public inputs (to the
+    /// circuit).
     pub x: Vec<CM::ScalarVar>,
 }
 

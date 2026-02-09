@@ -1,3 +1,5 @@
+//! Proof generation for Nova.
+
 use ark_ff::One;
 use ark_std::{borrow::Borrow, cfg_into_iter, cfg_iter, ops::Mul, rand::RngCore};
 #[cfg(feature = "parallel")]
