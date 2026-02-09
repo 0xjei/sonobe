@@ -1,3 +1,6 @@
+//! This module implements the Rank-1 Constraint System (R1CS) and its relation
+//! checks against plain and relaxed witnesses and instances.
+
 use ark_ff::Field;
 use ark_relations::gr1cs::{ConstraintSystem, Matrix, R1CS_PREDICATE_LABEL};
 use ark_std::{cfg_into_iter, cfg_iter, iterable::Iterable};
@@ -12,6 +15,7 @@ use crate::{
 
 pub mod circuits;
 
+/// [`R1CSConfig`] stores the shape parameters of an R1CS structure.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct R1CSConfig {
     m: usize, // number of constraints
@@ -20,6 +24,7 @@ pub struct R1CSConfig {
 }
 
 impl R1CSConfig {
+    /// [`R1CSConfig::new`] creates a new R1CS configuration.
     pub fn new(n_constraints: usize, n_variables: usize, n_public_inputs: usize) -> Self {
         Self {
             m: n_constraints,
@@ -53,11 +58,6 @@ impl ArithConfig for R1CSConfig {
     #[inline]
     fn n_witnesses(&self) -> usize {
         self.n_variables() - self.n_public_inputs() - 1
-    }
-
-    #[inline]
-    fn set_n_public_inputs(&mut self, l: usize) {
-        self.l = l;
     }
 }
 
@@ -93,48 +93,62 @@ impl CCSVariant for R1CSConfig {
     }
 }
 
+/// [`R1CS`] holds the three sparse matrices `A`, `B`, `C` together with the
+/// configuration.
 #[allow(non_snake_case)]
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct R1CS<F: Field> {
     cfg: R1CSConfig,
-    pub A: Matrix<F>,
-    pub B: Matrix<F>,
-    pub C: Matrix<F>,
+    pub(super) A: Matrix<F>,
+    pub(super) B: Matrix<F>,
+    pub(super) C: Matrix<F>,
 }
 
+type Row<F> = Vec<(F, usize)>;
+
 impl<F: Field> R1CS<F> {
-    /// Evaluates the R1CS relation at a given vector of assignments `z`
-    pub fn eval_assignments(
+    /// [`R1CS::evaluate_rows`] evaluates the R1CS relation by applying the
+    /// provided function `f` to each triplet of rows `(A[i], B[i], C[i])`.
+    pub fn evaluate_rows(
+        &self,
+        f: impl FnMut(((&Row<F>, &Row<F>), &Row<F>)) -> Result<F, Error>,
+    ) -> Result<Vec<F>, Error> {
+        cfg_iter!(self.A).zip(&self.B).zip(&self.C).map(f).collect()
+    }
+
+    /// [`R1CS::evaluate_at`] evaluates the R1CS relation at a given vector of
+    /// assignments `z`.
+    pub fn evaluate_at(
         &self,
         z: Assignments<F, impl AsRef<[F]> + Sync>,
     ) -> Result<Vec<F>, Error> {
+        let cfg = &self.cfg;
+
         let public_len = z.public.as_ref().len();
         let private_len = z.private.as_ref().len();
-        if public_len != self.n_public_inputs() {
+        if public_len != cfg.n_public_inputs() {
             return Err(Error::MalformedAssignments(format!(
                 "The number of public inputs in R1CS ({}) does not match the length of the provided public inputs ({}).",
-                self.n_public_inputs(),
+                cfg.n_public_inputs(),
                 public_len
             )));
         }
-        if private_len != self.n_witnesses() {
+        if private_len != cfg.n_witnesses() {
             return Err(Error::MalformedAssignments(format!(
                 "The number of witnesses in R1CS ({}) does not match the length of the provided witnesses ({}).",
-                self.n_witnesses(),
+                cfg.n_witnesses(),
                 private_len
             )));
         }
 
-        Ok(cfg_iter!(self.A)
-            .zip(&self.B)
-            .zip(&self.C)
-            .map(|((a, b), c)| {
-                let az = a.iter().map(|(val, col)| z[*col] * val).sum::<F>();
-                let bz = b.iter().map(|(val, col)| z[*col] * val).sum::<F>();
-                let cz = c.iter().map(|(val, col)| z[*col] * val).sum::<F>();
-                az * bz - z[0] * cz
-            })
-            .collect())
+        self.evaluate_rows(|((a, b), c)| {
+            let az = a.iter().map(|(val, col)| z[*col] * val).sum::<F>();
+            let bz = b.iter().map(|(val, col)| z[*col] * val).sum::<F>();
+            let cz = c.iter().map(|(val, col)| z[*col] * val).sum::<F>();
+            // use `z[0]` here since the constant term at index 0 may not be 1
+            // for relaxed instances
+            Ok(az * bz - z[0] * cz)
+        })
     }
 }
 
@@ -153,6 +167,8 @@ impl<F: Field> Arith for R1CS<F> {
 }
 
 impl<F: Field> R1CS<F> {
+    /// [`R1CS::new`] creates a new R1CS structure from the given configuration
+    /// and matrices.
     #[allow(non_snake_case)]
     pub fn new(cfg: R1CSConfig, [A, B, C]: [Matrix<F>; 3]) -> Self {
         Self { cfg, A, B, C }
@@ -163,11 +179,12 @@ impl<F: Field> TryFrom<CCS<F, R1CSConfig>> for R1CS<F> {
     type Error = Error;
 
     fn try_from(ccs: CCS<F, R1CSConfig>) -> Result<Self, Error> {
+        let cfg = ccs.config();
         Ok(Self::new(
             R1CSConfig::new(
-                ccs.n_constraints(),
-                ccs.n_variables(),
-                ccs.n_public_inputs(),
+                cfg.n_constraints(),
+                cfg.n_variables(),
+                cfg.n_public_inputs(),
             ),
             // `unwrap` is safe here because the type parameter T = 3
             ccs.M.try_into().unwrap(),
@@ -195,7 +212,7 @@ impl<F: Field, W: AsRef<[F]>, U: AsRef<[F]>> ArithRelation<W, U> for R1CS<F> {
     type Evaluation = Vec<F>;
 
     fn eval_relation(&self, w: &W, x: &U) -> Result<Self::Evaluation, Error> {
-        self.eval_assignments((F::one(), x.as_ref(), w.as_ref()).into())
+        self.evaluate_at((F::one(), x.as_ref(), w.as_ref()).into())
     }
 
     fn check_evaluation(_w: &W, _x: &U, e: Self::Evaluation) -> Result<(), Error> {
@@ -208,13 +225,23 @@ impl<F: Field, W: AsRef<[F]>, U: AsRef<[F]>> ArithRelation<W, U> for R1CS<F> {
     }
 }
 
+/// [`RelaxedWitness`] defines a relaxed version of R1CS witness.
+///
+/// It is the basis of witnesses in many folding schemes that support R1CS.
 pub struct RelaxedWitness<V> {
+    /// [`RelaxedWitness::w`] is the witness vector
     pub w: V,
+    /// [`RelaxedWitness::e`] is the error term
     pub e: V,
 }
 
+/// [`RelaxedInstance`] defines a relaxed version of R1CS instance.
+///
+/// It is the basis of instances in many folding schemes that support R1CS.
 pub struct RelaxedInstance<V: IntoIterator> {
+    /// [`RelaxedInstance::x`] is the public input vector
     pub x: V,
+    /// [`RelaxedInstance::u`] is the constant term
     pub u: V::Item,
 }
 
@@ -226,7 +253,7 @@ impl<F: Field> ArithRelation<RelaxedWitness<&[F]>, RelaxedInstance<&[F]>> for R1
         w: &RelaxedWitness<&[F]>,
         u: &RelaxedInstance<&[F]>,
     ) -> Result<Self::Evaluation, Error> {
-        self.eval_assignments((*u.u, u.x, w.w).into())
+        self.evaluate_at((*u.u, u.x, w.w).into())
     }
 
     fn check_evaluation(
@@ -245,7 +272,7 @@ impl<F: Field> ArithRelation<RelaxedWitness<&[F]>, RelaxedInstance<&[F]>> for R1
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use ark_bn254::Fr;
     use ark_ff::UniformRand;
     use ark_relations::gr1cs::ConstraintSynthesizer;

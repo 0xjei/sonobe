@@ -1,9 +1,12 @@
+//! Poseidon-based transcript configurations and implementations.
+
 use ark_crypto_primitives::sponge::poseidon::{PoseidonConfig, find_poseidon_ark_and_mds};
 use ark_ff::PrimeField;
 
 pub mod sponge;
 
-/// This Poseidon configuration generator produces a Poseidon configuration with custom parameters
+/// [`poseidon_custom_config`] produces a Poseidon configuration with custom
+/// parameters.
 pub fn poseidon_custom_config<F: PrimeField>(
     full_rounds: usize,
     partial_rounds: usize,
@@ -22,7 +25,9 @@ pub fn poseidon_custom_config<F: PrimeField>(
     PoseidonConfig::new(full_rounds, partial_rounds, alpha, mds, ark, rate, capacity)
 }
 
-/// This Poseidon configuration generator agrees with Circom's Poseidon(4) in the case of BN254's scalar field
+/// [`poseidon_canonical_config`] produces a Poseidon configuration with default
+/// parameters, which agrees with Circom's Poseidon(4) when `F` is the scalar
+/// field of BN254.
 pub fn poseidon_canonical_config<F: PrimeField>() -> PoseidonConfig<F> {
     // 120 bit security target as in
     // https://eprint.iacr.org/2019/458.pdf

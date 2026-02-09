@@ -1,7 +1,8 @@
+//! This module provides utility circuits.
+
 use ark_ff::{Field, PrimeField};
 use ark_r1cs_std::{
-    alloc::AllocVar,
-    fields::fp::{AllocatedFp, FpVar},
+    GR1CSVar, alloc::AllocVar, fields::fp::{AllocatedFp, FpVar}
 };
 use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError, Variable};
 
@@ -12,7 +13,13 @@ use crate::{
     traits::SonobeField,
 };
 
+/// [`CircuitForTest`] implements a simple test circuit computing
+/// `y = x^3 + x + 5` with 4 R1CS constraints.
+///
+/// It is used in unit tests to verify constraint extraction and witness
+/// generation.
 pub struct CircuitForTest<F: PrimeField> {
+    /// [`CircuitForTest::x`] is the input variable `x` of the circuit.
     pub x: F,
 }
 
@@ -64,11 +71,12 @@ impl<F: SonobeField> FCircuit for CircuitForTest<F> {
 
     fn generate_step_constraints(
         &self,
-        cs: ConstraintSystemRef<Self::Field>,
         _i: FpVar<Self::Field>,
         z_i: Self::StateVar,
         _external_inputs: Self::ExternalInputs,
     ) -> Result<(Self::StateVar, Self::ExternalOutputs), SynthesisError> {
+        let cs = z_i.cs();
+
         // Variable 0 (implicitly added by arkworks as 1)
         // Variable 1
         let x = if let FpVar::Var(x) = z_i[0].clone() {
@@ -105,6 +113,7 @@ impl<F: SonobeField> FCircuit for CircuitForTest<F> {
     }
 }
 
+/// [`constraints_for_test`] returns the R1CS constraints for the test circuit.
 #[allow(non_snake_case)]
 pub fn constraints_for_test<F: Field>() -> R1CS<F> {
     // R1CS for: x^3 + x + 5 = y (example from article
@@ -131,6 +140,8 @@ pub fn constraints_for_test<F: Field>() -> R1CS<F> {
     R1CS::<F>::new(R1CSConfig::new(4, 6, 1), [A, B, C])
 }
 
+/// [`satisfying_assignments_for_test`] returns a satisfying assignment for the
+/// test circuit given an input `x`.
 pub fn satisfying_assignments_for_test<F: Field>(x: F) -> Assignments<F, Vec<F>> {
     Assignments::from((
         F::one(),
