@@ -1,13 +1,10 @@
-use ark_ff::{One, Zero};
 use ark_r1cs_std::{
     GR1CSVar, alloc::AllocVar, fields::fp::FpVar,
     poly::polynomial::univariate::dense::DensePolynomialVar,
 };
 use ark_relations::gr1cs::SynthesisError;
-use num_bigint::BigInt;
 use sonobe_primitives::{
-    algebra::{field::emulated::Bound, ops::bits::FromBitsGadget},
-    commitments::GroupBasedCommitment,
+    algebra::ops::bits::FromBitsGadget, commitments::GroupBasedCommitment,
     transcripts::TranscriptVar,
 };
 
@@ -41,13 +38,7 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemePartial
         transcript.add(&proof.t)?;
 
         let rho_bits = transcript.challenge_bits(CHALLENGE_BITS)?;
-        let rho = FpVar::from_bits_le(
-            &rho_bits,
-            Bound(
-                BigInt::zero(),
-                (BigInt::one() << CHALLENGE_BITS) - BigInt::one(),
-            ),
-        )?;
+        let rho = FpVar::from_bits_le(&rho_bits)?;
 
         Ok((
             Self::RU {

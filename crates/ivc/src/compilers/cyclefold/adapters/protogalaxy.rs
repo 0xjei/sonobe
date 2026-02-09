@@ -7,7 +7,7 @@ use sonobe_fs::{
 };
 use sonobe_primitives::{
     algebra::{
-        field::emulated::{Bound, EmulatedFieldVar},
+        field::emulated::{Bounds, EmulatedFieldVar},
         ops::bits::{FromBits, FromBitsGadget, ToBitsGadgetExt},
     },
     commitments::GroupBasedCommitment,
@@ -112,7 +112,7 @@ impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemeCycleFoldExt<1, N> f
             lagrange_evals_bits
                 .chunks(CF2::<CM::Commitment>::MODULUS_BIT_SIZE as usize - 1)
                 .map(|bits| {
-                    EmulatedFieldVar::from_bits_le(
+                    EmulatedFieldVar::from_bounded_bits_le(
                         &[
                             bits,
                             &vec![
@@ -121,7 +121,7 @@ impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemeCycleFoldExt<1, N> f
                             ][..],
                         ]
                         .concat(),
-                        Bound(Zero::zero(), CF2::<CM::Commitment>::MODULUS.into().into()),
+                        Bounds(Zero::zero(), CF2::<CM::Commitment>::MODULUS.into().into()),
                     )
                 })
                 .chain(

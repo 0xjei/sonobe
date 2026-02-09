@@ -5,7 +5,7 @@ use ark_std::{borrow::Borrow, iter::once};
 use sonobe_fs::{FoldingSchemeDefGadget, mova::Mova, nova::CycleFoldNova, ova::CycleFoldOva};
 use sonobe_primitives::{
     algebra::{
-        field::emulated::{Bound, EmulatedFieldVar},
+        field::emulated::{Bounds, EmulatedFieldVar},
         ops::bits::{FromBits, FromBitsGadget, ToBitsGadgetExt},
     },
     commitments::GroupBasedCommitment,
@@ -88,9 +88,9 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
             Boolean::FALSE,
         );
         Ok(vec![
-            once(EmulatedFieldVar::from_bits_le(
+            once(EmulatedFieldVar::from_bounded_bits_le(
                 &rho,
-                Bound(Zero::zero(), CF2::<CM::Commitment>::MODULUS.into().into()),
+                Bounds(Zero::zero(), CF2::<CM::Commitment>::MODULUS.into().into()),
             )?)
             .chain(
                 [U.cm_w, proof.cm_w, UU.cm_w]

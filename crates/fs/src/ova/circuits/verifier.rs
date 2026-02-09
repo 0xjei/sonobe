@@ -1,9 +1,7 @@
-use ark_ff::{One, Zero};
 use ark_r1cs_std::{GR1CSVar, alloc::AllocVar, groups::CurveVar};
 use ark_relations::gr1cs::SynthesisError;
-use num_bigint::BigInt;
 use sonobe_primitives::{
-    algebra::{field::emulated::Bound, ops::bits::FromBitsGadget},
+    algebra::ops::bits::FromBitsGadget,
     commitments::{CommitmentDef, CommitmentDefGadget, GroupBasedCommitment},
     transcripts::TranscriptVar,
 };
@@ -31,13 +29,7 @@ where
             transcript.add(proof)?;
             transcript.challenge_bits(CHALLENGE_BITS)?
         };
-        let rho = CM::ScalarVar::from_bits_le(
-            &rho_bits,
-            Bound(
-                BigInt::zero(),
-                (BigInt::one() << CHALLENGE_BITS) - BigInt::one(),
-            ),
-        )?;
+        let rho = CM::ScalarVar::from_bits_le(&rho_bits)?;
 
         Ok((
             Self::RU {
@@ -80,13 +72,7 @@ where
             transcript.add(proof)?;
             transcript.challenge_bits(CHALLENGE_BITS)?
         };
-        let rho = CM::ScalarVar::from_bits_le(
-            &rho_bits,
-            Bound(
-                BigInt::zero(),
-                (BigInt::one() << CHALLENGE_BITS) - BigInt::one(),
-            ),
-        )?;
+        let rho = CM::ScalarVar::from_bits_le(&rho_bits)?;
 
         Ok(Self::RU {
             u: (U.u.clone() + &rho)

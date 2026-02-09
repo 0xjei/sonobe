@@ -9,7 +9,7 @@ use sonobe_fs::{
 };
 use sonobe_primitives::{
     algebra::{
-        field::emulated::{Bound, EmulatedFieldVar},
+        field::emulated::{Bounds, EmulatedFieldVar},
         ops::bits::{FromBits, FromBitsGadget, ToBitsGadgetExt},
     },
     commitments::GroupBasedCommitment,
@@ -92,9 +92,9 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
             Boolean::FALSE,
         );
         Ok(vec![
-            once(EmulatedFieldVar::from_bits_le(
+            once(EmulatedFieldVar::from_bounded_bits_le(
                 &rho,
-                Bound(Zero::zero(), CF2::<CM::Commitment>::MODULUS.into().into()),
+                Bounds(Zero::zero(), CF2::<CM::Commitment>::MODULUS.into().into()),
             )?)
             .chain([U.cm, proof, UU.cm].into_iter().flat_map(|p| [p.x, p.y]))
             .collect(),

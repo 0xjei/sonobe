@@ -7,7 +7,7 @@ use sonobe_fs::{
 };
 use sonobe_primitives::{
     algebra::{
-        field::emulated::{Bound, EmulatedFieldVar},
+        field::emulated::{Bounds, EmulatedFieldVar},
         ops::bits::{FromBits, FromBitsGadget, ToBitsGadgetExt},
     },
     arithmetizations::{ccs::CCSVariant, r1cs::R1CSConfig},
@@ -108,9 +108,9 @@ impl<
             Boolean::FALSE,
         );
         Ok(vec![
-            once(EmulatedFieldVar::from_bits_le(
+            once(EmulatedFieldVar::from_bounded_bits_le(
                 &rho,
-                Bound(Zero::zero(), CF2::<CM::Commitment>::MODULUS.into().into()),
+                Bounds(Zero::zero(), CF2::<CM::Commitment>::MODULUS.into().into()),
             )?)
             .chain(
                 Us.into_iter()

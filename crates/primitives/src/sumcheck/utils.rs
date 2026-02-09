@@ -1,14 +1,34 @@
-// code forked from
-// https://github.com/privacy-scaling-explorations/multifolding-poc/blob/main/src/espresso/virtual_polynomial.rs
+//! Virtual polynomial implementation and polynomial utilities.
+//!
+//! The code is forked from our previous [multifolding PoC implementation],
+//! which is itself forked from HyperPlonk's [virtual polynomial code].
+//!
+//! [multifolding PoC implementation]: https://github.com/privacy-scaling-explorations/multifolding-poc/blob/main/src/espresso/virtual_polynomial.rs,
+//! [virtual polynomial code]: https://github.com/EspressoSystems/hyperplonk/blob/main/arithmetic/src/virtual_polynomial.rs
+
+// Below we attach HyperPlonk's original license notice.
 //
-// Copyright (c) 2023 Espresso Systems (espressosys.com)
-// This file is part of the HyperPlonk library.
-
-// You should have received a copy of the MIT License
-// along with the HyperPlonk library. If not, see <https://mit-license.org/>.
-
-//! This module defines our main mathematical object `VirtualPolynomial`; and
-//! various functions associated with it.
+// The MIT License (MIT)
+//
+// Copyright (c) 2022 Espresso Systems (espressosys.com)
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
 use ark_ff::{Field, PrimeField, batch_inversion};
 use ark_poly::{DenseMultilinearExtension, DenseUVPolynomial, univariate::DensePolynomial};
@@ -18,7 +38,7 @@ use ark_std::cfg_into_iter;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-/// A virtual polynomial is a sum of products of multilinear polynomials;
+/// [`VirtualPolynomial`] is a sum of products of multilinear polynomials;
 /// where the multilinear polynomials are stored via their multilinear
 /// extensions:  `(coefficient, DenseMultilinearExtension)`
 ///
@@ -42,19 +62,25 @@ use rayon::prelude::*;
 ///
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct VirtualPolynomial<F: PrimeField> {
-    /// Aux information about the multilinear polynomial
+    /// [`VirtualPolynomial::aux_info`] is the aux information about the
+    /// multilinear polynomial.
     pub aux_info: VPAuxInfo,
+    /// [`VirtualPolynomial::flattened_ml_extensions`] stores multilinear
+    /// extensions in which product multiplicand can refer to.
     pub flattened_ml_extensions: Vec<DenseMultilinearExtension<F>>,
-    /// list of reference to products (as usize) of multilinear extension
+    /// [`VirtualPolynomial::products`] is a list of reference to products
+    /// (as usize) of multilinear extension
     pub products: Vec<(F, Vec<usize>)>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, CanonicalSerialize)]
-/// Auxiliary information about the multilinear polynomial
+/// [`VPAuxInfo`] is auxiliary information about the multilinear polynomial.
 pub struct VPAuxInfo {
-    /// max number of multiplicands in each product
+    /// [`VPAuxInfo::max_degree`] is the max number of multiplicands in each
+    /// product.
     pub max_degree: usize,
-    /// number of variables of the polynomial
+    /// [`VPAuxInfo::num_variables`] is the number of variables of the
+    /// polynomial.
     pub num_variables: usize,
 }
 
@@ -74,14 +100,13 @@ impl<F: PrimeField> VirtualPolynomial<F> {
     }
 }
 
-/// `EqPoly` represents the following polynomial:
-///
-/// `eq(x, y) = \prod_{i=1}^n (x_i * y_i + (1 - x_i) * (1 - y_i))`
+/// [`EqPoly`] represents the multilinear equality polynomial
+/// `eq(x, y) = Π_{i ∈ {0,1}} (x_i y_i + (1 - x_i)(1 - y_i))`.
 pub struct EqPoly;
 
 impl EqPoly {
-    /// This function builds `eq(x, y)` by fixing `y = r` and outputting the
-    /// evaluations over all `x` in `[0, 2^n)`.
+    /// [`EqPoly::fix_y_evals`] function evaluates `eq(x, y)` by fixing `y = r`
+    /// and outputting the evaluations over all `x` in `[0, 2^n)`.
     pub fn fix_y_evals<F: PrimeField>(r: &[F]) -> Vec<F> {
         // we build eq(x,r) from its evaluations
         // we want to evaluate eq(x,r) over all binary strings `x` of length `n`
@@ -113,7 +138,7 @@ impl EqPoly {
         buf
     }
 
-    /// Evaluate eq polynomial.
+    /// [`EqPoly::fix_xy_eval`] evaluates `eq(x, y)` by fixing both `x` and `y`.
     pub fn fix_xy_eval<F: Field>(x: &[F], y: &[F]) -> F {
         debug_assert_eq!(x.len(), y.len());
         x.iter()
@@ -123,10 +148,12 @@ impl EqPoly {
     }
 }
 
-pub struct EqPolyVar;
+/// [`EqPolyGadget`] is the in-circuit gadget of [`EqPoly`].
+pub struct EqPolyGadget;
 
-impl EqPolyVar {
-    /// Evaluate eq polynomial in circuit.
+impl EqPolyGadget {
+    /// [`EqPolyGadget::fix_xy_eval`] evaluates `eq(x, y)` in-circuit by fixing
+    /// both `x` and `y`.
     pub fn fix_xy_eval<F: PrimeField>(x: &[FpVar<F>], y: &[FpVar<F>]) -> FpVar<F> {
         debug_assert_eq!(x.len(), y.len());
         let mut eval = FpVar::<F>::one();
@@ -137,6 +164,10 @@ impl EqPolyVar {
     }
 }
 
+/// [`barycentric_weights`] computes the barycentric weights for a given set of
+/// evaluation `points`.
+/// 
+/// Used to extrapolate polynomial evaluations via the barycentric formula.
 #[allow(clippy::filter_map_bool_then)]
 pub fn barycentric_weights<F: PrimeField>(points: &[F]) -> Vec<F> {
     let mut weights = points
@@ -155,6 +186,8 @@ pub fn barycentric_weights<F: PrimeField>(points: &[F]) -> Vec<F> {
     weights
 }
 
+/// [`extrapolate`] extrapolates the polynomial defined by `(points, evals)` to
+/// a new point `at`, using the precomputed barycentric `weights`.
 pub fn extrapolate<F: PrimeField>(points: &[F], weights: &[F], evals: &[F], at: &F) -> F {
     let (coeffs, sum_inv) = {
         let mut coeffs = points.iter().map(|point| *at - point).collect::<Vec<_>>();
@@ -173,7 +206,8 @@ pub fn extrapolate<F: PrimeField>(points: &[F], weights: &[F], evals: &[F], at: 
         * sum_inv
 }
 
-/// Computes the lagrange interpolated polynomial from the given points `p_i`
+/// [`compute_lagrange_interpolated_poly`] computes the lagrange interpolated
+/// polynomial from the given points `p_i`.
 pub fn compute_lagrange_interpolated_poly<F: PrimeField>(p_i: &[F]) -> DensePolynomial<F> {
     let v = (0..p_i.len())
         .map(|i| F::from(i as u64))

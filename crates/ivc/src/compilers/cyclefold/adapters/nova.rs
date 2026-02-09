@@ -11,7 +11,7 @@ use sonobe_fs::{
 };
 use sonobe_primitives::{
     algebra::{
-        field::emulated::{Bound, EmulatedFieldVar},
+        field::emulated::{Bounds, EmulatedFieldVar},
         group::emulated::EmulatedAffineVar,
         ops::bits::{FromBits, FromBitsGadget, ToBitsGadgetExt},
     },
@@ -100,9 +100,9 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
             CF2::<CM::Commitment>::MODULUS_BIT_SIZE as usize,
             Boolean::FALSE,
         );
-        let rho = EmulatedFieldVar::from_bits_le(
+        let rho = EmulatedFieldVar::from_bounded_bits_le(
             &rho,
-            Bound(Zero::zero(), CF2::<CM::Commitment>::MODULUS.into().into()),
+            Bounds(Zero::zero(), CF2::<CM::Commitment>::MODULUS.into().into()),
         )?;
         Ok(vec![
             once(rho.clone())
@@ -167,9 +167,9 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
             CF2::<CM::Commitment>::MODULUS_BIT_SIZE as usize,
             Boolean::FALSE,
         );
-        let rho = EmulatedFieldVar::from_bits_le(
+        let rho = EmulatedFieldVar::from_bounded_bits_le(
             &rho_bits,
-            Bound(Zero::zero(), CF2::<CM::Commitment>::MODULUS.into().into()),
+            Bounds(Zero::zero(), CF2::<CM::Commitment>::MODULUS.into().into()),
         )?;
         let x =
             EmulatedAffineVar::new_witness(U2.cm_e.cs().or(proof.cs()).or(rho_bits.cs()), || {
