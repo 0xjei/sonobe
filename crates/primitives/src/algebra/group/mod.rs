@@ -1,3 +1,6 @@
+//! This module defines extension traits for elliptic curve points and their
+//! in-circuit counterparts, along with some common implementations.
+
 use ark_ec::{
     AffineRepr, CurveGroup, PrimeGroup,
     short_weierstrass::{Projective, SWCurveConfig},
@@ -13,15 +16,17 @@ use ark_relations::gr1cs::SynthesisError;
 use crate::{
     algebra::{Val, field::SonobeField, group::emulated::EmulatedAffineVar},
     traits::{Dummy, Inputize, InputizeEmulated},
-    transcripts::{Absorbable, AbsorbableGadget},
+    transcripts::{Absorbable, AbsorbableVar},
 };
 
 pub mod emulated;
 
+/// [`CF1`] is a type alias for the scalar field of a curve `C`.
 pub type CF1<C> = <C as PrimeGroup>::ScalarField;
+/// [`CF2`] is a type alias for the base field of a curve `C`.
 pub type CF2<C> = <<C as CurveGroup>::BaseField as Field>::BasePrimeField;
 
-/// `SonobeCurve` trait is a wrapper around `CurveGroup` that also includes the
+/// [`SonobeCurve`] trait is a wrapper around [`CurveGroup`] that also includes
 /// necessary bounds for the curve to be used conveniently in folding schemes.
 pub trait SonobeCurve:
     CurveGroup<ScalarField: SonobeField, BaseField: SonobeField, Config: SWCurveConfig>
@@ -29,7 +34,7 @@ pub trait SonobeCurve:
     + Inputize<Self::BaseField>
     + InputizeEmulated<Self::ScalarField>
     + Val<
-        Var: CurveVar<Self, Self::BaseField> + AbsorbableGadget<Self::BaseField>,
+        Var: CurveVar<Self, Self::BaseField> + AbsorbableVar<Self::BaseField>,
         EmulatedVar<Self::ScalarField> = EmulatedAffineVar<Self::ScalarField, Self>,
     >
 {
@@ -41,7 +46,7 @@ impl<P: SWCurveConfig<ScalarField: SonobeField, BaseField: SonobeField>> SonobeC
 }
 
 impl<P: SWCurveConfig<ScalarField: SonobeField, BaseField: SonobeField>> Val for Projective<P> {
-    type ConstraintField = P::BaseField;
+    type PreferredConstraintField = P::BaseField;
     type Var = ProjectiveVar<P, FpVar<P::BaseField>>;
 
     type EmulatedVar<F: SonobeField> = EmulatedAffineVar<F, Self>;
@@ -61,7 +66,7 @@ impl<P: SWCurveConfig<BaseField: Absorbable>> Absorbable for Projective<P> {
     }
 }
 
-impl<P: SWCurveConfig<BaseField: PrimeField>> AbsorbableGadget<P::BaseField>
+impl<P: SWCurveConfig<BaseField: PrimeField>> AbsorbableVar<P::BaseField>
     for ProjectiveVar<P, FpVar<P::BaseField>>
 {
     fn absorb_into(&self, dest: &mut Vec<FpVar<P::BaseField>>) -> Result<(), SynthesisError> {
@@ -80,8 +85,6 @@ impl<P: SWCurveConfig<BaseField: PrimeField>> AbsorbableGadget<P::BaseField>
 }
 
 impl<P: SWCurveConfig<BaseField: SonobeField>> Inputize<P::BaseField> for Projective<P> {
-    /// Returns the internal representation in the same order as how the value
-    /// is allocated in `ProjectiveVar::new_input`.
     fn inputize(&self) -> Vec<P::BaseField> {
         let affine = self.into_affine();
         match affine.xy() {
@@ -94,8 +97,6 @@ impl<P: SWCurveConfig<BaseField: SonobeField>> Inputize<P::BaseField> for Projec
 impl<P: SWCurveConfig<BaseField: SonobeField, ScalarField: SonobeField>>
     InputizeEmulated<P::ScalarField> for Projective<P>
 {
-    /// Returns the internal representation in the same order as how the value
-    /// is allocated in `NonNativeAffineVar::new_input`.
     fn inputize_emulated(&self) -> Vec<P::ScalarField> {
         let affine = self.into_affine();
         let (x, y) = affine.xy().unwrap_or_default();
@@ -103,69 +104,3 @@ impl<P: SWCurveConfig<BaseField: SonobeField, ScalarField: SonobeField>>
         [x, y].inputize_emulated()
     }
 }
-
-// fn lattice_reduction_2x2(
-//     mut b1: (BigInt, BigInt),
-//     mut b2: (BigInt, BigInt),
-// ) -> ((BigInt, BigInt), (BigInt, BigInt)) {
-//     loop {
-//         let mut b1_norm_sq = &b1.0 * &b1.0 + &b1.1 * &b1.1;
-//         let mut b2_norm_sq = &b2.0 * &b2.0 + &b2.1 * &b2.1;
-
-//         if b1_norm_sq > b2_norm_sq {
-//             swap(&mut b1, &mut b2);
-//             swap(&mut b1_norm_sq, &mut b2_norm_sq);
-//         }
-
-//         let (mut m, r) = (&b1.0 * &b2.0 + &b1.1 * &b2.1).div_rem(&b1_norm_sq);
-//         if &r + &r >= b1_norm_sq {
-//             m += BigInt::one();
-//         }
-
-//         if m.is_zero() {
-//             break;
-//         }
-
-//         b2.0 -= &m * &b1.0;
-//         b2.1 -= &m * &b1.1;
-//     }
-
-//     (b1, b2)
-// }
-
-// impl<C: SonobeCurve> PointScalarMulGadget<CF2<C>> for C {
-//     fn mul_scalar(&self, scalar: &impl ToBitsGadget<CF2<C>>) -> Result<Self, SynthesisError> {
-//         let scalar = scalar.to_bits_le()?;
-
-//         let cs = scalar.cs();
-
-//         let m = BigInt::from_biguint(Sign::Plus, CF1::<C>::MODULUS.into());
-//         let m_sqrt = m.sqrt();
-
-//         let (a, b) = lattice_reduction_2x2(
-//             (m, Zero::zero()),
-//             (
-//                 CI2::<C>::from_bits_le(&scalar.value().unwrap_or_default())
-//                     .into()
-//                     .into(),
-//                 One::one(),
-//             ),
-//         )
-//         .0;
-//         let (a_sign, a_abs) = a.into_parts();
-//         let (b_sign, b_abs) = b.into_parts();
-//         let a_is_negative =
-//             Boolean::new_variable_with_inferred_mode(cs.clone(), || Ok(a_sign == Sign::Minus))?;
-//         let b_is_negative =
-//             Boolean::new_variable_with_inferred_mode(cs.clone(), || Ok(b_sign == Sign::Minus))?;
-
-//         // let a = NonNativeUintVar::new_variable_with_inferred_mode(cs.clone(), || {
-//         //     Ok((a_abs.into(), Bound::new_ub(m_sqrt.clone())))
-//         // })?;
-//         // let b = NonNativeUintVar::new_variable_with_inferred_mode(cs, || {
-//         //     Ok((b_abs.into(), Bound::new_ub(m_sqrt)))
-//         // })?;
-
-//         todo!()
-//     }
-// }

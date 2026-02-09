@@ -1,3 +1,12 @@
+//! This module provides implementation of in-circuit variables for emulated
+//! elliptic curve points.
+//!
+//! This is useful when we want to express points whose coordinates lie in a
+//! different field than the circuit's constraint field.
+//!
+//! Note that currently this module only provides the representation of such
+//! points, without any arithmetic operations.
+
 use ark_ec::{AffineRepr, short_weierstrass::SWFlags};
 use ark_ff::Zero;
 use ark_r1cs_std::{
@@ -15,19 +24,20 @@ use ark_std::borrow::Borrow;
 use crate::{
     algebra::{field::emulated::EmulatedFieldVar, group::SonobeCurve},
     traits::SonobeField,
-    transcripts::AbsorbableGadget,
+    transcripts::AbsorbableVar,
 };
 
-/// `EmulatedAffineVar` defines an in-circuit elliptic curve point in its affine
-/// representation, where the coordinates are non-native field variables in the
-/// curve's base field `Target::BaseField`, emulated over the constraint field
-/// `Base`.
-///
-/// It is not intended to perform operations, but just to record the coordinates
-/// in order to perform hash operations of the point.
+/// [`EmulatedAffineVar`] defines an in-circuit elliptic curve point with its
+/// affine representation, where the coordinates are in the curve's base field
+/// `Target::BaseField` and are emulated over the constraint field `Base` in the
+/// circuit.
 #[derive(Debug, Clone)]
 pub struct EmulatedAffineVar<Base: SonobeField, Target: SonobeCurve> {
+    /// [`EmulatedAffineVar::x`] is the x-coordinate of the point's affine
+    /// representation.
     pub x: EmulatedFieldVar<Base, Target::BaseField>,
+    /// [`EmulatedAffineVar::y`] is the y-coordinate of the point's affine
+    /// representation.
     pub y: EmulatedFieldVar<Base, Target::BaseField>,
 }
 
@@ -103,6 +113,8 @@ impl<Base: SonobeField, Target: SonobeCurve> EqGadget<Base> for EmulatedAffineVa
 }
 
 impl<Base: SonobeField, Target: SonobeCurve> EmulatedAffineVar<Base, Target> {
+    /// [`EmulatedAffineVar::zero`] allocates the zero point (point at infinity)
+    /// of the curve as a constant.
     pub fn zero() -> Self {
         // `unwrap` below is safe because we are allocating a constant value,
         // which is guaranteed to succeed.
@@ -110,7 +122,7 @@ impl<Base: SonobeField, Target: SonobeCurve> EmulatedAffineVar<Base, Target> {
     }
 }
 
-impl<Base: SonobeField, Target: SonobeCurve> AbsorbableGadget<Base>
+impl<Base: SonobeField, Target: SonobeCurve> AbsorbableVar<Base>
     for EmulatedAffineVar<Base, Target>
 {
     fn absorb_into(&self, dest: &mut Vec<FpVar<Base>>) -> Result<(), SynthesisError> {
@@ -158,20 +170,24 @@ mod tests {
     }
 
     #[test]
-    fn test_improved_to_hash_preimage() -> Result<(), Box<dyn Error>> {
+    fn test_to_hash_preimage() -> Result<(), Box<dyn Error>> {
         let cs = ConstraintSystem::<Fr>::new_ref();
 
-        // check that point_to_nonnative_limbs returns the expected values
         let mut rng = thread_rng();
         let p = Projective::rand(&mut rng);
         let p_var = EmulatedAffineVar::<Fr, Projective>::new_witness(cs.clone(), || Ok(p))?;
-        assert_eq!(p_var.to_absorbable()?.value()?, p.to_absorbable());
+
+        let mut v = vec![];
+        let mut v_var = vec![];
+        p.absorb_into(&mut v);
+        p_var.absorb_into(&mut v_var)?;
+
+        assert_eq!(v_var.value()?, v);
         Ok(())
     }
 
     #[test]
     fn test_inputize() -> Result<(), Box<dyn Error>> {
-        // check that point_to_nonnative_limbs returns the expected values
         let mut rng = thread_rng();
         let p = Projective::rand(&mut rng);
 
