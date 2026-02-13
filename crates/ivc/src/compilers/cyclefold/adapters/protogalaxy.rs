@@ -1,3 +1,6 @@
+//! ProtoGalaxy CycleFold adapter that bridges ProtoGalaxy into the CycleFold
+//! IVC compiler.
+
 use ark_ff::{BigInteger, PrimeField, Zero};
 use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar, groups::CurveVar, prelude::Boolean};
 use ark_relations::gr1cs::{ConstraintSystemRef, SynthesisError};
@@ -18,6 +21,7 @@ use crate::compilers::cyclefold::{
     CycleFoldBasedIVC, FoldingSchemeCycleFoldExt, circuits::CycleFoldCircuit,
 };
 
+/// [`ProtoGalaxyCycleFoldCircuit`] defines CycleFold circuit for ProtoGalaxy.
 pub struct ProtoGalaxyCycleFoldCircuit<C: SonobeCurve, const N: usize> {
     r: Vec<bool>,
     points: Vec<C>,
@@ -131,9 +135,13 @@ impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemeCycleFoldExt<1, N> f
     }
 }
 
+/// [`ProtoGalaxyOvaIVC`] defines a CycleFold-based IVC using ProtoGalaxy as the
+/// primary folding scheme and Ova as the secondary folding scheme.
 pub type ProtoGalaxyOvaIVC<VC1, VC2, T, const CHALLENGE_BITS: usize = 128> =
     CycleFoldBasedIVC<ProtoGalaxy<VC1>, CycleFoldOva<VC2, CHALLENGE_BITS>, T>;
 
+/// [`ProtoGalaxyNovaIVC`] defines a CycleFold-based IVC using ProtoGalaxy as
+/// the primary folding scheme and Nova as the secondary folding scheme.
 pub type ProtoGalaxyNovaIVC<VC1, VC2, T, const CHALLENGE_BITS: usize = 128> =
     CycleFoldBasedIVC<ProtoGalaxy<VC1>, CycleFoldNova<VC2, CHALLENGE_BITS>, T>;
 

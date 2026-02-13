@@ -1,3 +1,5 @@
+//! Key generation for ProtoGalaxy.
+
 use ark_std::sync::Arc;
 use sonobe_primitives::{
     arithmetizations::{Arith, ArithConfig},

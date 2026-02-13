@@ -1,3 +1,5 @@
+//! In-circuit variables for ProtoGalaxy witnesses.
+
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::{AllocVar, AllocationMode},
@@ -8,9 +10,12 @@ use sonobe_primitives::commitments::CommitmentDefGadget;
 
 use super::{IncomingWitness, RunningWitness};
 
+/// [`RunningWitnessVar`] defines ProtoGalaxy's running witness variable.
 #[derive(Debug, PartialEq)]
 pub struct RunningWitnessVar<CM: CommitmentDefGadget> {
+    /// [`RunningWitnessVar::w`] is the witness (to the circuit).
     pub w: Vec<CM::ScalarVar>,
+    /// [`RunningWitnessVar::r`] is the randomness for the witness commitment.
     pub r: CM::RandomnessVar,
 }
 
@@ -47,9 +52,12 @@ impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for RunningWitnessVa
     }
 }
 
+/// [`IncomingWitnessVar`] defines ProtoGalaxy's incoming witness variable.
 #[derive(Debug, PartialEq)]
 pub struct IncomingWitnessVar<CM: CommitmentDefGadget> {
+    /// [`IncomingWitnessVar::w`] is the witness (to the circuit).
     pub w: Vec<CM::ScalarVar>,
+    /// [`IncomingWitnessVar::r`] is the randomness for the witness commitment.
     pub r: CM::RandomnessVar,
 }
 

@@ -1,3 +1,5 @@
+//! Proof generation for ProtoGalaxy.
+
 use ark_ff::{Field, One, Zero, batch_inversion};
 use ark_poly::{
     DenseUVPolynomial, EvaluationDomain, Evaluations, GeneralEvaluationDomain, Polynomial,

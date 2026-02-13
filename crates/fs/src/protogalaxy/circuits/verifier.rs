@@ -1,3 +1,5 @@
+//! Partial in-circuit verifier implementation for ProtoGalaxy.
+
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_r1cs_std::{
     GR1CSVar,

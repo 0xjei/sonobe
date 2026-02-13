@@ -1,3 +1,5 @@
+//! Proof verification for ProtoGalaxy.
+
 use ark_ff::One;
 use ark_poly::{
     DenseUVPolynomial, EvaluationDomain, GeneralEvaluationDomain, Polynomial,

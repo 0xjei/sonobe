@@ -1,3 +1,5 @@
+//! In-circuit variables for ProtoGalaxy instances.
+
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::{AllocVar, AllocationMode},
@@ -12,11 +14,17 @@ use sonobe_primitives::{commitments::CommitmentDefGadget, transcripts::Absorbabl
 use super::{IncomingInstance, RunningInstance};
 use crate::FoldingInstanceVar;
 
+/// [`RunningInstanceVar`] defines ProtoGalaxy's running instance variable.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RunningInstanceVar<CM: CommitmentDefGadget> {
+    /// [`RunningInstanceVar::phi`] is the witness commitment.
     pub phi: CM::CommitmentVar,
+    /// [`RunningInstanceVar::betas`] is the vector of randomness.
     pub betas: Vec<CM::ScalarVar>,
+    /// [`RunningInstanceVar::e`] is the error term.
     pub e: CM::ScalarVar,
+    /// [`RunningInstanceVar::x`] is the vector of public inputs (to the
+    /// circuit).
     pub x: Vec<CM::ScalarVar>,
 }
 
@@ -128,9 +136,13 @@ impl<CM: CommitmentDefGadget> FoldingInstanceVar<CM> for RunningInstanceVar<CM> 
     }
 }
 
+/// [`IncomingInstanceVar`] defines ProtoGalaxy's incoming instance variable.
 #[derive(Clone, Debug, PartialEq)]
 pub struct IncomingInstanceVar<CM: CommitmentDefGadget> {
+    /// [`IncomingInstanceVar::phi`] is the witness commitment.
     pub phi: CM::CommitmentVar,
+    /// [`IncomingInstanceVar::x`] is the vector of public inputs (to the
+    /// circuit).
     pub x: Vec<CM::ScalarVar>,
 }
 
