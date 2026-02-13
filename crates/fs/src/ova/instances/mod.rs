@@ -1,3 +1,6 @@
+//! Definitions of out-of-circuit values and in-circuit variables for Ova
+//! instances.
+
 use ark_ff::PrimeField;
 use sonobe_primitives::{
     arithmetizations::ArithConfig, commitments::CommitmentDef, traits::Dummy,
@@ -8,10 +11,15 @@ use crate::FoldingInstance;
 
 pub mod circuits;
 
+/// [`RunningInstance`] defines Ova's running instance.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RunningInstance<CM: CommitmentDef> {
+    /// [`RunningInstance::u`] is the constant term.
     pub u: CM::Scalar,
+    /// [`RunningInstance::cm`] is the combined witness and error term
+    /// commitment.
     pub cm: CM::Commitment,
+    /// [`RunningInstance::x`] is the vector of public inputs (to the circuit).
     pub x: Vec<CM::Scalar>,
 }
 

@@ -1,7 +1,10 @@
+//! This module implements the Ova folding scheme, which is introduced in this
+//! [note].
+//!
+//! [note]: https://hackmd.io/V4838nnlRKal9ZiTHiGYzw
+
 use ark_r1cs_std::boolean::Boolean;
 use ark_std::{UniformRand, marker::PhantomData, rand::RngCore, sync::Arc};
-#[cfg(feature = "parallel")]
-use rayon::prelude::*;
 use sonobe_primitives::{
     arithmetizations::{
         Arith, ArithConfig, ArithRelation,
@@ -28,6 +31,7 @@ pub mod circuits;
 pub mod instances;
 pub mod witnesses;
 
+/// [`OvaKey`] is Ova's decider key.
 #[derive(Clone)]
 pub struct OvaKey<A, CM: CommitmentDef> {
     arith: Arc<A>,
@@ -133,13 +137,18 @@ where
     }
 }
 
+/// [`AbstractOva`] implements the Ova folding scheme which can operate on
+/// both the primary and secondary curves.
 pub struct AbstractOva<CM, TF, const CHALLENGE_BITS: usize = 128> {
     _t: PhantomData<(CM, TF)>,
 }
 
+/// [`Ova`] is the main Ova folding scheme on the primary curve.
 pub type Ova<CM, const CHALLENGE_BITS: usize = 128> =
     AbstractOva<CM, <CM as CommitmentDef>::Scalar, CHALLENGE_BITS>;
 
+/// [`CycleFoldOva`] is the Ova folding scheme on the secondary curve which can
+/// be used as the folding scheme for folding CycleFold instances.
 pub type CycleFoldOva<CM, const CHALLENGE_BITS: usize = 128> =
     AbstractOva<CM, CF2<<CM as CommitmentDef>::Commitment>, CHALLENGE_BITS>;
 
@@ -162,6 +171,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> Fol
     type Proof<const M: usize, const N: usize> = CM::Commitment;
 }
 
+/// [`AbstractOvaGadget`] is the in-circuit gadget for [`AbstractOva`].
 pub struct AbstractOvaGadget<CM, const CHALLENGE_BITS: usize = 128> {
     _t: PhantomData<CM>,
 }

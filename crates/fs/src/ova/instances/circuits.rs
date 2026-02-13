@@ -1,3 +1,5 @@
+//! In-circuit variables for Ova instances.
+
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::{AllocVar, AllocationMode},
@@ -12,10 +14,16 @@ use sonobe_primitives::{commitments::CommitmentDefGadget, transcripts::Absorbabl
 use super::RunningInstance;
 use crate::FoldingInstanceVar;
 
+/// [`RunningInstanceVar`] defines Ova's running instance variable.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RunningInstanceVar<CM: CommitmentDefGadget> {
+    /// [`RunningInstanceVar::u`] is the constant term.
     pub u: CM::ScalarVar,
+    /// [`RunningInstanceVar::cm`] is the combined witness and error term
+    /// commitment.
     pub cm: CM::CommitmentVar,
+    /// [`RunningInstanceVar::x`] is the vector of public inputs (to the
+    /// circuit).
     pub x: Vec<CM::ScalarVar>,
 }
 
