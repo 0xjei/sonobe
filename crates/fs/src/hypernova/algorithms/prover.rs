@@ -1,3 +1,5 @@
+//! Proof generation for HyperNova.
+
 use ark_ff::One;
 use ark_poly::{DenseMultilinearExtension as MLE, MultilinearExtension};
 use ark_std::{borrow::Borrow, rand::RngCore};

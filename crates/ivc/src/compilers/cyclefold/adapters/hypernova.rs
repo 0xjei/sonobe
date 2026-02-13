@@ -1,3 +1,6 @@
+//! HyperNova CycleFold adapter that bridges HyperNova into the CycleFold IVC
+//! compiler.
+
 use ark_ff::{PrimeField, Zero};
 use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar, groups::CurveVar, prelude::Boolean};
 use ark_relations::gr1cs::{ConstraintSystemRef, SynthesisError};
@@ -19,7 +22,7 @@ use crate::compilers::cyclefold::{
     CycleFoldBasedIVC, FoldingSchemeCycleFoldExt, circuits::CycleFoldCircuit,
 };
 
-/// Configuration for HyperNova's CycleFold circuit
+/// [`HyperNovaCycleFoldCircuit`] defines CycleFold circuit for HyperNova.
 pub struct HyperNovaCycleFoldCircuit<C, const M: usize, const N: usize, const CHALLENGE_BITS: usize>
 {
     r: Vec<bool>,
@@ -119,9 +122,13 @@ impl<
     }
 }
 
+/// [`HyperNovaOvaIVC`] defines a CycleFold-based IVC using HyperNova as the
+/// primary folding scheme and Ova as the secondary folding scheme.
 pub type HyperNovaOvaIVC<VC1, VC2, T, V = R1CSConfig, const CHALLENGE_BITS: usize = 128> =
     CycleFoldBasedIVC<HyperNova<VC1, V, CHALLENGE_BITS>, CycleFoldOva<VC2, CHALLENGE_BITS>, T>;
 
+/// [`HyperNovaNovaIVC`] defines a CycleFold-based IVC using HyperNova as the
+/// primary folding scheme and Nova as the secondary folding scheme.
 pub type HyperNovaNovaIVC<VC1, VC2, T, V = R1CSConfig, const CHALLENGE_BITS: usize = 128> =
     CycleFoldBasedIVC<HyperNova<VC1, V, CHALLENGE_BITS>, CycleFoldNova<VC2, CHALLENGE_BITS>, T>;
 

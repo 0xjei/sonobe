@@ -1,3 +1,4 @@
+//! In-circuit variables for HyperNova instances.
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::{AllocVar, AllocationMode},
@@ -12,12 +13,19 @@ use sonobe_primitives::{commitments::CommitmentDefGadget, transcripts::Absorbabl
 use super::{CCCSInstance, LCCCSInstance};
 use crate::FoldingInstanceVar;
 
+/// [`LCCCSInstanceVar`] defines HyperNova's running instance variable.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LCCCSInstanceVar<CM: CommitmentDefGadget> {
+    /// [`LCCCSInstanceVar::cm`] is the witness commitment.
     pub cm: CM::CommitmentVar,
+    /// [`LCCCSInstanceVar::u`] is the constant term.
     pub u: CM::ScalarVar,
+    /// [`LCCCSInstanceVar::x`] is the vector of public inputs (to the circuit).
     pub x: Vec<CM::ScalarVar>,
+    /// [`LCCCSInstanceVar::r_x`] is the random evaluation point.
     pub r_x: Vec<CM::ScalarVar>,
+    /// [`LCCCSInstanceVar::v`] is the vector of sums of MLE evaluations defined
+    /// in Definition 2.
     pub v: Vec<CM::ScalarVar>,
 }
 
@@ -143,9 +151,12 @@ impl<CM: CommitmentDefGadget> FoldingInstanceVar<CM> for LCCCSInstanceVar<CM> {
     }
 }
 
+/// [`CCCSInstanceVar`] defines HyperNova's incoming instance variable.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CCCSInstanceVar<CM: CommitmentDefGadget> {
+    /// [`CCCSInstanceVar::cm`] is the witness commitment.
     pub cm: CM::CommitmentVar,
+    /// [`CCCSInstanceVar::x`] is the vector of public inputs (to the circuit).
     pub x: Vec<CM::ScalarVar>,
 }
 

@@ -1,3 +1,5 @@
+//! Partial in-circuit verifier implementation for HyperNova.
+
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::AllocVar,

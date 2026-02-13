@@ -1,3 +1,5 @@
+//! Proof verification for HyperNova.
+
 use ark_ff::One;
 use ark_std::borrow::Borrow;
 use sonobe_primitives::{

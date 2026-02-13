@@ -1,3 +1,5 @@
+//! Preprocessing for HyperNova.
+
 use ark_std::rand::RngCore;
 use sonobe_primitives::{arithmetizations::ccs::CCSVariant, commitments::GroupBasedCommitment};
 

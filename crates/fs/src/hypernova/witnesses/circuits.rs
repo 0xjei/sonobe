@@ -1,3 +1,5 @@
+//! In-circuit variables for HyperNova witnesses.
+
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::{AllocVar, AllocationMode},
@@ -8,9 +10,12 @@ use sonobe_primitives::commitments::CommitmentDefGadget;
 
 use super::{CCCSWitness, LCCCSWitness};
 
+/// [`LCCCSWitnessVar`] defines HyperNova's running witness variable.
 #[derive(Debug, PartialEq)]
 pub struct LCCCSWitnessVar<CM: CommitmentDefGadget> {
+    /// [`LCCCSWitnessVar::w`] is the witness (to the circuit).
     pub w: Vec<CM::ScalarVar>,
+    /// [`LCCCSWitnessVar::r`] is the randomness for the witness commitment.
     pub r: CM::RandomnessVar,
 }
 
@@ -47,9 +52,12 @@ impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for LCCCSWitnessVar<
     }
 }
 
+/// [`CCCSWitnessVar`] defines HyperNova's incoming witness variable.
 #[derive(Debug, PartialEq)]
 pub struct CCCSWitnessVar<CM: CommitmentDefGadget> {
+    /// [`CCCSWitnessVar::w`] is the witness (to the circuit).
     pub w: Vec<CM::ScalarVar>,
+    /// [`CCCSWitnessVar::r`] is the randomness for the witness commitment.
     pub r: CM::RandomnessVar,
 }
 
