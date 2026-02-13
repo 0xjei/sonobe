@@ -1,3 +1,5 @@
+//! Proof generation for Ova.
+
 use ark_ff::One;
 use ark_std::{borrow::Borrow, cfg_iter, rand::RngCore};
 #[cfg(feature = "parallel")]
