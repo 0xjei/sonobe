@@ -118,10 +118,7 @@ impl<F: Field> R1CS<F> {
 
     /// [`R1CS::evaluate_at`] evaluates the R1CS relation at a given vector of
     /// assignments `z`.
-    pub fn evaluate_at(
-        &self,
-        z: Assignments<F, impl AsRef<[F]> + Sync>,
-    ) -> Result<Vec<F>, Error> {
+    pub fn evaluate_at(&self, z: Assignments<F, impl AsRef<[F]> + Sync>) -> Result<Vec<F>, Error> {
         let cfg = &self.cfg;
 
         let public_len = z.public.as_ref().len();

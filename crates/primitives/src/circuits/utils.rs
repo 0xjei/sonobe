@@ -2,7 +2,9 @@
 
 use ark_ff::{Field, PrimeField};
 use ark_r1cs_std::{
-    GR1CSVar, alloc::AllocVar, fields::fp::{AllocatedFp, FpVar}
+    GR1CSVar,
+    alloc::AllocVar,
+    fields::fp::{AllocatedFp, FpVar},
 };
 use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError, Variable};
 
