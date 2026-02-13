@@ -1,3 +1,5 @@
+//! Proof generation for ProtoGalaxy.
+
 use ark_ff::{Field, One, Zero, batch_inversion};
 use ark_poly::{
     DenseUVPolynomial, EvaluationDomain, Evaluations, GeneralEvaluationDomain, Polynomial,
@@ -39,8 +41,9 @@ impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemeProver<1, N> for Pro
         let us = &us.iter().map(|i| i.borrow()).collect::<Vec<_>>();
 
         let r1cs = &pk.arith;
-        let d = r1cs.config().degree();
-        let t = r1cs.log_constraints();
+        let cfg = r1cs.config();
+        let d = cfg.degree();
+        let t = cfg.log_constraints();
 
         transcript.add(&t);
         transcript.add(&(d * N + 1));
@@ -101,7 +104,7 @@ impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemeProver<1, N> for Pro
             .collect::<Vec<_>>();
 
         // Optimized G(X) computation as described in Claim 4.5 of the paper.
-        let s_evals = (0..r1cs.n_variables())
+        let s_evals = (0..cfg.n_variables())
             .map(|i| {
                 lagrange_bases
                     .iter()
@@ -131,14 +134,14 @@ impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemeProver<1, N> for Pro
                 }
                 let z = AssignmentsOwned::from((
                     s_evals[0][k],
-                    (1..1 + r1cs.n_public_inputs())
+                    (1..1 + cfg.n_public_inputs())
                         .map(|i| s_evals[i][k])
                         .collect(),
-                    (1 + r1cs.n_public_inputs()..r1cs.n_variables())
+                    (1 + cfg.n_public_inputs()..cfg.n_variables())
                         .map(|i| s_evals[i][k])
                         .collect(),
                 ));
-                let v = r1cs.eval_assignments(z)?;
+                let v = r1cs.evaluate_at(z)?;
                 // L_0(e) = (e^H.size() - 1) / (e - 1) / H.size()
                 let l_0_eval = H.evaluate_vanishing_polynomial(e) * inv * H.size_inv();
                 Ok(v.into_iter().scalar_rlc(&beta_star_pows) - f_alpha * l_0_eval)
@@ -208,8 +211,9 @@ impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemeProver<1, N> for Pro
         let us = &us.iter().map(|i| i.borrow()).collect::<Vec<_>>();
 
         let r1cs = &pk.arith;
-        let d = r1cs.config().degree();
-        let t = r1cs.log_constraints();
+        let cfg = r1cs.config();
+        let d = cfg.degree();
+        let t = cfg.log_constraints();
 
         let mut phis = [CM::Commitment::default(); N];
         let mut rs = [CM::Randomness::default(); N];
@@ -279,7 +283,7 @@ impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemeProver<1, N> for Pro
             .collect::<Vec<_>>();
 
         // Optimized G(X) computation as described in Claim 4.5 of the paper.
-        let s_evals = (0..r1cs.n_variables())
+        let s_evals = (0..cfg.n_variables())
             .map(|i| {
                 lagrange_bases
                     .iter()
@@ -309,14 +313,14 @@ impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemeProver<1, N> for Pro
                 }
                 let z = AssignmentsOwned::from((
                     s_evals[0][k],
-                    (1..1 + r1cs.n_public_inputs())
+                    (1..1 + cfg.n_public_inputs())
                         .map(|i| s_evals[i][k])
                         .collect(),
-                    (1 + r1cs.n_public_inputs()..r1cs.n_variables())
+                    (1 + cfg.n_public_inputs()..cfg.n_variables())
                         .map(|i| s_evals[i][k])
                         .collect(),
                 ));
-                let v = r1cs.eval_assignments(z)?;
+                let v = r1cs.evaluate_at(z)?;
                 // L_0(e) = (e^H.size() - 1) / (e - 1) / H.size()
                 let l_0_eval = H.evaluate_vanishing_polynomial(e) * inv * H.size_inv();
                 Ok(v.into_iter().scalar_rlc(&beta_star_pows) - f_alpha * l_0_eval)
@@ -366,9 +370,8 @@ impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemeProver<1, N> for Pro
     }
 }
 
-/// calculates F[x] using the optimized binary-tree technique
-/// described in Claim 4.4
-/// of [ProtoGalaxy](https://eprint.iacr.org/2023/1106.pdf)
+// Calculates F[x] using the optimized binary-tree technique described in Claim
+// 4.4 of [ProtoGalaxy](https://eprint.iacr.org/2023/1106.pdf)
 fn calc_f_from_btree<F: Field>(fw: &[F], betas: &[F], deltas: &[F]) -> DensePolynomial<F> {
     let mut layer = fw
         .iter()

@@ -1,3 +1,5 @@
+//! Proof generation for Ova.
+
 use ark_ff::One;
 use ark_std::{borrow::Borrow, cfg_iter, rand::RngCore};
 #[cfg(feature = "parallel")]
@@ -31,19 +33,15 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
         // Compute the cross term `T` by following the original Nova paper.
         let z1 = Assignments::from((U.u, &U.x, &W.w));
         let z2 = Assignments::from((CM::Scalar::one(), &u[..], &w[..]));
-        let t = cfg_iter!(pk.arith.A)
-            .zip(&pk.arith.B)
-            .zip(&pk.arith.C)
-            .map(|((a, b), c)| {
-                let az1: CM::Scalar = a.iter().map(|(val, col)| z1[*col] * val).sum();
-                let az2: CM::Scalar = a.iter().map(|(val, col)| z2[*col] * val).sum();
-                let bz1: CM::Scalar = b.iter().map(|(val, col)| z1[*col] * val).sum();
-                let bz2: CM::Scalar = b.iter().map(|(val, col)| z2[*col] * val).sum();
-                let cz1: CM::Scalar = c.iter().map(|(val, col)| z1[*col] * val).sum();
-                let cz2: CM::Scalar = c.iter().map(|(val, col)| z2[*col] * val).sum();
-                az1 * bz2 + az2 * bz1 - z2[0] * cz1 - z1[0] * cz2
-            })
-            .collect::<Vec<_>>();
+        let t = pk.arith.evaluate_rows(|((a, b), c)| {
+            let az1: CM::Scalar = a.iter().map(|(val, col)| z1[*col] * val).sum();
+            let az2: CM::Scalar = a.iter().map(|(val, col)| z2[*col] * val).sum();
+            let bz1: CM::Scalar = b.iter().map(|(val, col)| z1[*col] * val).sum();
+            let bz2: CM::Scalar = b.iter().map(|(val, col)| z2[*col] * val).sum();
+            let cz1: CM::Scalar = c.iter().map(|(val, col)| z1[*col] * val).sum();
+            let cz2: CM::Scalar = c.iter().map(|(val, col)| z2[*col] * val).sum();
+            Ok(az1 * bz2 + az2 * bz1 - z2[0] * cz1 - z1[0] * cz2)
+        })?;
 
         let (cm, r) = CM::commit(&pk.ck, &[w, &t[..]].concat(), rng)?;
 

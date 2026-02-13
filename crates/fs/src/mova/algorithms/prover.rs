@@ -1,3 +1,5 @@
+//! Proof generation for Mova.
+
 use ark_ff::{One, Zero};
 use ark_poly::{
     DenseMultilinearExtension as MLE, DenseUVPolynomial, Polynomial, univariate::DensePolynomial,
@@ -7,7 +9,7 @@ use ark_std::{borrow::Borrow, cfg_into_iter, cfg_iter, rand::RngCore};
 use rayon::prelude::*;
 use sonobe_primitives::{
     algebra::ops::{bits::FromBits, poly::MLEHelper},
-    arithmetizations::Arith,
+    arithmetizations::{Arith, ArithConfig},
     circuits::AssignmentsOwned,
     commitments::GroupBasedCommitment,
     transcripts::Transcript,
@@ -77,7 +79,7 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeProver<
         // Step 6.1: Send h1(X) and h2(X), where the constant term is omitted
         // because it always equals v
         let mut h1_coeffs = h1.coeffs.clone();
-        h1_coeffs.resize(pk.arith.log_constraints() + 1, Zero::zero());
+        h1_coeffs.resize(pk.arith.config().log_constraints() + 1, Zero::zero());
         h1_coeffs.remove(0);
         transcript.add(&h1_coeffs);
 
@@ -91,7 +93,7 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeProver<
 
         // Step 7.1: Compute cross term `T`. We follow the optimized approach in
         // [Mova](https://eprint.iacr.org/2024/1220.pdf)'s section 5.2.
-        let v = pk.arith.eval_assignments(AssignmentsOwned::from((
+        let v = pk.arith.evaluate_at(AssignmentsOwned::from((
             U.u + CM::Scalar::one(),
             cfg_iter!(U.x).zip(&u[..]).map(|(a, b)| *a + b).collect(),
             cfg_iter!(W.w).zip(&w[..]).map(|(a, b)| *a + b).collect(),

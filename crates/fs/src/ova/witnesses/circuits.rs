@@ -1,3 +1,5 @@
+//! In-circuit variables for Ova witnesses.
+
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::{AllocVar, AllocationMode},
@@ -8,16 +10,19 @@ use sonobe_primitives::commitments::CommitmentDefGadget;
 
 use super::RunningWitness;
 
+/// [`RunningWitnessVar`] defines Ova's running witness variable.
 #[derive(Debug, PartialEq)]
 pub struct RunningWitnessVar<CM: CommitmentDefGadget> {
+    /// [`RunningWitnessVar::w`] is the witness (to the circuit).
     pub w: Vec<CM::ScalarVar>,
+    /// [`RunningWitnessVar::r`] is the randomness for the witness commitment.
     pub r: CM::RandomnessVar,
 }
 
-impl<CM: CommitmentDefGadget> AllocVar<RunningWitness<CM::Native>, CM::ConstraintField>
+impl<CM: CommitmentDefGadget> AllocVar<RunningWitness<CM::Widget>, CM::ConstraintField>
     for RunningWitnessVar<CM>
 {
-    fn new_variable<T: Borrow<RunningWitness<CM::Native>>>(
+    fn new_variable<T: Borrow<RunningWitness<CM::Widget>>>(
         cs: impl Into<Namespace<CM::ConstraintField>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
         mode: AllocationMode,
@@ -33,7 +38,7 @@ impl<CM: CommitmentDefGadget> AllocVar<RunningWitness<CM::Native>, CM::Constrain
 }
 
 impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for RunningWitnessVar<CM> {
-    type Value = RunningWitness<CM::Native>;
+    type Value = RunningWitness<CM::Widget>;
 
     fn cs(&self) -> ConstraintSystemRef<CM::ConstraintField> {
         self.w.cs().or(self.r.cs())

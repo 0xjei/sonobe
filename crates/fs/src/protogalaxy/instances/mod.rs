@@ -1,3 +1,6 @@
+//! Definitions of out-of-circuit values and in-circuit variables for ProtoGalaxy
+//! instances.
+
 use ark_ff::PrimeField;
 use sonobe_primitives::{
     arithmetizations::ArithConfig, commitments::CommitmentDef, traits::Dummy,
@@ -8,11 +11,16 @@ use crate::FoldingInstance;
 
 pub mod circuits;
 
+/// [`RunningInstance`] defines ProtoGalaxy's running instance.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RunningInstance<CM: CommitmentDef> {
+    /// [`RunningInstance::phi`] is the witness commitment.
     pub phi: CM::Commitment,
+    /// [`RunningInstance::betas`] is the vector of randomness.
     pub betas: Vec<CM::Scalar>,
+    /// [`RunningInstance::e`] is the error term.
     pub e: CM::Scalar,
+    /// [`RunningInstance::x`] is the vector of public inputs (to the circuit).
     pub x: Vec<CM::Scalar>,
 }
 
@@ -52,9 +60,12 @@ impl<CM: CommitmentDef> Absorbable for RunningInstance<CM> {
     }
 }
 
+/// [`IncomingInstance`] defines ProtoGalaxy's incoming instance.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct IncomingInstance<CM: CommitmentDef> {
+    /// [`IncomingInstance::phi`] is the witness commitment.
     pub phi: CM::Commitment,
+    /// [`IncomingInstance::x`] is the vector of public inputs (to the circuit).
     pub x: Vec<CM::Scalar>,
 }
 

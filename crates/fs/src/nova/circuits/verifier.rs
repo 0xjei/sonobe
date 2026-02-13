@@ -1,9 +1,11 @@
+//! Partial and full in-circuit verifier implementations for Nova.
+
 use ark_r1cs_std::{GR1CSVar, alloc::AllocVar, groups::CurveVar};
 use ark_relations::gr1cs::SynthesisError;
 use sonobe_primitives::{
     algebra::ops::bits::FromBitsGadget,
     commitments::{CommitmentDef, CommitmentDefGadget, GroupBasedCommitment},
-    transcripts::TranscriptVar,
+    transcripts::TranscriptGadget,
 };
 
 use crate::{
@@ -13,12 +15,12 @@ use crate::{
 impl<CM, const CHALLENGE_BITS: usize> FoldingSchemePartialVerifierGadget<1, 1>
     for AbstractNovaGadget<CM, CHALLENGE_BITS>
 where
-    CM: CommitmentDefGadget<Native: GroupBasedCommitment>,
+    CM: CommitmentDefGadget<Widget: GroupBasedCommitment>,
 {
     #[allow(non_snake_case)]
     fn verify_hinted(
         _vk: &Self::VerifierKey,
-        transcript: &mut impl TranscriptVar<CM::ConstraintField>,
+        transcript: &mut impl TranscriptGadget<CM::ConstraintField>,
         [U]: [&Self::RU; 1],
         [u]: [&Self::IU; 1],
         proof: &Self::Proof<1, 1>,
@@ -65,12 +67,12 @@ where
 impl<CM, const CHALLENGE_BITS: usize> FoldingSchemePartialVerifierGadget<2, 0>
     for AbstractNovaGadget<CM, CHALLENGE_BITS>
 where
-    CM: CommitmentDefGadget<Native: GroupBasedCommitment>,
+    CM: CommitmentDefGadget<Widget: GroupBasedCommitment>,
 {
     #[allow(non_snake_case)]
     fn verify_hinted(
         _vk: &Self::VerifierKey,
-        transcript: &mut impl TranscriptVar<CM::ConstraintField>,
+        transcript: &mut impl TranscriptGadget<CM::ConstraintField>,
         [U1, U2]: [&Self::RU; 2],
         _: [&Self::IU; 0],
         proof: &Self::Proof<2, 0>,
@@ -120,13 +122,13 @@ where
 impl<CM, const CHALLENGE_BITS: usize> FoldingSchemeFullVerifierGadget<1, 1>
     for AbstractNovaGadget<CM, CHALLENGE_BITS>
 where
-    CM: CommitmentDefGadget<Native: GroupBasedCommitment>,
-    CM::CommitmentVar: CurveVar<<CM::Native as CommitmentDef>::Commitment, CM::ConstraintField>,
+    CM: CommitmentDefGadget<Widget: GroupBasedCommitment>,
+    CM::CommitmentVar: CurveVar<<CM::Widget as CommitmentDef>::Commitment, CM::ConstraintField>,
 {
     #[allow(non_snake_case)]
     fn verify(
         _vk: &Self::VerifierKey,
-        transcript: &mut impl TranscriptVar<CM::ConstraintField>,
+        transcript: &mut impl TranscriptGadget<CM::ConstraintField>,
         [U]: [&Self::RU; 1],
         [u]: [&Self::IU; 1],
         proof: &Self::Proof<1, 1>,

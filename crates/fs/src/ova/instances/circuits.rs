@@ -1,3 +1,5 @@
+//! In-circuit variables for Ova instances.
+
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::{AllocVar, AllocationMode},
@@ -7,22 +9,28 @@ use ark_r1cs_std::{
 };
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::borrow::Borrow;
-use sonobe_primitives::{commitments::CommitmentDefGadget, transcripts::AbsorbableGadget};
+use sonobe_primitives::{commitments::CommitmentDefGadget, transcripts::AbsorbableVar};
 
 use super::RunningInstance;
 use crate::FoldingInstanceVar;
 
+/// [`RunningInstanceVar`] defines Ova's running instance variable.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RunningInstanceVar<CM: CommitmentDefGadget> {
+    /// [`RunningInstanceVar::u`] is the constant term.
     pub u: CM::ScalarVar,
+    /// [`RunningInstanceVar::cm`] is the combined witness and error term
+    /// commitment.
     pub cm: CM::CommitmentVar,
+    /// [`RunningInstanceVar::x`] is the vector of public inputs (to the
+    /// circuit).
     pub x: Vec<CM::ScalarVar>,
 }
 
-impl<CM: CommitmentDefGadget> AllocVar<RunningInstance<CM::Native>, CM::ConstraintField>
+impl<CM: CommitmentDefGadget> AllocVar<RunningInstance<CM::Widget>, CM::ConstraintField>
     for RunningInstanceVar<CM>
 {
-    fn new_variable<T: Borrow<RunningInstance<CM::Native>>>(
+    fn new_variable<T: Borrow<RunningInstance<CM::Widget>>>(
         cs: impl Into<Namespace<CM::ConstraintField>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
         mode: AllocationMode,
@@ -39,7 +47,7 @@ impl<CM: CommitmentDefGadget> AllocVar<RunningInstance<CM::Native>, CM::Constrai
 }
 
 impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for RunningInstanceVar<CM> {
-    type Value = RunningInstance<CM::Native>;
+    type Value = RunningInstance<CM::Widget>;
 
     fn cs(&self) -> ConstraintSystemRef<CM::ConstraintField> {
         self.u.cs().or(self.cm.cs()).or(self.x.cs())
@@ -54,7 +62,7 @@ impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for RunningInstanceV
     }
 }
 
-impl<CM: CommitmentDefGadget> AbsorbableGadget<CM::ConstraintField> for RunningInstanceVar<CM> {
+impl<CM: CommitmentDefGadget> AbsorbableVar<CM::ConstraintField> for RunningInstanceVar<CM> {
     fn absorb_into(
         &self,
         dest: &mut Vec<FpVar<CM::ConstraintField>>,

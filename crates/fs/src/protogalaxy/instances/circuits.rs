@@ -1,3 +1,5 @@
+//! In-circuit variables for ProtoGalaxy instances.
+
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::{AllocVar, AllocationMode},
@@ -7,23 +9,29 @@ use ark_r1cs_std::{
 };
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::borrow::Borrow;
-use sonobe_primitives::{commitments::CommitmentDefGadget, transcripts::AbsorbableGadget};
+use sonobe_primitives::{commitments::CommitmentDefGadget, transcripts::AbsorbableVar};
 
 use super::{IncomingInstance, RunningInstance};
 use crate::FoldingInstanceVar;
 
+/// [`RunningInstanceVar`] defines ProtoGalaxy's running instance variable.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RunningInstanceVar<CM: CommitmentDefGadget> {
+    /// [`RunningInstanceVar::phi`] is the witness commitment.
     pub phi: CM::CommitmentVar,
+    /// [`RunningInstanceVar::betas`] is the vector of randomness.
     pub betas: Vec<CM::ScalarVar>,
+    /// [`RunningInstanceVar::e`] is the error term.
     pub e: CM::ScalarVar,
+    /// [`RunningInstanceVar::x`] is the vector of public inputs (to the
+    /// circuit).
     pub x: Vec<CM::ScalarVar>,
 }
 
-impl<CM: CommitmentDefGadget> AllocVar<RunningInstance<CM::Native>, CM::ConstraintField>
+impl<CM: CommitmentDefGadget> AllocVar<RunningInstance<CM::Widget>, CM::ConstraintField>
     for RunningInstanceVar<CM>
 {
-    fn new_variable<T: Borrow<RunningInstance<CM::Native>>>(
+    fn new_variable<T: Borrow<RunningInstance<CM::Widget>>>(
         cs: impl Into<Namespace<CM::ConstraintField>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
         mode: AllocationMode,
@@ -41,7 +49,7 @@ impl<CM: CommitmentDefGadget> AllocVar<RunningInstance<CM::Native>, CM::Constrai
 }
 
 impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for RunningInstanceVar<CM> {
-    type Value = RunningInstance<CM::Native>;
+    type Value = RunningInstance<CM::Widget>;
 
     fn cs(&self) -> ConstraintSystemRef<CM::ConstraintField> {
         self.phi
@@ -61,7 +69,7 @@ impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for RunningInstanceV
     }
 }
 
-impl<CM: CommitmentDefGadget> AbsorbableGadget<CM::ConstraintField> for RunningInstanceVar<CM> {
+impl<CM: CommitmentDefGadget> AbsorbableVar<CM::ConstraintField> for RunningInstanceVar<CM> {
     fn absorb_into(
         &self,
         dest: &mut Vec<FpVar<CM::ConstraintField>>,
@@ -128,16 +136,20 @@ impl<CM: CommitmentDefGadget> FoldingInstanceVar<CM> for RunningInstanceVar<CM> 
     }
 }
 
+/// [`IncomingInstanceVar`] defines ProtoGalaxy's incoming instance variable.
 #[derive(Clone, Debug, PartialEq)]
 pub struct IncomingInstanceVar<CM: CommitmentDefGadget> {
+    /// [`IncomingInstanceVar::phi`] is the witness commitment.
     pub phi: CM::CommitmentVar,
+    /// [`IncomingInstanceVar::x`] is the vector of public inputs (to the
+    /// circuit).
     pub x: Vec<CM::ScalarVar>,
 }
 
-impl<CM: CommitmentDefGadget> AllocVar<IncomingInstance<CM::Native>, CM::ConstraintField>
+impl<CM: CommitmentDefGadget> AllocVar<IncomingInstance<CM::Widget>, CM::ConstraintField>
     for IncomingInstanceVar<CM>
 {
-    fn new_variable<T: Borrow<IncomingInstance<CM::Native>>>(
+    fn new_variable<T: Borrow<IncomingInstance<CM::Widget>>>(
         cs: impl Into<Namespace<CM::ConstraintField>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
         mode: AllocationMode,
@@ -153,7 +165,7 @@ impl<CM: CommitmentDefGadget> AllocVar<IncomingInstance<CM::Native>, CM::Constra
 }
 
 impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for IncomingInstanceVar<CM> {
-    type Value = IncomingInstance<CM::Native>;
+    type Value = IncomingInstance<CM::Widget>;
 
     fn cs(&self) -> ConstraintSystemRef<CM::ConstraintField> {
         self.phi.cs().or(self.x.cs())
@@ -167,7 +179,7 @@ impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for IncomingInstance
     }
 }
 
-impl<CM: CommitmentDefGadget> AbsorbableGadget<CM::ConstraintField> for IncomingInstanceVar<CM> {
+impl<CM: CommitmentDefGadget> AbsorbableVar<CM::ConstraintField> for IncomingInstanceVar<CM> {
     fn absorb_into(
         &self,
         dest: &mut Vec<FpVar<CM::ConstraintField>>,

@@ -1,3 +1,5 @@
+//! Nova CycleFold adapter that bridges Nova into the CycleFold IVC compiler.
+
 use ark_ff::{PrimeField, Zero};
 use ark_r1cs_std::{
     GR1CSVar, alloc::AllocVar, fields::fp::FpVar, groups::CurveVar, prelude::Boolean,
@@ -20,17 +22,17 @@ use sonobe_primitives::{
 };
 
 use crate::compilers::cyclefold::{
-    CycleFoldBasedIVC, FoldingSchemeCycleFoldExt, circuits::CycleFoldConfig,
+    CycleFoldBasedIVC, FoldingSchemeCycleFoldExt, circuits::CycleFoldCircuit,
 };
 
-/// Configuration for Nova's CycleFold circuit
-pub struct NovaCycleFoldConfig<C, const CHALLENGE_BITS: usize> {
+/// [`NovaCycleFoldCircuit`] defines CycleFold circuit for Nova.
+pub struct NovaCycleFoldCircuit<C, const CHALLENGE_BITS: usize> {
     r: Vec<bool>,
     points: Vec<C>,
 }
 
 impl<C: SonobeCurve, const CHALLENGE_BITS: usize> Default
-    for NovaCycleFoldConfig<C, CHALLENGE_BITS>
+    for NovaCycleFoldCircuit<C, CHALLENGE_BITS>
 {
     fn default() -> Self {
         Self {
@@ -40,15 +42,10 @@ impl<C: SonobeCurve, const CHALLENGE_BITS: usize> Default
     }
 }
 
-impl<C: SonobeCurve, const CHALLENGE_BITS: usize> CycleFoldConfig
-    for NovaCycleFoldConfig<C, CHALLENGE_BITS>
+impl<C: SonobeCurve, const CHALLENGE_BITS: usize> CycleFoldCircuit<CF2<C>>
+    for NovaCycleFoldCircuit<C, CHALLENGE_BITS>
 {
-    type C = C;
-
-    fn verify_point_rlc(
-        &self,
-        cs: ConstraintSystemRef<CF2<Self::C>>,
-    ) -> Result<(), SynthesisError> {
+    fn verify_point_rlc(&self, cs: ConstraintSystemRef<CF2<C>>) -> Result<(), SynthesisError> {
         let rho = FpVar::new_input(cs.clone(), || Ok(CF2::<C>::from_bits_le(&self.r[..])))?;
         let rho_bits = rho.to_n_bits_le(CHALLENGE_BITS)?;
 
@@ -66,21 +63,21 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
 {
     const N_CYCLEFOLDS: usize = 2;
 
-    type CFConfig = NovaCycleFoldConfig<CM::Commitment, CHALLENGE_BITS>;
+    type CFCircuit = NovaCycleFoldCircuit<CM::Commitment, CHALLENGE_BITS>;
 
     #[allow(non_snake_case)]
-    fn to_cyclefold_configs(
+    fn to_cyclefold_circuits(
         [U]: &[impl Borrow<Self::RU>; 1],
         [u]: &[impl Borrow<Self::IU>; 1],
         proof: &Self::Proof<1, 1>,
         rho: Self::Challenge,
-    ) -> Vec<Self::CFConfig> {
+    ) -> Vec<Self::CFCircuit> {
         vec![
-            NovaCycleFoldConfig {
+            NovaCycleFoldCircuit {
                 r: rho.into(),
                 points: vec![U.borrow().cm_e, *proof],
             },
-            NovaCycleFoldConfig {
+            NovaCycleFoldCircuit {
                 r: rho.into(),
                 points: vec![U.borrow().cm_w, u.borrow().cm_w],
             },
@@ -128,26 +125,26 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
 {
     const N_CYCLEFOLDS: usize = 3;
 
-    type CFConfig = NovaCycleFoldConfig<CM::Commitment, CHALLENGE_BITS>;
+    type CFCircuit = NovaCycleFoldCircuit<CM::Commitment, CHALLENGE_BITS>;
 
     #[allow(non_snake_case)]
-    fn to_cyclefold_configs(
+    fn to_cyclefold_circuits(
         [U1, U2]: &[impl Borrow<Self::RU>; 2],
         _: &[impl Borrow<Self::IU>; 0],
         proof: &Self::Proof<2, 0>,
         rho_bits: Self::Challenge,
-    ) -> Vec<Self::CFConfig> {
+    ) -> Vec<Self::CFCircuit> {
         let rho = CM::Scalar::from_bits_le(&rho_bits);
         vec![
-            NovaCycleFoldConfig {
+            NovaCycleFoldCircuit {
                 r: rho_bits.into(),
                 points: vec![*proof, U2.borrow().cm_e],
             },
-            NovaCycleFoldConfig {
+            NovaCycleFoldCircuit {
                 r: rho_bits.into(),
                 points: vec![U1.borrow().cm_e, U2.borrow().cm_e * rho + proof],
             },
-            NovaCycleFoldConfig {
+            NovaCycleFoldCircuit {
                 r: rho_bits.into(),
                 points: vec![U1.borrow().cm_w, U2.borrow().cm_w],
             },
@@ -199,9 +196,13 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
     }
 }
 
+/// [`NovaOvaIVC`] defines a CycleFold-based IVC using Nova as the primary
+/// folding scheme and Ova as the secondary folding scheme.
 pub type NovaOvaIVC<VC1, VC2, T, const CHALLENGE_BITS: usize = 128> =
     CycleFoldBasedIVC<Nova<VC1, CHALLENGE_BITS>, CycleFoldOva<VC2, CHALLENGE_BITS>, T>;
 
+/// [`NovaNovaIVC`] defines a CycleFold-based IVC using Nova as the primary
+/// folding scheme and Nova as the secondary folding scheme.
 pub type NovaNovaIVC<VC1, VC2, T, const CHALLENGE_BITS: usize = 128> =
     CycleFoldBasedIVC<Nova<VC1, CHALLENGE_BITS>, CycleFoldNova<VC2, CHALLENGE_BITS>, T>;
 

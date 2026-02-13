@@ -1,12 +1,18 @@
+//! Definitions of out-of-circuit values and in-circuit variables for HyperNova
+//! witnesses.
+
 use sonobe_primitives::{arithmetizations::ArithConfig, commitments::CommitmentDef, traits::Dummy};
 
 use crate::FoldingWitness;
 
 pub mod circuits;
 
+/// [`LCCCSWitness`] defines HyperNova's running witness.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LCCCSWitness<CM: CommitmentDef> {
+    /// [`LCCCSWitness::w`] is the witness (to the circuit).
     pub w: Vec<CM::Scalar>,
+    /// [`LCCCSWitness::r`] is the randomness for the witness commitment.
     pub r: CM::Randomness,
 }
 
@@ -27,9 +33,12 @@ impl<CM: CommitmentDef, Cfg: ArithConfig> Dummy<&Cfg> for LCCCSWitness<CM> {
     }
 }
 
+/// [`CCCSWitness`] defines HyperNova's incoming witness.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CCCSWitness<CM: CommitmentDef> {
+    /// [`CCCSWitness::w`] is the witness (to the circuit).
     pub w: Vec<CM::Scalar>,
+    /// [`CCCSWitness::r`] is the randomness for the witness commitment.
     pub r: CM::Randomness,
 }
 

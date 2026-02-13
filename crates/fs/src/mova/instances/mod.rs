@@ -1,3 +1,6 @@
+//! Definitions of out-of-circuit values and in-circuit variables for Mova
+//! instances.
+
 use ark_ff::PrimeField;
 use sonobe_primitives::{
     arithmetizations::ArithConfig, commitments::CommitmentDef, traits::Dummy,
@@ -8,14 +11,20 @@ use crate::FoldingInstance;
 
 pub mod circuits;
 
+/// [`RunningInstance`] defines Mova's running instance.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RunningInstance<CM: CommitmentDef> {
-    // Random evaluation point for the E
+    /// [`RunningInstance::r_e`] is the random evaluation point for the error
+    /// term.
     pub r_e: Vec<CM::Scalar>,
-    // Evaluation of the MLE of E at r_E
+    /// [`RunningInstance::v`] is the evaluation of the MLE of the error term
+    /// at `r_e`.
     pub v: CM::Scalar,
+    /// [`RunningInstance::u`] is the constant term.
     pub u: CM::Scalar,
+    /// [`RunningInstance::cm_w`] is the witness commitment.
     pub cm_w: CM::Commitment,
+    /// [`RunningInstance::x`] is the vector of public inputs (to the circuit).
     pub x: Vec<CM::Scalar>,
 }
 

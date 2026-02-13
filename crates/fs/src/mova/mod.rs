@@ -1,3 +1,8 @@
+//! This module implements the Mova folding scheme, which is introduced in this
+//! [paper].
+//! 
+//! [paper]: https://eprint.iacr.org/2024/1220.pdf
+
 use ark_ff::{Field, Zero};
 use ark_poly::{DenseMultilinearExtension as MLE, Polynomial};
 use ark_r1cs_std::{
@@ -34,10 +39,11 @@ pub mod circuits;
 pub mod instances;
 pub mod witnesses;
 
+/// [`MovaKey`] is Mova's decider key.
 #[derive(Clone)]
 pub struct MovaKey<A, CM: CommitmentDef> {
-    pub arith: Arc<A>,
-    pub ck: Arc<CM::Key>,
+    arith: Arc<A>,
+    ck: Arc<CM::Key>,
 }
 
 impl<A: Arith, CM: CommitmentDef> DeciderKey for MovaKey<A, CM> {
@@ -125,11 +131,13 @@ where
     type Error = Error;
 
     fn sample(&self, _: Self::Source, mut rng: impl RngCore) -> Result<(RW<CM>, RU<CM>), Error> {
+        let cfg = self.arith.config();
+
         let u = CM::Scalar::rand(&mut rng);
-        let x = (0..self.arith.n_public_inputs())
+        let x = (0..cfg.n_public_inputs())
             .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
-        let w = (0..self.arith.n_witnesses())
+        let w = (0..cfg.n_witnesses())
             .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
         let e = self.arith.eval_relation(
@@ -139,7 +147,7 @@ where
 
         let (cm_w, r_w) = CM::commit(&self.ck, &w, &mut rng)?;
 
-        let r_e = (0..self.arith.log_constraints())
+        let r_e = (0..cfg.log_constraints())
             .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
         let v = MLE::from_evaluations(&e).evaluate(&r_e);
@@ -148,10 +156,15 @@ where
     }
 }
 
+/// [`MovaProof`] is Mova's proof.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MovaProof<C: SonobeCurve> {
+    /// [`MovaProof::h1_coeffs`] is the `h_1` polynomial.
     pub h1_coeffs: Vec<CF1<C>>,
+    /// [`MovaProof::t`] is the evaluation of the `T` polynomial's MLE at the
+    /// challenge point `r_e`.
     pub t: CF1<C>,
+    /// [`MovaProof::cm_w`] is the witness commitment.
     pub cm_w: C,
 }
 
@@ -165,6 +178,7 @@ impl<C: SonobeCurve, Cfg: ArithConfig> Dummy<&Cfg> for MovaProof<C> {
     }
 }
 
+/// [`Mova`] implements the Mova folding scheme.
 pub struct Mova<CM, const CHALLENGE_BITS: usize = 128> {
     _vc: PhantomData<CM>,
 }
@@ -188,10 +202,15 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeDef
     type Proof<const M: usize, const N: usize> = MovaProof<CM::Commitment>;
 }
 
+/// [`MovaProofVar`] is the in-circuit variable for [`MovaProof`].
 #[derive(Clone)]
 pub struct MovaProofVar<C: SonobeCurve> {
+    /// [`MovaProofVar::h1_coeffs`] is the `h_1` polynomial.
     pub h1_coeffs: Vec<FpVar<CF1<C>>>,
+    /// [`MovaProofVar::t`] is the evaluation of the `T` polynomial's MLE at the
+    /// challenge point `r_e`.
     pub t: FpVar<CF1<C>>,
+    /// [`MovaProofVar::cm_w`] is the witness commitment.
     pub cm_w: C::EmulatedVar<CF1<C>>,
 }
 
@@ -230,6 +249,7 @@ impl<C: SonobeCurve> GR1CSVar<CF1<C>> for MovaProofVar<C> {
     }
 }
 
+/// [`MovaGadget`] is the in-circuit gadget for [`Mova`].
 pub struct MovaGadget<CM, const CHALLENGE_BITS: usize = 128> {
     _vc: PhantomData<CM>,
 }
@@ -237,7 +257,7 @@ pub struct MovaGadget<CM, const CHALLENGE_BITS: usize = 128> {
 impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeDefGadget
     for MovaGadget<CM, CHALLENGE_BITS>
 {
-    type Native = Mova<CM, CHALLENGE_BITS>;
+    type Widget = Mova<CM, CHALLENGE_BITS>;
 
     type CM = CM::Gadget2;
     type RU = RUVar<CM::Gadget2>;

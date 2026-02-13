@@ -1,3 +1,8 @@
+//! This module implements the HyperNova folding scheme, which is introduced in
+//! this [paper].
+//! 
+//! [paper]: https://eprint.iacr.org/2023/573.pdf
+
 use ark_ff::{Field, PrimeField};
 use ark_poly::MultilinearExtension;
 use ark_r1cs_std::{
@@ -41,6 +46,7 @@ pub mod circuits;
 pub mod instances;
 pub mod witnesses;
 
+/// [`HyperNovaKey`] is HyperNova's decider key.
 #[derive(Clone)]
 pub struct HyperNovaKey<A, CM: CommitmentDef> {
     arith: Arc<A>,
@@ -167,16 +173,18 @@ where
 
     #[allow(non_snake_case)]
     fn sample(&self, _: Self::Source, mut rng: impl RngCore) -> Result<(RW<CM>, RU<CM>), Error> {
+        let cfg = self.arith.config();
+
         let u = CM::Scalar::rand(&mut rng);
-        let x = (0..self.arith.n_public_inputs())
+        let x = (0..cfg.n_public_inputs())
             .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
-        let w = (0..self.arith.n_witnesses())
+        let w = (0..cfg.n_witnesses())
             .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
         let (cm, r) = CM::commit(&self.ck, &w, &mut rng)?;
 
-        let r_x = (0..self.arith.log_constraints())
+        let r_x = (0..cfg.log_constraints())
             .map(|_| CM::Scalar::rand(&mut rng))
             .collect();
 
@@ -194,10 +202,16 @@ where
     }
 }
 
+/// [`NIMFSProof`] is HyperNova's proof.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NIMFSProof<F, const M: usize, const N: usize> {
+    /// [`NIMFSProof::sc_proof`] is the sum-check proof.
     pub sc_proof: Vec<Vec<F>>,
+    /// [`NIMFSProof::sigmas`] is a vector of claimed internal sums defined
+    /// in Equation 9
     pub sigmas: Vec<F>,
+    /// [`NIMFSProof::thetas`] is a vector of claimed internal sums defined
+    /// in Equation 10
     pub thetas: Vec<F>,
 }
 
@@ -216,6 +230,7 @@ impl<F: Field, const M: usize, const N: usize, V: CCSVariant> Dummy<&CCSConfig<V
     }
 }
 
+/// [`HyperNova`] implements the HyperNova folding scheme for a CCS variant `V`.
 pub struct HyperNova<CM, V: CCSVariant = R1CSConfig, const CHALLENGE_BITS: usize = 128> {
     _v: PhantomData<(CM, V)>,
 }
@@ -239,7 +254,12 @@ impl<CM: GroupBasedCommitment, V: CCSVariant, const CHALLENGE_BITS: usize> Foldi
     type Proof<const M: usize, const N: usize> = NIMFSProof<CM::Scalar, M, N>;
 }
 
-// TODO: experimental design
+/// [`HyperNova2`] implements the HyperNova folding scheme for a CCS variant
+/// `V`.
+///
+/// This design is experimental, following the definition of accumulation
+/// schemes where the incoming witnesses and instances are simply plain vectors
+/// in the circuit's assignments.
 pub struct HyperNova2<CM, V: CCSVariant = R1CSConfig, const CHALLENGE_BITS: usize = 128> {
     _v: PhantomData<(CM, V)>,
 }
@@ -264,10 +284,16 @@ impl<CM: GroupBasedCommitment, V: CCSVariant, const CHALLENGE_BITS: usize> Foldi
         ([CM::Commitment; N], NIMFSProof<CM::Scalar, M, N>);
 }
 
+/// [`NIMFSProofVar`] is the in-circuit variable for [`NIMFSProof`].
 #[derive(Clone)]
 pub struct NIMFSProofVar<F: PrimeField, const M: usize, const N: usize> {
+    /// [`NIMFSProofVar::sc_proof`] is the sum-check proof.
     pub sc_proof: Vec<Vec<FpVar<F>>>,
+    /// [`NIMFSProofVar::sigmas`] is a vector of claimed internal sums defined
+    /// in Equation 9
     pub sigmas: Vec<FpVar<F>>,
+    /// [`NIMFSProofVar::thetas`] is a vector of claimed internal sums defined
+    /// in Equation 10
     pub thetas: Vec<FpVar<F>>,
 }
 
@@ -320,6 +346,7 @@ impl<F: PrimeField, const M: usize, const N: usize> GR1CSVar<F> for NIMFSProofVa
     }
 }
 
+/// [`HyperNovaGadget`] is the in-circuit gadget for [`HyperNova`].
 pub struct HyperNovaGadget<CM, V: CCSVariant = R1CSConfig, const CHALLENGE_BITS: usize = 128> {
     _v: PhantomData<(CM, V)>,
 }
@@ -327,7 +354,7 @@ pub struct HyperNovaGadget<CM, V: CCSVariant = R1CSConfig, const CHALLENGE_BITS:
 impl<CM: GroupBasedCommitment, V: CCSVariant, const CHALLENGE_BITS: usize> FoldingSchemeDefGadget
     for HyperNovaGadget<CM, V, CHALLENGE_BITS>
 {
-    type Native = HyperNova<CM, V, CHALLENGE_BITS>;
+    type Widget = HyperNova<CM, V, CHALLENGE_BITS>;
 
     type CM = CM::Gadget2;
     type RU = RUVar<CM::Gadget2>;

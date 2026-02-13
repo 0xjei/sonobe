@@ -1,3 +1,5 @@
+//! Utility types shared across folding scheme definitions.
+
 use ark_ff::{Field, PrimeField};
 use ark_r1cs_std::{
     GR1CSVar,
@@ -11,8 +13,13 @@ use ark_std::{
     borrow::Borrow,
     ops::{Deref, DerefMut},
 };
-use sonobe_primitives::transcripts::{Absorbable, AbsorbableGadget};
+use sonobe_primitives::transcripts::{Absorbable, AbsorbableVar};
 
+/// [`TaggedVec`] is a wrapper around a vector that additionally carries a
+/// compile-time `char` tag.
+///
+/// This is used to create nominally distinct vector types that are structurally
+/// identical.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct TaggedVec<V, const TAG: char>(pub Vec<V>);
 
@@ -48,9 +55,7 @@ impl<V: Absorbable, const TAG: char> Absorbable for TaggedVec<V, TAG> {
     }
 }
 
-impl<F: PrimeField, V: AbsorbableGadget<F>, const TAG: char> AbsorbableGadget<F>
-    for TaggedVec<V, TAG>
-{
+impl<F: PrimeField, V: AbsorbableVar<F>, const TAG: char> AbsorbableVar<F> for TaggedVec<V, TAG> {
     fn absorb_into(&self, dest: &mut Vec<FpVar<F>>) -> Result<(), SynthesisError> {
         self.0.absorb_into(dest)
     }

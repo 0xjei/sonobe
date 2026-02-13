@@ -1,3 +1,6 @@
+//! ProtoGalaxy CycleFold adapter that bridges ProtoGalaxy into the CycleFold
+//! IVC compiler.
+
 use ark_ff::{BigInteger, PrimeField, Zero};
 use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar, groups::CurveVar, prelude::Boolean};
 use ark_relations::gr1cs::{ConstraintSystemRef, SynthesisError};
@@ -15,16 +18,16 @@ use sonobe_primitives::{
 };
 
 use crate::compilers::cyclefold::{
-    CycleFoldBasedIVC, FoldingSchemeCycleFoldExt, circuits::CycleFoldConfig,
+    CycleFoldBasedIVC, FoldingSchemeCycleFoldExt, circuits::CycleFoldCircuit,
 };
 
-/// Configuration for ProtoGalaxy's CycleFold circuit
-pub struct ProtoGalaxyCycleFoldConfig<C: SonobeCurve, const N: usize> {
+/// [`ProtoGalaxyCycleFoldCircuit`] defines CycleFold circuit for ProtoGalaxy.
+pub struct ProtoGalaxyCycleFoldCircuit<C: SonobeCurve, const N: usize> {
     r: Vec<bool>,
     points: Vec<C>,
 }
 
-impl<C: SonobeCurve, const N: usize> Default for ProtoGalaxyCycleFoldConfig<C, N> {
+impl<C: SonobeCurve, const N: usize> Default for ProtoGalaxyCycleFoldCircuit<C, N> {
     fn default() -> Self {
         Self {
             r: vec![false; CF1::<C>::MODULUS_BIT_SIZE as usize * (1 + N)],
@@ -33,13 +36,10 @@ impl<C: SonobeCurve, const N: usize> Default for ProtoGalaxyCycleFoldConfig<C, N
     }
 }
 
-impl<C: SonobeCurve, const N: usize> CycleFoldConfig for ProtoGalaxyCycleFoldConfig<C, N> {
-    type C = C;
-
-    fn verify_point_rlc(
-        &self,
-        cs: ConstraintSystemRef<CF2<Self::C>>,
-    ) -> Result<(), SynthesisError> {
+impl<C: SonobeCurve, const N: usize> CycleFoldCircuit<CF2<C>>
+    for ProtoGalaxyCycleFoldCircuit<C, N>
+{
+    fn verify_point_rlc(&self, cs: ConstraintSystemRef<CF2<C>>) -> Result<(), SynthesisError> {
         let rho_bits = self
             .r
             .chunks(CF2::<C>::MODULUS_BIT_SIZE as usize - 1)
@@ -50,7 +50,7 @@ impl<C: SonobeCurve, const N: usize> CycleFoldConfig for ProtoGalaxyCycleFoldCon
             .collect::<Result<Vec<_>, _>>()?
             .concat();
 
-        let points = Vec::new_witness(cs.clone(), || Ok(&self.points[..]))?;
+        let points = Vec::<C::Var>::new_witness(cs.clone(), || Ok(&self.points[..]))?;
         for point in &points {
             Self::mark_point_as_public(point)?;
         }
@@ -70,16 +70,16 @@ impl<C: SonobeCurve, const N: usize> CycleFoldConfig for ProtoGalaxyCycleFoldCon
 impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemeCycleFoldExt<1, N> for ProtoGalaxy<CM> {
     const N_CYCLEFOLDS: usize = 1;
 
-    type CFConfig = ProtoGalaxyCycleFoldConfig<CM::Commitment, N>;
+    type CFCircuit = ProtoGalaxyCycleFoldCircuit<CM::Commitment, N>;
 
     #[allow(non_snake_case)]
-    fn to_cyclefold_configs(
+    fn to_cyclefold_circuits(
         [U]: &[impl Borrow<Self::RU>; 1],
         us: &[impl Borrow<Self::IU>; N],
         _proof: &Self::Proof<1, N>,
         lagrange_evals: Self::Challenge,
-    ) -> Vec<Self::CFConfig> {
-        vec![ProtoGalaxyCycleFoldConfig {
+    ) -> Vec<Self::CFCircuit> {
+        vec![ProtoGalaxyCycleFoldCircuit {
             r: lagrange_evals
                 .iter()
                 .flat_map(|eval| {
@@ -135,9 +135,13 @@ impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemeCycleFoldExt<1, N> f
     }
 }
 
+/// [`ProtoGalaxyOvaIVC`] defines a CycleFold-based IVC using ProtoGalaxy as the
+/// primary folding scheme and Ova as the secondary folding scheme.
 pub type ProtoGalaxyOvaIVC<VC1, VC2, T, const CHALLENGE_BITS: usize = 128> =
     CycleFoldBasedIVC<ProtoGalaxy<VC1>, CycleFoldOva<VC2, CHALLENGE_BITS>, T>;
 
+/// [`ProtoGalaxyNovaIVC`] defines a CycleFold-based IVC using ProtoGalaxy as
+/// the primary folding scheme and Nova as the secondary folding scheme.
 pub type ProtoGalaxyNovaIVC<VC1, VC2, T, const CHALLENGE_BITS: usize = 128> =
     CycleFoldBasedIVC<ProtoGalaxy<VC1>, CycleFoldNova<VC2, CHALLENGE_BITS>, T>;
 

@@ -1,3 +1,5 @@
+//! Proof generation for HyperNova.
+
 use ark_ff::One;
 use ark_poly::{DenseMultilinearExtension as MLE, MultilinearExtension};
 use ark_std::{borrow::Borrow, rand::RngCore};
@@ -10,7 +12,7 @@ use sonobe_primitives::{
     arithmetizations::{Arith, ArithConfig, ccs::CCSVariant},
     commitments::GroupBasedCommitment,
     sumcheck::{
-        IOPSumCheck,
+        SumCheck,
         utils::{EqPoly, VPAuxInfo, VirtualPolynomial},
     },
     transcripts::Transcript,
@@ -104,7 +106,7 @@ impl<
 
         // Step 3: Run the sumcheck prover
         // Step 2: dig into the sumcheck and extract r_x_prime
-        let (sumcheck_proof, r_x_prime, mles) = IOPSumCheck::prove(g, transcript)?;
+        let (sumcheck_proof, r_x_prime, mles) = SumCheck::prove(g, transcript)?;
 
         // Step 4: compute sigmas and thetas
         let sigmas = mles[0..t * M]
@@ -259,7 +261,7 @@ impl<
 
         // Step 3: Run the sumcheck prover
         // Step 2: dig into the sumcheck and extract r_x_prime
-        let (sumcheck_proof, r_x_prime, mles) = IOPSumCheck::prove(g, transcript)?;
+        let (sumcheck_proof, r_x_prime, mles) = SumCheck::prove(g, transcript)?;
 
         // Step 4: compute sigmas and thetas
         let sigmas = mles[0..t * M]

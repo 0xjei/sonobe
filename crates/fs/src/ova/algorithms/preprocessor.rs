@@ -1,3 +1,5 @@
+//! Preprocessing for Ova.
+
 use ark_std::rand::RngCore;
 use sonobe_primitives::{commitments::GroupBasedCommitment, traits::SonobeField};
 

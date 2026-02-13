@@ -1,3 +1,5 @@
+//! Partial in-circuit verifier implementation for HyperNova.
+
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::AllocVar,
@@ -14,10 +16,10 @@ use sonobe_primitives::{
     arithmetizations::ccs::CCSVariant,
     commitments::GroupBasedCommitment,
     sumcheck::{
-        circuits::IOPSumCheckGadget,
-        utils::{EqPolyVar, VPAuxInfo},
+        circuits::SumCheckGadget,
+        utils::{EqPolyGadget, VPAuxInfo},
     },
-    transcripts::TranscriptVar,
+    transcripts::TranscriptGadget,
 };
 
 use crate::{FoldingSchemePartialVerifierGadget, hypernova::HyperNovaGadget};
@@ -33,7 +35,7 @@ impl<
     #[allow(non_snake_case)]
     fn verify_hinted(
         _vk: &Self::VerifierKey,
-        transcript: &mut impl TranscriptVar<CM::Scalar>,
+        transcript: &mut impl TranscriptGadget<CM::Scalar>,
         Us: [&Self::RU; M],
         us: [&Self::IU; N],
         proof: &Self::Proof<M, N>,
@@ -71,17 +73,17 @@ impl<
         // Verify the interactive part of the sumcheck
         // Step 2: Dig into the sumcheck claim and extract the randomness used
         let (expected_eval, r_x_prime) =
-            IOPSumCheckGadget::verify(sum_v_j_gamma, &proof.sc_proof, &vp_aux_info, transcript)?;
+            SumCheckGadget::verify(sum_v_j_gamma, &proof.sc_proof, &vp_aux_info, transcript)?;
 
         // Step 5: Finish verifying sumcheck (verify the claim c)
         let c = {
-            let e2 = EqPolyVar::fix_xy_eval(&beta, &r_x_prime);
+            let e2 = EqPolyGadget::fix_xy_eval(&beta, &r_x_prime);
             proof
                 .sigmas
                 .chunks(t)
                 .zip(Us)
                 .flat_map(|(sigmas, u)| {
-                    let e_lcccs = EqPolyVar::fix_xy_eval(&u.r_x, &r_x_prime);
+                    let e_lcccs = EqPolyGadget::fix_xy_eval(&u.r_x, &r_x_prime);
                     sigmas.iter().map(move |sigma_j| &e_lcccs * sigma_j)
                 })
                 .chain(proof.thetas.chunks(t).map(|thetas| {

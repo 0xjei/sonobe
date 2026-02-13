@@ -1,3 +1,5 @@
+//! Proof verification for Mova.
+
 use ark_poly::{DenseUVPolynomial, Polynomial, univariate::DensePolynomial};
 use ark_std::{borrow::Borrow, cfg_iter};
 #[cfg(feature = "parallel")]

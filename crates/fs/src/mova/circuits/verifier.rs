@@ -1,3 +1,5 @@
+//! Partial in-circuit verifier implementation for Mova.
+
 use ark_r1cs_std::{
     GR1CSVar, alloc::AllocVar, fields::fp::FpVar,
     poly::polynomial::univariate::dense::DensePolynomialVar,
@@ -5,7 +7,7 @@ use ark_r1cs_std::{
 use ark_relations::gr1cs::SynthesisError;
 use sonobe_primitives::{
     algebra::ops::bits::FromBitsGadget, commitments::GroupBasedCommitment,
-    transcripts::TranscriptVar,
+    transcripts::TranscriptGadget,
 };
 
 use crate::{FoldingSchemePartialVerifierGadget, mova::MovaGadget};
@@ -16,7 +18,7 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemePartial
     #[allow(non_snake_case)]
     fn verify_hinted(
         _vk: &Self::VerifierKey,
-        transcript: &mut impl TranscriptVar<CM::Scalar>,
+        transcript: &mut impl TranscriptGadget<CM::Scalar>,
         [U]: [&Self::RU; 1],
         [u]: [&Self::IU; 1],
         proof: &Self::Proof<1, 1>,

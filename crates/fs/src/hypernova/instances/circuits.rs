@@ -1,3 +1,4 @@
+//! In-circuit variables for HyperNova instances.
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::{AllocVar, AllocationMode},
@@ -7,24 +8,31 @@ use ark_r1cs_std::{
 };
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::borrow::Borrow;
-use sonobe_primitives::{commitments::CommitmentDefGadget, transcripts::AbsorbableGadget};
+use sonobe_primitives::{commitments::CommitmentDefGadget, transcripts::AbsorbableVar};
 
 use super::{CCCSInstance, LCCCSInstance};
 use crate::FoldingInstanceVar;
 
+/// [`LCCCSInstanceVar`] defines HyperNova's running instance variable.
 #[derive(Clone, Debug, PartialEq)]
 pub struct LCCCSInstanceVar<CM: CommitmentDefGadget> {
+    /// [`LCCCSInstanceVar::cm`] is the witness commitment.
     pub cm: CM::CommitmentVar,
+    /// [`LCCCSInstanceVar::u`] is the constant term.
     pub u: CM::ScalarVar,
+    /// [`LCCCSInstanceVar::x`] is the vector of public inputs (to the circuit).
     pub x: Vec<CM::ScalarVar>,
+    /// [`LCCCSInstanceVar::r_x`] is the random evaluation point.
     pub r_x: Vec<CM::ScalarVar>,
+    /// [`LCCCSInstanceVar::v`] is the vector of sums of MLE evaluations defined
+    /// in Definition 2. 
     pub v: Vec<CM::ScalarVar>,
 }
 
-impl<CM: CommitmentDefGadget> AllocVar<LCCCSInstance<CM::Native>, CM::ConstraintField>
+impl<CM: CommitmentDefGadget> AllocVar<LCCCSInstance<CM::Widget>, CM::ConstraintField>
     for LCCCSInstanceVar<CM>
 {
-    fn new_variable<T: Borrow<LCCCSInstance<CM::Native>>>(
+    fn new_variable<T: Borrow<LCCCSInstance<CM::Widget>>>(
         cs: impl Into<Namespace<CM::ConstraintField>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
         mode: AllocationMode,
@@ -43,7 +51,7 @@ impl<CM: CommitmentDefGadget> AllocVar<LCCCSInstance<CM::Native>, CM::Constraint
 }
 
 impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for LCCCSInstanceVar<CM> {
-    type Value = LCCCSInstance<CM::Native>;
+    type Value = LCCCSInstance<CM::Widget>;
 
     fn cs(&self) -> ConstraintSystemRef<CM::ConstraintField> {
         self.cm
@@ -65,7 +73,7 @@ impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for LCCCSInstanceVar
     }
 }
 
-impl<CM: CommitmentDefGadget> AbsorbableGadget<CM::ConstraintField> for LCCCSInstanceVar<CM> {
+impl<CM: CommitmentDefGadget> AbsorbableVar<CM::ConstraintField> for LCCCSInstanceVar<CM> {
     fn absorb_into(
         &self,
         dest: &mut Vec<FpVar<CM::ConstraintField>>,
@@ -143,16 +151,19 @@ impl<CM: CommitmentDefGadget> FoldingInstanceVar<CM> for LCCCSInstanceVar<CM> {
     }
 }
 
+/// [`CCCSInstanceVar`] defines HyperNova's incoming instance variable.
 #[derive(Clone, Debug, PartialEq)]
 pub struct CCCSInstanceVar<CM: CommitmentDefGadget> {
+    /// [`CCCSInstanceVar::cm`] is the witness commitment.
     pub cm: CM::CommitmentVar,
+    /// [`CCCSInstanceVar::x`] is the vector of public inputs (to the circuit).
     pub x: Vec<CM::ScalarVar>,
 }
 
-impl<CM: CommitmentDefGadget> AllocVar<CCCSInstance<CM::Native>, CM::ConstraintField>
+impl<CM: CommitmentDefGadget> AllocVar<CCCSInstance<CM::Widget>, CM::ConstraintField>
     for CCCSInstanceVar<CM>
 {
-    fn new_variable<T: Borrow<CCCSInstance<CM::Native>>>(
+    fn new_variable<T: Borrow<CCCSInstance<CM::Widget>>>(
         cs: impl Into<Namespace<CM::ConstraintField>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
         mode: AllocationMode,
@@ -168,7 +179,7 @@ impl<CM: CommitmentDefGadget> AllocVar<CCCSInstance<CM::Native>, CM::ConstraintF
 }
 
 impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for CCCSInstanceVar<CM> {
-    type Value = CCCSInstance<CM::Native>;
+    type Value = CCCSInstance<CM::Widget>;
 
     fn cs(&self) -> ConstraintSystemRef<CM::ConstraintField> {
         self.cm.cs().or(self.x.cs())
@@ -182,7 +193,7 @@ impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for CCCSInstanceVar<
     }
 }
 
-impl<CM: CommitmentDefGadget> AbsorbableGadget<CM::ConstraintField> for CCCSInstanceVar<CM> {
+impl<CM: CommitmentDefGadget> AbsorbableVar<CM::ConstraintField> for CCCSInstanceVar<CM> {
     fn absorb_into(
         &self,
         dest: &mut Vec<FpVar<CM::ConstraintField>>,

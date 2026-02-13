@@ -1,6 +1,8 @@
+//! Key generation for HyperNova.
+
 use ark_std::sync::Arc;
 use sonobe_primitives::{
-    arithmetizations::{Arith, ccs::CCSVariant},
+    arithmetizations::{Arith, ArithConfig, ccs::CCSVariant},
     commitments::{CommitmentKey, GroupBasedCommitment},
 };
 
@@ -15,7 +17,7 @@ impl<CM: GroupBasedCommitment, V: CCSVariant, const CHALLENGE_BITS: usize> Foldi
     fn generate_keys(ck: Self::PublicParam, ccs: Self::Arith) -> Result<Self::DeciderKey, Error> {
         let ck = Arc::new(ck);
         let ccs = Arc::new(ccs);
-        if ck.max_scalars_len() < ccs.n_witnesses() {
+        if ck.max_scalars_len() < ccs.config().n_witnesses() {
             return Err(Error::InvalidPublicParameters(
                 "The commitment key is too short for the CCS instance".into(),
             ));
@@ -30,7 +32,7 @@ impl<CM: GroupBasedCommitment, V: CCSVariant, const CHALLENGE_BITS: usize> Foldi
     fn generate_keys(ck: Self::PublicParam, ccs: Self::Arith) -> Result<Self::DeciderKey, Error> {
         let ck = Arc::new(ck);
         let ccs = Arc::new(ccs);
-        if ck.max_scalars_len() < ccs.n_witnesses() {
+        if ck.max_scalars_len() < ccs.config().n_witnesses() {
             return Err(Error::InvalidPublicParameters(
                 "The commitment key is too short for the CCS instance".into(),
             ));

@@ -1,3 +1,6 @@
+//! HyperNova CycleFold adapter that bridges HyperNova into the CycleFold IVC
+//! compiler.
+
 use ark_ff::{PrimeField, Zero};
 use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar, groups::CurveVar, prelude::Boolean};
 use ark_relations::gr1cs::{ConstraintSystemRef, SynthesisError};
@@ -16,18 +19,18 @@ use sonobe_primitives::{
 };
 
 use crate::compilers::cyclefold::{
-    CycleFoldBasedIVC, FoldingSchemeCycleFoldExt, circuits::CycleFoldConfig,
+    CycleFoldBasedIVC, FoldingSchemeCycleFoldExt, circuits::CycleFoldCircuit,
 };
 
-/// Configuration for HyperNova's CycleFold circuit
-pub struct HyperNovaCycleFoldConfig<C, const M: usize, const N: usize, const CHALLENGE_BITS: usize>
+/// [`HyperNovaCycleFoldCircuit`] defines CycleFold circuit for HyperNova.
+pub struct HyperNovaCycleFoldCircuit<C, const M: usize, const N: usize, const CHALLENGE_BITS: usize>
 {
     r: Vec<bool>,
     points: Vec<C>,
 }
 
 impl<C: SonobeCurve, const M: usize, const N: usize, const CHALLENGE_BITS: usize> Default
-    for HyperNovaCycleFoldConfig<C, M, N, CHALLENGE_BITS>
+    for HyperNovaCycleFoldCircuit<C, M, N, CHALLENGE_BITS>
 {
     fn default() -> Self {
         Self {
@@ -37,15 +40,10 @@ impl<C: SonobeCurve, const M: usize, const N: usize, const CHALLENGE_BITS: usize
     }
 }
 
-impl<C: SonobeCurve, const M: usize, const N: usize, const CHALLENGE_BITS: usize> CycleFoldConfig
-    for HyperNovaCycleFoldConfig<C, M, N, CHALLENGE_BITS>
+impl<C: SonobeCurve, const M: usize, const N: usize, const CHALLENGE_BITS: usize>
+    CycleFoldCircuit<CF2<C>> for HyperNovaCycleFoldCircuit<C, M, N, CHALLENGE_BITS>
 {
-    type C = C;
-
-    fn verify_point_rlc(
-        &self,
-        cs: ConstraintSystemRef<CF2<Self::C>>,
-    ) -> Result<(), SynthesisError> {
+    fn verify_point_rlc(&self, cs: ConstraintSystemRef<CF2<C>>) -> Result<(), SynthesisError> {
         let rho = FpVar::new_input(cs.clone(), || Ok(CF2::<C>::from_bits_le(&self.r)))?;
         let rho_bits = rho.to_n_bits_le(CHALLENGE_BITS)?;
 
@@ -75,16 +73,16 @@ impl<
 {
     const N_CYCLEFOLDS: usize = 1;
 
-    type CFConfig = HyperNovaCycleFoldConfig<CM::Commitment, M, N, CHALLENGE_BITS>;
+    type CFCircuit = HyperNovaCycleFoldCircuit<CM::Commitment, M, N, CHALLENGE_BITS>;
 
     #[allow(non_snake_case)]
-    fn to_cyclefold_configs(
+    fn to_cyclefold_circuits(
         Us: &[impl Borrow<Self::RU>; M],
         us: &[impl Borrow<Self::IU>; N],
         _proof: &Self::Proof<M, N>,
         rho: Self::Challenge,
-    ) -> Vec<Self::CFConfig> {
-        vec![HyperNovaCycleFoldConfig {
+    ) -> Vec<Self::CFCircuit> {
+        vec![HyperNovaCycleFoldCircuit {
             r: rho.into(),
             points: Us
                 .iter()
@@ -124,9 +122,13 @@ impl<
     }
 }
 
+/// [`HyperNovaOvaIVC`] defines a CycleFold-based IVC using HyperNova as the
+/// primary folding scheme and Ova as the secondary folding scheme.
 pub type HyperNovaOvaIVC<VC1, VC2, T, V = R1CSConfig, const CHALLENGE_BITS: usize = 128> =
     CycleFoldBasedIVC<HyperNova<VC1, V, CHALLENGE_BITS>, CycleFoldOva<VC2, CHALLENGE_BITS>, T>;
 
+/// [`HyperNovaNovaIVC`] defines a CycleFold-based IVC using HyperNova as the
+/// primary folding scheme and Nova as the secondary folding scheme.
 pub type HyperNovaNovaIVC<VC1, VC2, T, V = R1CSConfig, const CHALLENGE_BITS: usize = 128> =
     CycleFoldBasedIVC<HyperNova<VC1, V, CHALLENGE_BITS>, CycleFoldNova<VC2, CHALLENGE_BITS>, T>;
 

@@ -1,3 +1,5 @@
+//! Partial in-circuit verifier implementation for ProtoGalaxy.
+
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
 use ark_r1cs_std::{
     GR1CSVar,
@@ -14,7 +16,7 @@ use sonobe_primitives::{
         rlc::{ScalarRLC, SliceRLC},
     },
     commitments::GroupBasedCommitment,
-    transcripts::TranscriptVar,
+    transcripts::TranscriptGadget,
 };
 
 use crate::{FoldingSchemePartialVerifierGadget, protogalaxy::ProtoGalaxyGadget};
@@ -25,7 +27,7 @@ impl<CM: GroupBasedCommitment, const N: usize> FoldingSchemePartialVerifierGadge
     #[allow(non_snake_case)]
     fn verify_hinted(
         _vk: &Self::VerifierKey,
-        transcript: &mut impl TranscriptVar<CM::Scalar>,
+        transcript: &mut impl TranscriptGadget<CM::Scalar>,
         [U]: [&Self::RU; 1],
         us: [&Self::IU; N],
         proof: &Self::Proof<1, N>,

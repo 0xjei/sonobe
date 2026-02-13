@@ -1,3 +1,8 @@
+//! This module implements the ProtoGalaxy folding scheme, which is introduced
+//! in this [paper].
+//! 
+//! [paper]: https://eprint.iacr.org/2023/1106.pdf
+
 use ark_ff::{Field, PrimeField};
 use ark_r1cs_std::{
     GR1CSVar,
@@ -36,6 +41,7 @@ pub mod circuits;
 pub mod instances;
 pub mod witnesses;
 
+/// [`ProtoGalaxyKey`] is ProtoGalaxy's decider key.
 #[derive(Clone)]
 pub struct ProtoGalaxyKey<A, CM: CommitmentDef> {
     arith: Arc<A>,
@@ -166,15 +172,17 @@ where
     type Error = Error;
 
     fn sample(&self, _: Self::Source, mut rng: impl RngCore) -> Result<(RW<CM>, RU<CM>), Error> {
-        let x = (0..self.arith.n_public_inputs())
+        let cfg = self.arith.config();
+
+        let x = (0..cfg.n_public_inputs())
             .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
-        let w = (0..self.arith.n_witnesses())
+        let w = (0..cfg.n_witnesses())
             .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
         let (phi, r) = CM::commit(&self.ck, &w, &mut rng)?;
 
-        let betas = (0..self.arith.log_constraints())
+        let betas = (0..cfg.log_constraints())
             .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
 
@@ -189,10 +197,11 @@ where
     }
 }
 
+/// [`ProtoGalaxyProof`] is ProtoGalaxy's proof.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProtoGalaxyProof<F, const N: usize> {
-    pub f_coeffs: Vec<F>,
-    pub k_coeffs: Vec<F>,
+    f_coeffs: Vec<F>,
+    k_coeffs: Vec<F>,
 }
 
 impl<F: Field, Cfg: ArithConfig, const N: usize> Dummy<&Cfg> for ProtoGalaxyProof<F, N> {
@@ -204,6 +213,7 @@ impl<F: Field, Cfg: ArithConfig, const N: usize> Dummy<&Cfg> for ProtoGalaxyProo
     }
 }
 
+/// [`ProtoGalaxy`] implements the ProtoGalaxy folding scheme.
 pub struct ProtoGalaxy<CM> {
     _vc: PhantomData<CM>,
 }
@@ -225,7 +235,12 @@ impl<CM: GroupBasedCommitment> FoldingSchemeDef for ProtoGalaxy<CM> {
     type Proof<const M: usize, const N: usize> = ProtoGalaxyProof<CM::Scalar, N>;
 }
 
-// TODO: experimental design
+
+/// [`ProtoGalaxy2`] implements the ProtoGalaxy folding scheme.
+///
+/// This design is experimental, following the definition of accumulation
+/// schemes where the incoming witnesses and instances are simply plain vectors
+/// in the circuit's assignments.
 pub struct ProtoGalaxy2<CM> {
     _vc: PhantomData<CM>,
 }
@@ -248,10 +263,11 @@ impl<CM: GroupBasedCommitment> FoldingSchemeDef for ProtoGalaxy2<CM> {
         ([CM::Commitment; N], ProtoGalaxyProof<CM::Scalar, N>);
 }
 
+/// [`ProtoGalaxyProofVar`] is the in-circuit variable for [`ProtoGalaxyProof`].
 #[derive(Clone)]
 pub struct ProtoGalaxyProofVar<F: PrimeField, const N: usize> {
-    pub f_coeffs: Vec<FpVar<F>>,
-    pub k_coeffs: Vec<FpVar<F>>,
+    f_coeffs: Vec<FpVar<F>>,
+    k_coeffs: Vec<FpVar<F>>,
 }
 
 impl<F: PrimeField, const N: usize> AllocVar<ProtoGalaxyProof<F, N>, F>
@@ -289,12 +305,13 @@ impl<F: PrimeField, const N: usize> GR1CSVar<F> for ProtoGalaxyProofVar<F, N> {
     }
 }
 
+/// [`ProtoGalaxyGadget`] is the in-circuit gadget for [`ProtoGalaxy`].
 pub struct ProtoGalaxyGadget<CM> {
     _v: PhantomData<CM>,
 }
 
 impl<CM: GroupBasedCommitment> FoldingSchemeDefGadget for ProtoGalaxyGadget<CM> {
-    type Native = ProtoGalaxy<CM>;
+    type Widget = ProtoGalaxy<CM>;
 
     type CM = CM::Gadget2;
     type RU = RUVar<CM::Gadget2>;

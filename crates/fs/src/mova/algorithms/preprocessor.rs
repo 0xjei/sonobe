@@ -1,3 +1,5 @@
+//! Preprocessing for Mova.
+
 use ark_std::rand::RngCore;
 use sonobe_primitives::commitments::GroupBasedCommitment;
 

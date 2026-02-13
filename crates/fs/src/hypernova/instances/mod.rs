@@ -1,3 +1,6 @@
+//! Definitions of out-of-circuit values and in-circuit variables for HyperNova
+//! instances.
+
 use ark_ff::PrimeField;
 use sonobe_primitives::{
     arithmetizations::{
@@ -13,12 +16,19 @@ use crate::FoldingInstance;
 
 pub mod circuits;
 
+/// [`LCCCSInstance`] defines HyperNova's running instance.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct LCCCSInstance<CM: CommitmentDef> {
+    /// [`LCCCSInstance::cm`] is the witness commitment.
     pub cm: CM::Commitment,
+    /// [`LCCCSInstance::u`] is the constant term.
     pub u: CM::Scalar,
+    /// [`LCCCSInstance::x`] is the vector of public inputs (to the circuit).
     pub x: Vec<CM::Scalar>,
+    /// [`LCCCSInstance::r_x`] is the random evaluation point.
     pub r_x: Vec<CM::Scalar>,
+    /// [`LCCCSInstance::v`] is the vector of sums of MLE evaluations defined in
+    /// Definition 2.
     pub v: Vec<CM::Scalar>,
 }
 
@@ -60,9 +70,12 @@ impl<CM: CommitmentDef> Absorbable for LCCCSInstance<CM> {
     }
 }
 
+/// [`CCCSInstance`] defines HyperNova's incoming instance.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CCCSInstance<CM: CommitmentDef> {
+    /// [`CCCSInstance::cm`] is the witness commitment.
     pub cm: CM::Commitment,
+    /// [`CCCSInstance::x`] is the vector of public inputs (to the circuit).
     pub x: Vec<CM::Scalar>,
 }
 

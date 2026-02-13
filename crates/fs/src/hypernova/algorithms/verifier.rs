@@ -1,3 +1,5 @@
+//! Proof verification for HyperNova.
+
 use ark_ff::One;
 use ark_std::borrow::Borrow;
 use sonobe_primitives::{
@@ -9,7 +11,7 @@ use sonobe_primitives::{
     arithmetizations::ccs::CCSVariant,
     commitments::GroupBasedCommitment,
     sumcheck::{
-        Error as SumCheckError, IOPSumCheck,
+        Error as SumCheckError, SumCheck,
         utils::{EqPoly, VPAuxInfo},
     },
     transcripts::Transcript,
@@ -71,7 +73,7 @@ impl<
         // Verify the interactive part of the sumcheck
         // Step 2: Dig into the sumcheck claim and extract the randomness used
         let (claimed_eval, r_x_prime) =
-            IOPSumCheck::verify(sum_v_j_gamma, &proof.sc_proof, &vp_aux_info, transcript)?;
+            SumCheck::verify(sum_v_j_gamma, &proof.sc_proof, &vp_aux_info, transcript)?;
 
         // Step 5: Finish verifying sumcheck (verify the claim c)
         let e_beta = EqPoly::fix_xy_eval(&beta, &r_x_prime);
@@ -182,7 +184,7 @@ impl<
         // Verify the interactive part of the sumcheck
         // Step 2: Dig into the sumcheck claim and extract the randomness used
         let (claimed_eval, r_x_prime) =
-            IOPSumCheck::verify(sum_v_j_gamma, &proof.sc_proof, &vp_aux_info, transcript)?;
+            SumCheck::verify(sum_v_j_gamma, &proof.sc_proof, &vp_aux_info, transcript)?;
 
         // Step 5: Finish verifying sumcheck (verify the claim c)
         let e_beta = EqPoly::fix_xy_eval(&beta, &r_x_prime);

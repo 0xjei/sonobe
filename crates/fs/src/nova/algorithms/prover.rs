@@ -1,3 +1,5 @@
+//! Proof generation for Nova.
+
 use ark_ff::One;
 use ark_std::{borrow::Borrow, cfg_into_iter, cfg_iter, ops::Mul, rand::RngCore};
 #[cfg(feature = "parallel")]
@@ -30,7 +32,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
 
         // Compute the cross term `T` by following the optimized approach in
         // [Mova](https://eprint.iacr.org/2024/1220.pdf)'s section 5.2.
-        let v = pk.arith.eval_assignments(AssignmentsOwned::from((
+        let v = pk.arith.evaluate_at(AssignmentsOwned::from((
             U.u + CM::Scalar::one(),
             cfg_iter!(U.x).zip(&u.x).map(|(a, b)| *a + b).collect(),
             cfg_iter!(W.w).zip(&w.w).map(|(a, b)| *a + b).collect(),
@@ -87,7 +89,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
 
         // Compute the cross term `T` by following the optimized approach in
         // [Mova](https://eprint.iacr.org/2024/1220.pdf)'s section 5.2.
-        let v = pk.arith.eval_assignments(AssignmentsOwned::from((
+        let v = pk.arith.evaluate_at(AssignmentsOwned::from((
             U1.u + U2.u,
             cfg_iter!(U1.x).zip(&U2.x).map(|(a, b)| *a + b).collect(),
             cfg_iter!(W1.w).zip(&W2.w).map(|(a, b)| *a + b).collect(),
@@ -156,7 +158,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize>
 
         // Compute the cross term `T` by following the optimized approach in
         // [Mova](https://eprint.iacr.org/2024/1220.pdf)'s section 5.2.
-        let v = pk.arith.eval_assignments(AssignmentsOwned::from((
+        let v = pk.arith.evaluate_at(AssignmentsOwned::from((
             U.u + CM::Scalar::one(),
             cfg_iter!(U.x).zip(&u[..]).map(|(a, b)| *a + b).collect(),
             cfg_iter!(W.w).zip(&w[..]).map(|(a, b)| *a + b).collect(),
