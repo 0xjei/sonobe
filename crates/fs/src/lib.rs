@@ -24,7 +24,6 @@
 //! - `instances/`: Instance types.
 //! - `witnesses/`: Witness types.
 
-
 pub mod definitions;
 
 pub use self::definitions::{
