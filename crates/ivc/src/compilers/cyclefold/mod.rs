@@ -1,3 +1,9 @@
+//! Implementation of the CycleFold-based IVC compiler.
+//!
+//! It turns any compatible folding scheme into a full IVC scheme by running the
+//! primary circuit on one curve and a "CycleFold" circuit on the secondary
+//! curve to handle emulated elliptic curve operations.
+
 use ark_ff::Zero;
 use ark_relations::gr1cs::{ConstraintSystem, SynthesisError};
 use ark_std::{borrow::Borrow, marker::PhantomData, rand::RngCore};
@@ -18,26 +24,38 @@ use sonobe_primitives::{
 
 use crate::{
     Error, IVC,
-    compilers::cyclefold::circuits::{AugmentedCircuit, CycleFoldCircuit, CycleFoldConfig},
+    compilers::cyclefold::circuits::{AugmentedCircuit, CycleFoldCircuit},
 };
 
 pub mod circuits;
 
+/// [`FoldingSchemeCycleFoldExt`] is the extension trait that a folding scheme
+/// must implement to be used with the CycleFold compiler.
 pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
     GroupBasedFoldingSchemePrimary<M, N>
 {
-    type CFConfig: CycleFoldConfig<C = <Self::CM as CommitmentDef>::Commitment>;
+    /// [`FoldingSchemeCycleFoldExt::CFCircuit`] is the CycleFold circuit type
+    /// associated with the folding scheme.
+    type CFCircuit: CycleFoldCircuit<CF2<<Self::CM as CommitmentDef>::Commitment>>;
 
+    /// [`FoldingSchemeCycleFoldExt::N_CYCLEFOLDS`] specifies how many CycleFold
+    /// operations are needed to verify the primary folding scheme's proof.
     const N_CYCLEFOLDS: usize;
 
+    /// [`FoldingSchemeCycleFoldExt::to_cyclefold_circuits`] creates CycleFold
+    /// circuits for verifying the point RLCs needed by the folding scheme.
     #[allow(non_snake_case)]
-    fn to_cyclefold_configs(
+    fn to_cyclefold_circuits(
         Us: &[impl Borrow<Self::RU>; M],
         us: &[impl Borrow<Self::IU>; N],
         proof: &Self::Proof<M, N>,
         rho: Self::Challenge,
-    ) -> Vec<Self::CFConfig>;
+    ) -> Vec<Self::CFCircuit>;
 
+    /// [`FoldingSchemeCycleFoldExt::to_cyclefold_inputs`] computes the inputs
+    /// to CycleFold circuits.
+    /// 
+    /// This will be called by the augmented circuit on the primary curve.
     #[allow(non_snake_case, clippy::type_complexity)]
     fn to_cyclefold_inputs(
         Us: [<Self::Gadget as FoldingSchemeDefGadget>::RU; M],
@@ -58,12 +76,14 @@ pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
     >;
 }
 
+/// [`Key`] is the prover / verifier key for the CycleFold-based IVC scheme.
 pub struct Key<FS1: FoldingSchemeDef, FS2: FoldingSchemeDef, T>(
     pub FS1::DeciderKey,
     pub FS2::DeciderKey,
     pub T,
 );
 
+/// [`Proof`] is the proof produced by the CycleFold compiler.
 pub struct Proof<FS1: FoldingSchemeDef, FS2: FoldingSchemeDef>(
     pub FS1::RW,
     pub FS1::RU,
@@ -88,6 +108,16 @@ impl<FS1: FoldingSchemeDef, FS2: FoldingSchemeDef, T> Dummy<&Key<FS1, FS2, T>> f
     }
 }
 
+/// [`CycleFoldBasedIVC`] is the main implementation of the IVC compiler based
+/// on CycleFold.
+///
+/// We consider two folding schemes `FS1` and `FS2`, where `FS1` is the folding
+/// scheme on the primary curve and `FS2` is the folding scheme on the secondary
+/// curve.
+/// The user's step circuit is proven using `FS1`, and part of the verification
+/// of `FS1`'s proof is offloaded to `FS2` using CycleFold.
+///
+/// `T` is the transcript type used by the IVC prover and verifier.
 pub struct CycleFoldBasedIVC<FS1, FS2, T> {
     _d: PhantomData<(FS1, FS2, T)>,
 }
@@ -98,6 +128,10 @@ where
             1,
             1,
             Arith: From<ConstraintSystem<CF1<<FS1::CM as CommitmentDef>::Commitment>>>,
+            // TODO (@winderica):
+            // All folding schemes we currently support have an empty verifier
+            // key, so I used `()` here, but this should be generalized in the
+            // future.
             Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
             CM: CommitmentDef<
                 Commitment: SonobeCurve<BaseField = <FS2::CM as CommitmentDef>::Scalar>,
@@ -141,24 +175,35 @@ where
         (pp1, pp2, hash_config): Self::PublicParam,
         step_circuit: &FC,
     ) -> Result<(Self::ProverKey<FC>, Self::VerifierKey<FC>), Error> {
-        let cyclefold_circuit = CycleFoldCircuit::<FS1::CFConfig>::default();
+        // Run the CycleFold circuit to extract the arithmetization on the
+        // secondary curve.
+        let arith2 = {
+            let cs = ArithExtractor::new();
+            cs.execute_fn(|cs| FS1::CFCircuit::default().verify_point_rlc(cs))?;
+            cs.arith::<FS2::Arith>()?
+        };
 
-        let cs = ArithExtractor::new();
-        cs.execute_synthesizer(cyclefold_circuit)?;
-        let arith2 = cs.arith::<FS2::Arith>()?;
-
+        // The augmented circuit depends on the configuration of itself.
+        // For instance, we are not aware of the number of constraints in the
+        // augmented circuit until we fix `arith1_config`, which requires us to
+        // provide the number of constraints in the augmented circuit.
+        //
+        // To break this circular dependency, we use a fixed-point iteration
+        // where we start from a default arithmetization and repeatedly update
+        // it until its configuration stabilizes.
         let mut arith1 = FS1::Arith::default();
 
         loop {
-            let augmented_circuit = AugmentedCircuit::<FS1, FS2, FC, T> {
-                hash_config: hash_config.clone(),
-                arith1_config: arith1.config(),
-                arith2_config: arith2.config(),
-                step_circuit,
+            let new_arith1 = {
+                let cs = ArithExtractor::new();
+                cs.execute_synthesizer(AugmentedCircuit::<FS1, FS2, FC, T> {
+                    hash_config: hash_config.clone(),
+                    arith1_config: arith1.config(),
+                    arith2_config: arith2.config(),
+                    step_circuit,
+                })?;
+                cs.arith::<FS1::Arith>()?
             };
-            let cs = ArithExtractor::new();
-            cs.execute_synthesizer(augmented_circuit)?;
-            let new_arith1 = cs.arith::<FS1::Arith>()?;
             if new_arith1.config() == arith1.config() {
                 break;
             }
@@ -219,10 +264,10 @@ where
                 &mut rng,
             )?;
 
-            let cf_configs = FS1::to_cyclefold_configs(&[U], &[u], &proof, challenge);
-            for (i, cfg) in cf_configs.iter().enumerate() {
+            let cf_circuits = FS1::to_cyclefold_circuits(&[U], &[u], &proof, challenge);
+            for (i, cf_circuit) in cf_circuits.into_iter().enumerate() {
                 let cs = AssignmentsExtractor::new();
-                cs.execute_fn(|cs| cfg.verify_point_rlc(cs))?;
+                cs.execute_fn(|cs| cf_circuit.verify_point_rlc(cs))?;
 
                 let (cf_w, cf_u) = dk2.sample(cs.assignments()?, &mut rng)?;
 
