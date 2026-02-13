@@ -166,7 +166,7 @@ impl EqPolyGadget {
 
 /// [`barycentric_weights`] computes the barycentric weights for a given set of
 /// evaluation `points`.
-/// 
+///
 /// Used to extrapolate polynomial evaluations via the barycentric formula.
 #[allow(clippy::filter_map_bool_then)]
 pub fn barycentric_weights<F: PrimeField>(points: &[F]) -> Vec<F> {

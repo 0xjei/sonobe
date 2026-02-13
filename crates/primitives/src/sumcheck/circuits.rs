@@ -48,7 +48,7 @@ pub struct SumCheckGadget;
 impl SumCheckGadget {
     /// [`SumCheckGadget::verify`] provides an implementation of the sumcheck
     /// verification algorithm in circuit.
-    /// 
+    ///
     /// Given the claimed sum `claimed_sum = z`, the proof `proofs` (i.e., round
     /// polynomials `g_1, ..., g_n`), the auxiliary info `aux_info`, and the
     /// transcript `transcript`.
