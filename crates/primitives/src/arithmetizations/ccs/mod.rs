@@ -262,4 +262,70 @@ impl<F: Field> From<ConstraintSystem<F>> for CCS<F, R1CSConfig> {
     }
 }
 
-// TODO: add back tests
+#[cfg(test)]
+mod tests {
+    use ark_bn254::Fr;
+    use ark_ff::{One, UniformRand, Zero};
+    use ark_std::{error::Error, rand::thread_rng};
+
+    use super::*;
+    use crate::{
+        circuits::utils::{constraints_for_test, satisfying_assignments_for_test},
+        relations::Relation,
+    };
+
+    #[test]
+    fn test_eval() -> Result<(), Box<dyn Error>> {
+        let mut rng = thread_rng();
+        let ccs: CCS<Fr, R1CSConfig> = constraints_for_test::<Fr>().into();
+
+        assert!(
+            ccs.evaluate_at(satisfying_assignments_for_test(Fr::rand(&mut rng)))?
+                .into_iter()
+                .all(|e| e.is_zero())
+        );
+        assert!(
+            !ccs.evaluate_at(Assignments::from((
+                Fr::one(),
+                vec![Fr::rand(&mut rng)],
+                vec![
+                    Fr::rand(&mut rng),
+                    Fr::rand(&mut rng),
+                    Fr::rand(&mut rng),
+                    Fr::rand(&mut rng),
+                ],
+            )))?
+            .into_iter()
+            .all(|e| e.is_zero())
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_check() -> Result<(), Box<dyn Error>> {
+        let mut rng = thread_rng();
+        let ccs: CCS<Fr, R1CSConfig> = constraints_for_test::<Fr>().into();
+
+        let assignments = satisfying_assignments_for_test(Fr::rand(&mut rng));
+
+        assert!(
+            ccs.check_relation(&assignments.private, &assignments.public)
+                .is_ok()
+        );
+        assert!(
+            ccs.check_relation(
+                &[
+                    Fr::rand(&mut rng),
+                    Fr::rand(&mut rng),
+                    Fr::rand(&mut rng),
+                    Fr::rand(&mut rng),
+                ],
+                &[Fr::rand(&mut rng)]
+            )
+            .is_err()
+        );
+
+        Ok(())
+    }
+}
