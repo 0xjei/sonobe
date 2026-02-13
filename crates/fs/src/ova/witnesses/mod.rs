@@ -1,12 +1,18 @@
+//! Definitions of out-of-circuit values and in-circuit variables for Ova
+//! witnesses.
+
 use sonobe_primitives::{arithmetizations::ArithConfig, commitments::CommitmentDef, traits::Dummy};
 
 use crate::FoldingWitness;
 
 pub mod circuits;
 
+/// [`RunningWitness`] defines Ova's running witness.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RunningWitness<CM: CommitmentDef> {
+    /// [`RunningWitness::w`] is the witness (to the circuit).
     pub w: Vec<CM::Scalar>,
+    /// [`RunningWitness::r`] is the randomness for the witness commitment.
     pub r: CM::Randomness,
 }
 

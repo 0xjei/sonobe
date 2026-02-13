@@ -1,3 +1,5 @@
+//! Proof verification for Ova.
+
 use ark_std::{borrow::Borrow, cfg_iter};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
