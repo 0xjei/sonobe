@@ -45,7 +45,7 @@ pub trait FoldingSchemeFullVerifierGadget<const M: usize, const N: usize>:
     /// [`FoldingSchemeFullVerifierGadget::verify`] defines the proof
     /// verification gadget that matches its out-of-circuit widget
     /// [`crate::FoldingSchemeVerifier::verify`].
-    /// 
+    ///
     /// Unlike [`FoldingSchemePartialVerifierGadget::verify_hinted`], the
     /// implementation is expected to perform all necessary verification steps
     /// and constrain all required variables inside the circuit.

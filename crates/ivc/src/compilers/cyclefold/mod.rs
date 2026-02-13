@@ -54,7 +54,7 @@ pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
 
     /// [`FoldingSchemeCycleFoldExt::to_cyclefold_inputs`] computes the inputs
     /// to CycleFold circuits.
-    /// 
+    ///
     /// This will be called by the augmented circuit on the primary curve.
     #[allow(non_snake_case, clippy::type_complexity)]
     fn to_cyclefold_inputs(
