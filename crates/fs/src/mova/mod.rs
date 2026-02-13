@@ -1,3 +1,8 @@
+//! This module implements the Mova folding scheme, which is introduced in this
+//! [paper].
+//!
+//! [paper]: https://eprint.iacr.org/2024/1220.pdf
+
 use ark_ff::{Field, Zero};
 use ark_poly::{DenseMultilinearExtension as MLE, Polynomial};
 use ark_r1cs_std::{
@@ -34,10 +39,11 @@ pub mod circuits;
 pub mod instances;
 pub mod witnesses;
 
+/// [`MovaKey`] is Mova's decider key.
 #[derive(Clone)]
 pub struct MovaKey<A, CM: CommitmentDef> {
-    pub arith: Arc<A>,
-    pub ck: Arc<CM::Key>,
+    arith: Arc<A>,
+    ck: Arc<CM::Key>,
 }
 
 impl<A: Arith, CM: CommitmentDef> DeciderKey for MovaKey<A, CM> {
@@ -150,10 +156,15 @@ where
     }
 }
 
+/// [`MovaProof`] is Mova's proof.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MovaProof<C: SonobeCurve> {
+    /// [`MovaProof::h1_coeffs`] is the `h_1` polynomial.
     pub h1_coeffs: Vec<CF1<C>>,
+    /// [`MovaProof::t`] is the evaluation of the `T` polynomial's MLE at the
+    /// challenge point `r_e`.
     pub t: CF1<C>,
+    /// [`MovaProof::cm_w`] is the witness commitment.
     pub cm_w: C,
 }
 
@@ -167,6 +178,7 @@ impl<C: SonobeCurve, Cfg: ArithConfig> Dummy<&Cfg> for MovaProof<C> {
     }
 }
 
+/// [`Mova`] implements the Mova folding scheme.
 pub struct Mova<CM, const CHALLENGE_BITS: usize = 128> {
     _t: PhantomData<CM>,
 }
@@ -190,10 +202,15 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeDef
     type Proof<const M: usize, const N: usize> = MovaProof<CM::Commitment>;
 }
 
+/// [`MovaProofVar`] is the in-circuit variable for [`MovaProof`].
 #[derive(Clone)]
 pub struct MovaProofVar<C: SonobeCurve> {
+    /// [`MovaProofVar::h1_coeffs`] is the `h_1` polynomial.
     pub h1_coeffs: Vec<FpVar<CF1<C>>>,
+    /// [`MovaProofVar::t`] is the evaluation of the `T` polynomial's MLE at the
+    /// challenge point `r_e`.
     pub t: FpVar<CF1<C>>,
+    /// [`MovaProofVar::cm_w`] is the witness commitment.
     pub cm_w: C::EmulatedVar<CF1<C>>,
 }
 
@@ -232,6 +249,7 @@ impl<C: SonobeCurve> GR1CSVar<CF1<C>> for MovaProofVar<C> {
     }
 }
 
+/// [`MovaGadget`] is the in-circuit gadget for [`Mova`].
 pub struct MovaGadget<CM, const CHALLENGE_BITS: usize = 128> {
     _t: PhantomData<CM>,
 }

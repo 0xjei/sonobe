@@ -1,3 +1,5 @@
+//! In-circuit variables for Mova instances.
+
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::{AllocVar, AllocationMode},
@@ -12,14 +14,21 @@ use sonobe_primitives::{commitments::CommitmentDefGadget, transcripts::Absorbabl
 use super::RunningInstance;
 use crate::FoldingInstanceVar;
 
+/// [`RunningInstanceVar`] defines Mova's running instance variable.
 #[derive(Clone, Debug, PartialEq)]
 pub struct RunningInstanceVar<CM: CommitmentDefGadget> {
-    // Random evaluation point for the E
+    /// [`RunningInstanceVar::r_e`] is the random evaluation point for the error
+    /// term.
     pub r_e: Vec<CM::ScalarVar>,
-    // Evaluation of the MLE of E at r_E
+    /// [`RunningInstanceVar::v`] is the evaluation of the MLE of the error term
+    /// at `r_e`.
     pub v: CM::ScalarVar,
+    /// [`RunningInstanceVar::u`] is the constant term.
     pub u: CM::ScalarVar,
+    /// [`RunningInstanceVar::cm_w`] is the witness commitment.
     pub cm_w: CM::CommitmentVar,
+    /// [`RunningInstanceVar::x`] is the vector of public inputs (to the
+    /// circuit).
     pub x: Vec<CM::ScalarVar>,
 }
 

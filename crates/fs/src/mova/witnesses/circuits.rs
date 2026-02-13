@@ -1,3 +1,5 @@
+//! In-circuit variables for Mova witnesses.
+
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::{AllocVar, AllocationMode},
@@ -8,10 +10,14 @@ use sonobe_primitives::commitments::CommitmentDefGadget;
 
 use super::RunningWitness;
 
+/// [`RunningWitnessVar`] defines Mova's running witness variable.
 #[derive(Debug, PartialEq)]
 pub struct RunningWitnessVar<CM: CommitmentDefGadget> {
+    /// [`RunningWitnessVar::w`] is the witness (to the circuit).
     pub w: Vec<CM::ScalarVar>,
+    /// [`RunningWitnessVar::r_w`] is the randomness for the witness commitment.
     pub r_w: CM::RandomnessVar,
+    /// [`RunningWitnessVar::e`] is the error term.
     pub e: Vec<CM::ScalarVar>,
 }
 

@@ -1,3 +1,5 @@
+//! Mova CycleFold adapter that bridges Mova into the CycleFold IVC compiler.
+
 use ark_ff::{PrimeField, Zero};
 use ark_r1cs_std::{alloc::AllocVar, fields::fp::FpVar, groups::CurveVar, prelude::Boolean};
 use ark_relations::gr1cs::{ConstraintSystemRef, SynthesisError};
@@ -16,7 +18,7 @@ use crate::compilers::cyclefold::{
     CycleFoldBasedIVC, FoldingSchemeCycleFoldExt, circuits::CycleFoldCircuit,
 };
 
-/// Configuration for Mova's CycleFold circuit
+/// [`MovaCycleFoldCircuit`] defines CycleFold circuit for Mova.
 pub struct MovaCycleFoldCircuit<C, const CHALLENGE_BITS: usize> {
     r: Vec<bool>,
     points: Vec<C>,
@@ -97,9 +99,13 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
     }
 }
 
+/// [`MovaOvaIVC`] defines a CycleFold-based IVC using Mova as the primary
+/// folding scheme and Ova as the secondary folding scheme.
 pub type MovaOvaIVC<VC1, VC2, T, const CHALLENGE_BITS: usize = 128> =
     CycleFoldBasedIVC<Mova<VC1, CHALLENGE_BITS>, CycleFoldOva<VC2, CHALLENGE_BITS>, T>;
 
+/// [`MovaNovaIVC`] defines a CycleFold-based IVC using Mova as the primary
+/// folding scheme and Nova as the secondary folding scheme.
 pub type MovaNovaIVC<VC1, VC2, T, const CHALLENGE_BITS: usize = 128> =
     CycleFoldBasedIVC<Mova<VC1, CHALLENGE_BITS>, CycleFoldNova<VC2, CHALLENGE_BITS>, T>;
 

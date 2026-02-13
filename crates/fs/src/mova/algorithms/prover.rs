@@ -1,3 +1,5 @@
+//! Proof generation for Mova.
+
 use ark_ff::{One, Zero};
 use ark_poly::{
     DenseMultilinearExtension as MLE, DenseUVPolynomial, Polynomial, univariate::DensePolynomial,

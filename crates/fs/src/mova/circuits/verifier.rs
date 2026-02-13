@@ -1,3 +1,5 @@
+//! Partial in-circuit verifier implementation for Mova.
+
 use ark_r1cs_std::{
     GR1CSVar, alloc::AllocVar, fields::fp::FpVar,
     poly::polynomial::univariate::dense::DensePolynomialVar,
