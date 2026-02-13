@@ -111,7 +111,7 @@ impl<F: Field> R1CS<F> {
     /// provided function `f` to each triplet of rows `(A[i], B[i], C[i])`.
     pub fn evaluate_rows(
         &self,
-        f: impl FnMut(((&Row<F>, &Row<F>), &Row<F>)) -> Result<F, Error>,
+        f: impl Fn(((&Row<F>, &Row<F>), &Row<F>)) -> Result<F, Error> + Send + Sync,
     ) -> Result<Vec<F>, Error> {
         cfg_iter!(self.A).zip(&self.B).zip(&self.C).map(f).collect()
     }
