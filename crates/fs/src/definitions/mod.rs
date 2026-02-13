@@ -96,7 +96,6 @@ pub trait FoldingSchemeDef {
         + for<'a> Dummy<&'a <Self::Arith as Arith>::Config>;
 }
 
-
 /// [`FoldingSchemeDefGadget`] specifies the in-circuit associated types for a
 /// folding scheme gadget.
 pub trait FoldingSchemeDefGadget {
