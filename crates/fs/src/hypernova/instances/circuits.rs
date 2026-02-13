@@ -25,7 +25,7 @@ pub struct LCCCSInstanceVar<CM: CommitmentDefGadget> {
     /// [`LCCCSInstanceVar::r_x`] is the random evaluation point.
     pub r_x: Vec<CM::ScalarVar>,
     /// [`LCCCSInstanceVar::v`] is the vector of sums of MLE evaluations defined
-    /// in Definition 2. 
+    /// in Definition 2.
     pub v: Vec<CM::ScalarVar>,
 }
 

@@ -1,6 +1,6 @@
 //! This module implements the HyperNova folding scheme, which is introduced in
 //! this [paper].
-//! 
+//!
 //! [paper]: https://eprint.iacr.org/2023/573.pdf
 
 use ark_ff::{Field, PrimeField};

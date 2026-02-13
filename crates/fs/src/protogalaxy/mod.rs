@@ -1,6 +1,6 @@
 //! This module implements the ProtoGalaxy folding scheme, which is introduced
 //! in this [paper].
-//! 
+//!
 //! [paper]: https://eprint.iacr.org/2023/1106.pdf
 
 use ark_ff::{Field, PrimeField};
@@ -234,7 +234,6 @@ impl<CM: GroupBasedCommitment> FoldingSchemeDef for ProtoGalaxy<CM> {
     type Challenge = TaggedVec<CM::Scalar, 'c'>;
     type Proof<const M: usize, const N: usize> = ProtoGalaxyProof<CM::Scalar, N>;
 }
-
 
 /// [`ProtoGalaxy2`] implements the ProtoGalaxy folding scheme.
 ///

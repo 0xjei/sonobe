@@ -1,6 +1,6 @@
 //! This module implements the Nova folding scheme, which is introduced in this
 //! [paper].
-//! 
+//!
 //! [paper]: https://eprint.iacr.org/2021/370.pdf
 
 use ark_r1cs_std::boolean::Boolean;

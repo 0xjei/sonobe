@@ -1,6 +1,6 @@
 //! This module implements the Mova folding scheme, which is introduced in this
 //! [paper].
-//! 
+//!
 //! [paper]: https://eprint.iacr.org/2024/1220.pdf
 
 use ark_ff::{Field, Zero};

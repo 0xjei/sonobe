@@ -6,7 +6,7 @@
 //! number of constraints, but later an [attack] on Griffin and similar hash
 //! functions was discovered.
 //! Therefore, it is recommended to avoid using Griffin in production.
-//! 
+//!
 //! The code is forked from the [implementation] in the Hash Functions for
 //! Zero-Knowledge Applications Zoo but uses arkworks instead of bellman as the
 //! underlying cryptographic library.

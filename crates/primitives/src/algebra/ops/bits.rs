@@ -36,13 +36,13 @@ pub trait FromBitsGadget<F: PrimeField>: Sized {
 pub trait ToBitsGadgetExt<F: PrimeField>: Sized {
     /// [`ToBitsGadgetExt::to_n_bits_le`] decomposes `self` into `n`
     /// little-endian bits.
-    /// 
+    ///
     /// An error is returned if `self` cannot be represented in `n` bits.
     fn to_n_bits_le(&self, n: usize) -> Result<Vec<Boolean<F>>, SynthesisError>;
 
     /// [`ToBitsGadgetExt::enforce_bit_length`] enforces that `self` can be
     /// represented in at most `n` bits.
-    /// 
+    ///
     /// This is useful for checking that a field element is within the range of
     /// `[0, 2^n - 1]`
     fn enforce_bit_length(&self, n: usize) -> Result<(), SynthesisError> {

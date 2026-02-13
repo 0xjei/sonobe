@@ -1,6 +1,6 @@
 //! This module implements the Ova folding scheme, which is introduced in this
 //! [note].
-//! 
+//!
 //! [note]: https://hackmd.io/V4838nnlRKal9ZiTHiGYzw
 
 use ark_r1cs_std::boolean::Boolean;
