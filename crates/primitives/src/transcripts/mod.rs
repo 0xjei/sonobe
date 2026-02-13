@@ -155,10 +155,8 @@ pub trait TranscriptGadget<F: PrimeField>: Clone {
     /// [`TranscriptGadget::add`] absorbs a message `input` that can be any type
     /// implementing the [`AbsorbableGadget`] trait into the transcript / sponge
     /// variable.
-    fn add<A: AbsorbableVar<F> + ?Sized>(
-        &mut self,
-        input: &A,
-    ) -> Result<&mut Self, SynthesisError>;
+    fn add<A: AbsorbableVar<F> + ?Sized>(&mut self, input: &A)
+    -> Result<&mut Self, SynthesisError>;
 
     /// [`TranscriptGadget::get_bits`] squeezes `num_bits` bit variables from
     /// the transcript / sponge variable.
@@ -206,7 +204,7 @@ pub trait TranscriptGadget<F: PrimeField>: Clone {
 
     /// [`TranscriptGadget::challenge_bits`] squeezes a challenge from the
     /// transcript / sponge variable as a vector of bit variables.
-    /// 
+    ///
     /// Internally, it first squeezes the bit variables and then absorbs packed
     /// field element variables formed by the bit variables back into the
     /// transcript / sponge variable to ensure security.
@@ -223,7 +221,7 @@ pub trait TranscriptGadget<F: PrimeField>: Clone {
 
     /// [`TranscriptGadget::challenge_field_elements`] squeezes `n` challenges
     /// from the transcript / sponge variable as field element variables.
-    /// 
+    ///
     /// Internally, it first squeezes the field element variables and then
     /// absorbs them back into the transcript / sponge variable to ensure
     /// security.

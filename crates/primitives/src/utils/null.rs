@@ -16,7 +16,7 @@ use ark_std::{
 
 /// [`Null`] is a zero-sized type that absorbs any arithmetic and always returns
 /// itself.
-/// 
+///
 /// It also has itself as its in-circuit representation, which does not allocate
 /// any variables or require any constraints.
 #[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]

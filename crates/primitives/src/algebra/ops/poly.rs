@@ -38,9 +38,10 @@ pub trait EvaluationDomainGadget<F: PrimeField> {
 
     /// [`EvaluationDomainGadget::evaluate_vanishing_polynomial_var`] evaluates
     /// the vanishing polynomial of the domain at `tau`.
-    /// 
+    ///
     /// It is the in-circuit counterpart of [`EvaluationDomain::evaluate_vanishing_polynomial`].
-    fn evaluate_vanishing_polynomial_var(&self, tau: &FpVar<F>) -> Result<FpVar<F>, SynthesisError>;
+    fn evaluate_vanishing_polynomial_var(&self, tau: &FpVar<F>)
+    -> Result<FpVar<F>, SynthesisError>;
 }
 
 impl<F: PrimeField> EvaluationDomainGadget<F> for GeneralEvaluationDomain<F> {
