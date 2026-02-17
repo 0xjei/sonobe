@@ -312,7 +312,7 @@ impl<F: SonobeField, Cfg> LimbedVar<F, Cfg, true> {
             //               `d = 0` in this range (after we meet the first positive limb)
             // This guarantees that for every bit after the true bit in `helper`,
             // the corresponding limb in `delta` is zero.
-            (&r * &d).enforce_equal(&FpVar::zero())?;
+            r.mul_equals(&d, &FpVar::zero())?;
             // Add the current bit to `r`.
             r += FpVar::from(b);
         }
@@ -494,8 +494,21 @@ impl<F: SonobeField, Cfg, const LHS_ALIGNED: bool> LimbedVar<F, Cfg, LHS_ALIGNED
     ) -> Result<(), SynthesisError> {
         let len = min(self.limbs.len(), other.limbs.len());
 
-        // Group the limbs of `self` and `other` so that each group nearly
-        // reaches the capacity `F::MODULUS_MINUS_ONE_DIV_TWO`.
+        let mut i = 0;
+        let mut carry = FpVar::zero();
+        let mut x_bound = Bounds::zero();
+        let mut y_bound = Bounds::zero();
+        let mut step = 0;
+        // `unwrap` is safe as long as `F` is a prime field with `|F| > 2`.
+        let inv = F::from(BigUint::one() << F::BITS_PER_LIMB)
+            .inverse()
+            .unwrap();
+
+        // For each limb pair `(x_i, y_i)` in `self` and `other`, we first try
+        // to group their _bounds_ into `x_bound` and `y_bound`.
+        // If both new bounds do not overflow / underflow, we can safely group
+        // the _limbs_.
+        //
         // By saying group, we mean the operation `Σ x_i 2^{i * W}`, where `W`
         // is `F::BITS_PER_LIMB`, the initial number of bits in a limb.
         // This is just as what we do in grade school arithmetic, e.g.,
@@ -509,51 +522,58 @@ impl<F: SonobeField, Cfg, const LHS_ALIGNED: bool> LimbedVar<F, Cfg, LHS_ALIGNED
         // Note that this is different from the concatenation `x_0 || x_1 ...`,
         // since the bit-length of each limb is not necessarily the initial size
         // `W`.
-
-        let mut i = 0;
-        let mut diff = FpVar::zero();
-        let mut x_bound = Bounds::zero();
-        let mut y_bound = Bounds::zero();
-        let mut step = 0;
-        // `unwrap` is safe as long as `F` is a prime field with `|F| > 2`.
-        let inv = F::from(BigUint::one() << F::BITS_PER_LIMB)
-            .inverse()
-            .unwrap();
-
+        //
+        // Assume a pair of grouped limb `(x', y')` consists of `k` original
+        // limbs.
+        // Then the lower `k * W` bits of `x'` and `y'` must be equal.
+        // To check that, we need to enforce that `2^{k * W}` divides `x' - y'`,
+        // which is done by computing the quotient `q = (x' - y') / 2^{k * W}`
+        // and enforcing `q` is small that doesn't cause the multiplication
+        // `q * 2^{k * W}` to overflow.
+        //
+        // Moreover, we need to take into account the carry from the previous
+        // grouped limb, i.e., we actually enforce `x' - y' + carry` is a
+        // multiple of `2^{k * W}`, and derive the next carry by computing the
+        // quotient `q`.
+        //
+        // We can further avoid storing `x'` and `y'` by updating the carry on
+        // the fly for each limb, i.e., `carry = (carry + x_i - y_i) / 2^W`.
         while i < len {
             if let (Some(new_x_bound), Some(new_y_bound)) = (
                 self.bounds[i].shl(step).add(&x_bound).filter_safe::<F>(),
                 other.bounds[i].shl(step).add(&y_bound).filter_safe::<F>(),
             ) {
-                diff = (diff + &self.limbs[i] - &other.limbs[i]) * inv;
+                carry = (carry + &self.limbs[i] - &other.limbs[i]) * inv;
+
+                // The current limb pair is successfully grouped, so we move on
+                // to the next limb pair.
+                i += 1;
+
+                // Update the bounds and step for the current group.
                 x_bound = new_x_bound;
                 y_bound = new_y_bound;
-
-                i += 1;
                 step += F::BITS_PER_LIMB;
-                continue;
+            } else {
+                // New bounds overflow / underflow, meaning the current group is
+                // finalized.
+
+                // `bits` is the maximum possible bit-length of the carry's
+                // absolute value.
+                let bits = (max(
+                    min(&x_bound.0, &y_bound.0).bits(),
+                    max(&x_bound.1, &y_bound.1).bits(),
+                ) as usize)
+                    .saturating_sub(step);
+
+                // We ensure `carry` is small, i.e., `|carry| < 2^bits`, which
+                // guarantees that `carry * 2^{step}` does not overflow.
+                (&carry + F::from(BigUint::one() << bits)).enforce_bit_length(bits + 1)?;
+
+                // Reset the bounds and step for the next group.
+                x_bound = Bounds::zero();
+                y_bound = Bounds::zero();
+                step = 0;
             }
-            // For each group, check the last `step_i` bits of `x_i` and `y_i` are
-            // equal.
-            // The intuition is to check `diff = x_i - y_i = 0 (mod 2^step_i)`.
-            // However, this is only true for `i = 0`, and we need to consider carry
-            // values `diff >> step_i` for `i > 0`.
-            // Therefore, we actually check `diff = x_i - y_i + c = 0 (mod 2^step_i)`
-            // and derive the next `c` by computing `diff >> step_i`.
-            // To enforce `diff = 0 (mod 2^step_i)`, we compute `diff / 2^step_i`
-            // and enforce it to be small (soundness holds because for `a` that does
-            // not divide `b`, `b / a` in the field will be very large).
-            let bits = (max(
-                min(&x_bound.0, &y_bound.0).bits(),
-                max(&x_bound.1, &y_bound.1).bits(),
-            ) as usize)
-                .saturating_sub(step);
-
-            (&diff + F::from(BigUint::one() << bits)).enforce_bit_length(bits + 1)?;
-
-            x_bound = Bounds::zero();
-            y_bound = Bounds::zero();
-            step = 0;
         }
 
         let remaining_limbs = if i < self.limbs.len() {
@@ -567,29 +587,26 @@ impl<F: SonobeField, Cfg, const LHS_ALIGNED: bool> LimbedVar<F, Cfg, LHS_ALIGNED
             &other.bounds[i..]
         };
         if remaining_limbs.is_empty() {
-            diff.enforce_equal(&FpVar::zero())?;
+            carry.enforce_equal(&FpVar::zero())?;
         } else {
-            // If there is any remaining limb, the first one should be the
-            // final carry (which will be checked later), and the following
-            // ones should be zero.
+            // If there is any remaining limb, the first one must be the final
+            // carry (which will be checked later), and the following ones must
+            // be zero.
+
+            // Ensure that the final carry equals the remaining limb.
+            carry.enforce_equal(&remaining_limbs[0])?;
 
             // Enforce the remaining limbs to be zero.
-            // Instead of doing that one by one, we check if their sum is
-            // zero using a single constraint.
-            // This is sound, as the upper bounds of the limbs and their sum
-            // are guaranteed to be less than `F::MODULUS_MINUS_ONE_DIV_TWO`
-            // (i.e., all of them are "non-negative"), implying that all
-            // limbs should be zero to make the sum zero.
-            remaining_limbs[1..]
-                .iter()
-                .sum::<FpVar<F>>()
-                .enforce_equal(&FpVar::zero())?;
-            Bounds::add_many(remaining_bounds)
+            // Instead of doing that one by one, we check if their sum is zero
+            // using a single constraint.
+            // This is sound, as we first check that the bounds of their sum
+            // fit within the field capacity, which guarantees that the sum does
+            // not overflow or underflow, meaning that the sum is zero if and
+            // only if each limb is zero.
+            Bounds::add_many(&remaining_bounds[1..])
                 .filter_safe::<F>()
                 .ok_or(SynthesisError::Unsatisfiable)?;
-            // For the final carry, we need to ensure that it equals the
-            // remaining limb `rest`.
-            diff.enforce_equal(&remaining_limbs[0])?;
+            FpVar::zero().enforce_equal(&remaining_limbs[1..].iter().sum())?;
         }
 
         Ok(())
@@ -610,19 +627,23 @@ impl<Base: SonobeField, Target: SonobeField, const LHS_ALIGNED: bool>
         let cs = self.cs();
         let m = BigInt::from_biguint(Sign::Plus, Target::MODULUS.into());
         // Provide the quotient and remainder as hints
-        let q = LimbedVar::new_variable_with_inferred_mode(cs.clone(), || {
-            let (lb, ub) = (self.lbound().div_floor(&m), self.ubound().div_floor(&m));
-            Ok((
-                compose(self.limbs.value().unwrap_or_default()).div_floor(&m),
-                Bounds(lb, ub),
-            ))
-        })?;
-        let r = LimbedVar::new_variable_with_inferred_mode(cs.clone(), || {
-            Ok((
-                compose(self.limbs.value().unwrap_or_default()).abs() % &m,
-                Bounds(Zero::zero(), m.clone()),
-            ))
-        })?;
+        let (q, r) = {
+            let v = compose(self.limbs.value().unwrap_or_default());
+            let q = v.div_floor(&m);
+            let r = v - &q * &m;
+
+            (
+                LimbedVar::new_variable_with_inferred_mode(cs.clone(), || {
+                    Ok((
+                        q,
+                        Bounds(self.lbound().div_floor(&m), self.ubound().div_floor(&m)),
+                    ))
+                })?,
+                LimbedVar::new_variable_with_inferred_mode(cs.clone(), || {
+                    Ok((r, Bounds(Zero::zero(), m.clone())))
+                })?,
+            )
+        };
 
         let m = LimbedVar::constant(m);
 
@@ -646,10 +667,11 @@ impl<Base: SonobeField, Target: SonobeField, const LHS_ALIGNED: bool>
         let m = BigInt::from_biguint(Sign::Plus, Target::MODULUS.into());
         // Provide the quotient as hint
         let q = LimbedVar::new_variable_with_inferred_mode(cs.clone(), || {
-            let (lb, ub) = (self.lbound().div_floor(&m), self.ubound().div_floor(&m));
+            let x = compose(self.limbs.value().unwrap_or_default());
+            let y = compose(other.limbs.value().unwrap_or_default());
             Ok((
-                compose(self.limbs.value().unwrap_or_default()).div_floor(&m),
-                Bounds(lb, ub),
+                (x - y).div_floor(&m),
+                Bounds(self.lbound().div_floor(&m), self.ubound().div_floor(&m)),
             ))
         })?;
 
@@ -1361,15 +1383,50 @@ mod tests {
             ))
         })?;
 
+        let neg_a_var = EmulatedFieldVar::constant(BigInt::zero()) - &a_var;
+        let neg_b_var = EmulatedFieldVar::constant(BigInt::zero()) - &b_var;
+        let neg_ab_var = EmulatedFieldVar::constant(BigInt::zero()) - &ab_var;
+        let neg_aab_var = EmulatedFieldVar::constant(BigInt::zero()) - &aab_var;
+        let neg_abb_var = EmulatedFieldVar::constant(BigInt::zero()) - &abb_var;
+
         a_var
             .mul_unaligned(&b_var)?
             .enforce_equal_unaligned(&ab_var)?;
+        neg_a_var
+            .mul_unaligned(&neg_b_var)?
+            .enforce_equal_unaligned(&ab_var)?;
+        a_var
+            .mul_unaligned(&neg_b_var)?
+            .enforce_equal_unaligned(&neg_ab_var)?;
+        neg_a_var
+            .mul_unaligned(&b_var)?
+            .enforce_equal_unaligned(&neg_ab_var)?;
+
         a_var
             .mul_unaligned(&ab_var)?
             .enforce_equal_unaligned(&aab_var)?;
+        neg_a_var
+            .mul_unaligned(&neg_ab_var)?
+            .enforce_equal_unaligned(&aab_var)?;
+        a_var
+            .mul_unaligned(&neg_ab_var)?
+            .enforce_equal_unaligned(&neg_aab_var)?;
+        neg_a_var
+            .mul_unaligned(&ab_var)?
+            .enforce_equal_unaligned(&neg_aab_var)?;
+
         ab_var
             .mul_unaligned(&b_var)?
             .enforce_equal_unaligned(&abb_var)?;
+        neg_ab_var
+            .mul_unaligned(&neg_b_var)?
+            .enforce_equal_unaligned(&abb_var)?;
+        ab_var
+            .mul_unaligned(&neg_b_var)?
+            .enforce_equal_unaligned(&neg_abb_var)?;
+        neg_ab_var
+            .mul_unaligned(&b_var)?
+            .enforce_equal_unaligned(&neg_abb_var)?;
 
         assert!(cs.is_satisfied()?);
         Ok(())
@@ -1392,9 +1449,65 @@ mod tests {
         let aab_var = EmulatedFieldVar::new_witness(cs.clone(), || Ok(aab))?;
         let abb_var = EmulatedFieldVar::new_witness(cs.clone(), || Ok(abb))?;
 
+        let neg_a_var = EmulatedFieldVar::constant(BigInt::zero()) - &a_var;
+        let neg_b_var = EmulatedFieldVar::constant(BigInt::zero()) - &b_var;
+        let neg_ab_var = EmulatedFieldVar::constant(BigInt::zero()) - &ab_var;
+        let neg_aab_var = EmulatedFieldVar::constant(BigInt::zero()) - &aab_var;
+        let neg_abb_var = EmulatedFieldVar::constant(BigInt::zero()) - &abb_var;
+
         a_var.mul_unaligned(&b_var)?.enforce_congruent(&ab_var)?;
+        neg_a_var
+            .mul_unaligned(&neg_b_var)?
+            .enforce_congruent(&ab_var)?;
+        a_var
+            .mul_unaligned(&neg_b_var)?
+            .enforce_congruent(&neg_ab_var)?;
+        neg_a_var
+            .mul_unaligned(&b_var)?
+            .enforce_congruent(&neg_ab_var)?;
+
         a_var.mul_unaligned(&ab_var)?.enforce_congruent(&aab_var)?;
+        neg_a_var
+            .mul_unaligned(&neg_ab_var)?
+            .enforce_congruent(&aab_var)?;
+        a_var
+            .mul_unaligned(&neg_ab_var)?
+            .enforce_congruent(&neg_aab_var)?;
+        neg_a_var
+            .mul_unaligned(&ab_var)?
+            .enforce_congruent(&neg_aab_var)?;
+
         ab_var.mul_unaligned(&b_var)?.enforce_congruent(&abb_var)?;
+        neg_ab_var
+            .mul_unaligned(&neg_b_var)?
+            .enforce_congruent(&abb_var)?;
+        ab_var
+            .mul_unaligned(&neg_b_var)?
+            .enforce_congruent(&neg_abb_var)?;
+        neg_ab_var
+            .mul_unaligned(&b_var)?
+            .enforce_congruent(&neg_abb_var)?;
+
+        assert_eq!(a_var.mul_unaligned(&b_var)?.modulo()?.value()?, ab);
+        assert_eq!(neg_a_var.mul_unaligned(&neg_b_var)?.modulo()?.value()?, ab);
+        assert_eq!(a_var.mul_unaligned(&neg_b_var)?.modulo()?.value()?, -ab);
+        assert_eq!(neg_a_var.mul_unaligned(&b_var)?.modulo()?.value()?, -ab);
+
+        assert_eq!(a_var.mul_unaligned(&ab_var)?.modulo()?.value()?, aab);
+        assert_eq!(
+            neg_a_var.mul_unaligned(&neg_ab_var)?.modulo()?.value()?,
+            aab
+        );
+        assert_eq!(a_var.mul_unaligned(&neg_ab_var)?.modulo()?.value()?, -aab);
+        assert_eq!(neg_a_var.mul_unaligned(&ab_var)?.modulo()?.value()?, -aab);
+
+        assert_eq!(ab_var.mul_unaligned(&b_var)?.modulo()?.value()?, abb);
+        assert_eq!(
+            neg_ab_var.mul_unaligned(&neg_b_var)?.modulo()?.value()?,
+            abb
+        );
+        assert_eq!(ab_var.mul_unaligned(&neg_b_var)?.modulo()?.value()?, -abb);
+        assert_eq!(neg_ab_var.mul_unaligned(&b_var)?.modulo()?.value()?, -abb);
 
         assert!(cs.is_satisfied()?);
         Ok(())
