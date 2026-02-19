@@ -16,6 +16,7 @@ use sonobe_primitives::{
         group::emulated::EmulatedAffineVar,
         ops::bits::{FromBits, FromBitsGadget, ToBitsGadgetExt},
     },
+    circuits::WitnessToPublic,
     commitments::GroupBasedCommitment,
     traits::{CF2, SonobeCurve},
 };
@@ -49,11 +50,9 @@ impl<C: SonobeCurve, const CHALLENGE_BITS: usize> CycleFoldCircuit<CF2<C>>
         let rho_bits = rho.to_n_bits_le(CHALLENGE_BITS)?;
 
         let points = Vec::<C::Var>::new_witness(cs.clone(), || Ok(&self.points[..]))?;
-        for point in &points {
-            Self::mark_point_as_public(point)?;
-        }
+        points.mark_as_public()?;
 
-        Self::mark_point_as_public(&(points[1].scalar_mul_le(rho_bits.iter())? + &points[0]))
+        (points[1].scalar_mul_le(rho_bits.iter())? + &points[0]).mark_as_public()
     }
 }
 
@@ -167,7 +166,7 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
             &rho_bits,
             Bounds(Zero::zero(), CF2::<CM::Commitment>::MODULUS.into().into()),
         )?;
-        let x =
+        let cm_tmp =
             EmulatedAffineVar::new_witness(U2.cm_e.cs().or(proof.cs()).or(rho_bits.cs()), || {
                 let rho_bits = rho_bits.value().unwrap_or_default();
                 let rho = CM::Scalar::from_bits_le(&rho_bits);
@@ -176,13 +175,17 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
         Ok(vec![
             once(rho.clone())
                 .chain(
-                    [proof, U2.cm_e, x.clone()]
+                    [proof, U2.cm_e, cm_tmp.clone()]
                         .into_iter()
                         .flat_map(|p| [p.x, p.y]),
                 )
                 .collect(),
             once(rho.clone())
-                .chain([U1.cm_e, x, UU.cm_e].into_iter().flat_map(|p| [p.x, p.y]))
+                .chain(
+                    [U1.cm_e, cm_tmp, UU.cm_e]
+                        .into_iter()
+                        .flat_map(|p| [p.x, p.y]),
+                )
                 .collect(),
             once(rho)
                 .chain(

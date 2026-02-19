@@ -4,8 +4,6 @@ use ark_ff::PrimeField;
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::AllocVar,
-    convert::ToConstraintFieldGadget,
-    eq::EqGadget,
     fields::{FieldVar, fp::FpVar},
 };
 use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
@@ -15,7 +13,7 @@ use sonobe_fs::{
 };
 use sonobe_primitives::{
     arithmetizations::Arith,
-    circuits::FCircuit,
+    circuits::{FCircuit, WitnessToPublic},
     commitments::CommitmentDef,
     traits::{Dummy, SonobeCurve},
     transcripts::{Transcript, TranscriptGadget},
@@ -161,18 +159,7 @@ where
             .add(&actual_UU)?
             .add(&actual_cf_UU)?
             .get_field_element()?;
-        // This line "converts" `uu_x` from witnesses to public inputs.
-        // Instead of directly modifying the constraint system, we explicitly
-        // allocate a public input and enforce that its value is indeed `uu_x`.
-        // While comparing `uu_x` with itself seems redundant, this is necessary
-        // because:
-        // - `.value()` allows an honest prover to extract public inputs without
-        //   computing them outside the circuit.
-        // - `.enforce_equal()` prevents a malicious prover from claiming wrong
-        //   public inputs that are not the honest `uu_x` computed in-circuit.
-        uu_x.enforce_equal(&FpVar::new_input(cs.clone(), || {
-            Ok(uu_x.value().unwrap_or_default())
-        })?)?;
+        uu_x.mark_as_public()?;
 
         if cs.is_in_setup_mode() {
             Ok((self.step_circuit.dummy_state(), external_outputs))
@@ -229,29 +216,6 @@ where
 /// the folding proofs which is now expressed as a circuit on the secondary
 /// curve.
 pub trait CycleFoldCircuit<F: PrimeField>: Sized + Default {
-    /// [`CycleFoldCircuit::mark_point_as_public`] marks a point as public.
-    ///
-    /// The final vector of public inputs is shorter than the result of calling
-    /// [`AllocVar::new_input`], because we only need the x and y coordinates of
-    /// the point, but the `infinity` flag is not necessary.
-    fn mark_point_as_public<V: ToConstraintFieldGadget<F>>(
-        point: &V,
-    ) -> Result<(), SynthesisError> {
-        for x in &point.to_constraint_field()?[..2] {
-            // This line "converts" `x` from a witness to a public input.
-            // Instead of directly modifying the constraint system, we explicitly
-            // allocate a public input and enforce that its value is indeed `x`.
-            // While comparing `x` with itself seems redundant, this is necessary
-            // because:
-            // - `.value()` allows an honest prover to extract public inputs without
-            //   computing them outside the circuit.
-            // - `.enforce_equal()` prevents a malicious prover from claiming wrong
-            //   public inputs that are not the honest `x` computed in-circuit.
-            FpVar::new_input(x.cs(), || x.value())?.enforce_equal(x)?;
-        }
-        Ok(())
-    }
-
     /// [`CycleFoldCircuit::verify_point_rlc`] verifies the deferred folding
     /// proof in-circuit on the secondary curve, which is done by checking the
     /// random linear combination of the commitments contained in the folding
