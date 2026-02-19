@@ -15,6 +15,7 @@ use ark_relations::gr1cs::SynthesisError;
 
 use crate::{
     algebra::{Val, field::SonobeField, group::emulated::EmulatedAffineVar},
+    circuits::WitnessToPublic,
     traits::{Dummy, Inputize, InputizeEmulated},
     transcripts::{Absorbable, AbsorbableVar},
 };
@@ -34,7 +35,7 @@ pub trait SonobeCurve:
     + Inputize<Self::BaseField>
     + InputizeEmulated<Self::ScalarField>
     + Val<
-        Var: CurveVar<Self, Self::BaseField> + AbsorbableVar<Self::BaseField>,
+        Var: CurveVar<Self, Self::BaseField> + AbsorbableVar<Self::BaseField> + WitnessToPublic,
         EmulatedVar<Self::ScalarField> = EmulatedAffineVar<Self::ScalarField, Self>,
     >
 {
@@ -102,5 +103,15 @@ impl<P: SWCurveConfig<BaseField: SonobeField, ScalarField: SonobeField>>
         let (x, y) = affine.xy().unwrap_or_default();
 
         [x, y].inputize_emulated()
+    }
+}
+
+impl<P: SWCurveConfig<BaseField: PrimeField>> WitnessToPublic
+    for ProjectiveVar<P, FpVar<P::BaseField>>
+{
+    fn mark_as_public(&self) -> Result<(), SynthesisError> {
+        // We only need the x and y coordinates of the point, but the `infinity`
+        // flag is not necessary.
+        self.to_constraint_field()?[..2].mark_as_public()
     }
 }

@@ -238,20 +238,12 @@ where
 
         let arith1_config = dk1.to_arith_config();
         let arith2_config = dk2.to_arith_config();
-        let augmented_circuit = AugmentedCircuit::<FS1, FS2, FC, T> {
-            hash_config: hash_config.clone(),
-            arith1_config,
-            arith2_config,
-            step_circuit,
-        };
 
-        let mut WW = Dummy::dummy(arith1_config);
-        let mut UU = Dummy::dummy(arith1_config);
+        let (mut WW, mut UU) = (Dummy::dummy(arith1_config), Dummy::dummy(arith1_config));
         let mut proof = Dummy::dummy(arith1_config);
         let mut cf_us = vec![Dummy::dummy(arith2_config); FS1::N_CYCLEFOLDS];
         let mut cf_proofs = vec![Dummy::dummy(arith2_config); FS1::N_CYCLEFOLDS];
-        let mut cf_UU = Dummy::dummy(arith2_config);
-        let mut cf_WW = Dummy::dummy(arith2_config);
+        let (mut cf_UU, mut cf_WW) = (Dummy::dummy(arith2_config), Dummy::dummy(arith2_config));
 
         if i != 0 {
             let challenge;
@@ -287,6 +279,12 @@ where
 
         let cs = AssignmentsExtractor::new();
         let (next_state, external_outputs) = cs.execute_fn(|cs| {
+            let augmented_circuit = AugmentedCircuit::<FS1, FS2, FC, T> {
+                hash_config: hash_config.clone(),
+                arith1_config,
+                arith2_config,
+                step_circuit,
+            };
             augmented_circuit.compute_next_state(
                 cs,
                 *pp_hash,

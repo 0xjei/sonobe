@@ -2,7 +2,12 @@
 //! counterparts, along with some common implementations.
 
 use ark_ff::{BigInteger, Fp, FpConfig, PrimeField};
-use ark_r1cs_std::fields::{FieldVar, fp::FpVar};
+use ark_r1cs_std::{
+    GR1CSVar,
+    alloc::AllocVar,
+    eq::EqGadget,
+    fields::{FieldVar, fp::FpVar},
+};
 use ark_relations::gr1cs::SynthesisError;
 use ark_std::{
     any::TypeId,
@@ -12,6 +17,7 @@ use ark_std::{
 
 use crate::{
     algebra::{Val, field::emulated::EmulatedFieldVar},
+    circuits::WitnessToPublic,
     traits::{Inputize, InputizeEmulated},
     transcripts::{Absorbable, AbsorbableVar},
 };
@@ -24,7 +30,10 @@ pub trait SonobeField:
     PrimeField<BasePrimeField = Self>
     + Absorbable
     + Inputize<Self>
-    + Val<Var: FieldVar<Self, Self>, EmulatedVar<Self> = EmulatedFieldVar<Self, Self>>
+    + Val<
+        Var: FieldVar<Self, Self> + WitnessToPublic,
+        EmulatedVar<Self> = EmulatedFieldVar<Self, Self>,
+    >
 {
     /// [`SonobeField::BITS_PER_LIMB`] defines the bit length of each limb when
     /// representing field elements as limbs in an emulated field variable.
@@ -87,6 +96,22 @@ impl<F: SonobeField, P: SonobeField> InputizeEmulated<F> for P {
             .chunks(F::BITS_PER_LIMB)
             .map(|chunk| F::from(F::BigInt::from_bits_le(chunk)))
             .collect()
+    }
+}
+
+impl<F: PrimeField> WitnessToPublic for FpVar<F> {
+    fn mark_as_public(&self) -> Result<(), SynthesisError> {
+        // This line "converts" `x` from a witness to a public input.
+        // Instead of directly modifying the constraint system, we allocate a
+        // public input variable explicitly and enforce that its value is indeed
+        // `x`.
+        // While seemingly redundant, comparing `x` with itself is necessary
+        // because:
+        // - `.value()` allows an honest prover to extract public inputs without
+        //   computing them outside the circuit.
+        // - `.enforce_equal()` prevents a malicious prover from claiming public
+        //   inputs that are not the honest `x` computed in-circuit.
+        self.enforce_equal(&FpVar::new_input(self.cs(), || self.value())?)
     }
 }
 
