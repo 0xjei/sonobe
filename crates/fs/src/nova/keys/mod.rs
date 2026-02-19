@@ -1,6 +1,7 @@
 //! Definitions of Nova keys and trait implementations for relation checks and
 //! witness-instance sampling using Nova keys.
 
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{UniformRand, rand::RngCore, sync::Arc};
 use sonobe_primitives::{
     arithmetizations::{
@@ -19,8 +20,8 @@ use super::{
 use crate::{DeciderKey, Error, PlainInstance as PU, PlainWitness as PW};
 
 /// [`NovaKey`] is Nova's decider key.
-#[derive(Clone)]
-pub struct NovaKey<A, CM: CommitmentDef> {
+#[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
+pub struct NovaKey<A: Arith, CM: CommitmentDef> {
     pub(super) arith: Arc<A>,
     pub(super) ck: Arc<CM::Key>,
 }
@@ -88,7 +89,7 @@ where
     }
 }
 
-impl<A, CM: CommitmentOps> WitnessInstanceSampler<IW<CM>, IU<CM>> for NovaKey<A, CM> {
+impl<A: Arith, CM: CommitmentOps> WitnessInstanceSampler<IW<CM>, IU<CM>> for NovaKey<A, CM> {
     type Source = AssignmentsOwned<CM::Scalar>;
     type Error = Error;
 
@@ -99,7 +100,7 @@ impl<A, CM: CommitmentOps> WitnessInstanceSampler<IW<CM>, IU<CM>> for NovaKey<A,
     }
 }
 
-impl<A, CM: CommitmentDef> WitnessInstanceSampler<PW<CM::Scalar>, PU<CM::Scalar>>
+impl<A: Arith, CM: CommitmentDef> WitnessInstanceSampler<PW<CM::Scalar>, PU<CM::Scalar>>
     for NovaKey<A, CM>
 {
     type Source = AssignmentsOwned<CM::Scalar>;

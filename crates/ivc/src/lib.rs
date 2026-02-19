@@ -8,6 +8,7 @@
 
 use ark_ff::PrimeField;
 use ark_relations::gr1cs::SynthesisError;
+use ark_serialize::SerializationError;
 use ark_std::rand::RngCore;
 use sonobe_fs::Error as FoldingError;
 use sonobe_primitives::{arithmetizations::Error as ArithError, circuits::FCircuit, traits::Dummy};
@@ -22,6 +23,9 @@ pub enum Error {
     /// system.
     #[error(transparent)]
     ArithError(#[from] ArithError),
+    /// [`Error::SerializationError`] indicates an error during serialization.
+    #[error(transparent)]
+    SerializationError(#[from] SerializationError),
     /// [`Error::FoldingError`] indicates an error from the underlying folding
     /// scheme.
     #[error(transparent)]

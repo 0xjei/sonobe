@@ -10,6 +10,7 @@
 use ark_ff::{BigInteger, PrimeField};
 use ark_r1cs_std::{boolean::Boolean, fields::fp::FpVar};
 use ark_relations::gr1cs::SynthesisError;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 pub use self::absorbable::{Absorbable, AbsorbableVar};
 
@@ -24,7 +25,7 @@ pub mod poseidon;
 pub trait Transcript<F: PrimeField>: Clone {
     /// [`Transcript::Config`] is the configuration for the underlying hash
     /// function of the transcript.
-    type Config: Clone;
+    type Config: Clone + CanonicalSerialize + CanonicalDeserialize;
 
     /// [`Transcript::Gadget`] is the in-circuit gadget corresponding to this
     /// widget.

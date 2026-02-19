@@ -9,6 +9,7 @@ use ark_r1cs_std::{
     boolean::Boolean, convert::ToBitsGadget, eq::EqGadget, fields::fp::FpVar, groups::CurveVar,
 };
 use ark_relations::gr1cs::SynthesisError;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{UniformRand, iter::repeat_with, marker::PhantomData, rand::RngCore};
 
 use super::{CommitmentDef, CommitmentDefGadget, CommitmentKey, CommitmentOps, Error};
@@ -21,7 +22,7 @@ use crate::{
 
 /// [`PedersenKey`] stores the public parameters for the Pedersen commitment
 /// scheme, where `H` controls whether the scheme is hiding or not.
-#[derive(Clone)]
+#[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct PedersenKey<C: SonobeCurve, const H: bool> {
     g: Vec<C::Affine>,
     h: C,

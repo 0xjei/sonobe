@@ -11,8 +11,10 @@ ark-ec = { workspace = true }
 ark-ff = { workspace = true, features = ["asm"] }
 ark-r1cs-std = { workspace = true }
 ark-relations = { workspace = true }
+ark-serialize = { workspace = true }
 ark-std = { workspace = true, features = ["getrandom"] }
 num-bigint = { workspace = true, features = ["rand"] }
+sha3 = { workspace = true }
 thiserror = { workspace = true }
 
 sonobe-primitives = { workspace = true }

@@ -22,6 +22,7 @@
 use ark_ff::Field;
 use ark_poly::DenseMultilinearExtension;
 use ark_relations::gr1cs::{ConstraintSystem, Matrix};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{borrow::Borrow, cfg_into_iter, cfg_iter, fmt::Debug, marker::PhantomData};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -37,7 +38,7 @@ pub mod circuits;
 
 /// [`CCSVariant`] defines the methods that a CCS variant (e.g., R1CS) should
 /// implement.
-pub trait CCSVariant: Clone + Debug + PartialEq + Default + Sync {
+pub trait CCSVariant: Clone + Debug + PartialEq + Default + Sync + Send {
     /// [`CCSVariant::n_matrices`] returns the number of matrices in the CCS
     /// variant.
     fn n_matrices() -> usize;
@@ -56,7 +57,7 @@ pub trait CCSVariant: Clone + Debug + PartialEq + Default + Sync {
 
 /// [`CCSConfig`] stores the shape parameters of a CCS structure.
 #[allow(non_snake_case)]
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct CCSConfig<V: CCSVariant> {
     _v: PhantomData<V>,
     /// m: number of rows in M_i (such that M_i \in F^{m, n})
@@ -114,7 +115,7 @@ impl<F: Field, V: CCSVariant> From<&ConstraintSystem<F>> for CCSConfig<V> {
 
 /// [`CCS`] holds the CCS matrices `M` together with the configuration.
 #[allow(non_snake_case)]
-#[derive(Clone)]
+#[derive(Clone, CanonicalSerialize, CanonicalDeserialize)]
 pub struct CCS<F: Field, V: CCSVariant> {
     cfg: CCSConfig<V>,
 
