@@ -38,7 +38,7 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-use ark_ff::{LegendreSymbol, PrimeField};
+use ark_ff::{LegendreSymbol, PrimeField, field_hashers::hash_to_field};
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::AllocVar,
@@ -121,31 +121,16 @@ impl<F: PrimeField> GriffinParams<F> {
     }
 
     fn instantiate_rc(t: usize, rounds: usize, shake: &mut Shake128Reader) -> Vec<Vec<F>> {
-        fn field_element_from_shake<F: PrimeField>(reader: &mut impl XofReader) -> F {
-            let mut buf = vec![0u8; F::MODULUS_BIT_SIZE.div_ceil(8) as usize];
-
-            loop {
-                reader.read(&mut buf);
-                if let Some(element) = F::from_random_bytes(&buf) {
-                    return element;
-                }
-            }
-        }
-
         (0..rounds - 1)
-            .map(|_| (0..t).map(|_| field_element_from_shake(shake)).collect())
+            .map(|_| (0..t).map(|_| hash_to_field::<_, _, 128>(shake)).collect())
             .collect()
     }
 
     fn instantiate_alpha_beta(t: usize, shake: &mut Shake128Reader) -> Vec<[F; 2]> {
-        fn field_element_from_shake_without_0<F: PrimeField>(reader: &mut impl XofReader) -> F {
-            let mut buf = vec![0u8; F::MODULUS_BIT_SIZE.div_ceil(8) as usize];
-
+        fn hash_to_non_zero_field<F: PrimeField>(reader: &mut impl XofReader) -> F {
             loop {
-                reader.read(&mut buf);
-                if let Some(element) = F::from_random_bytes(&buf)
-                    && !element.is_zero()
-                {
+                let element = hash_to_field::<F, _, 128>(reader);
+                if !element.is_zero() {
                     return element;
                 }
             }
@@ -155,11 +140,11 @@ impl<F: PrimeField> GriffinParams<F> {
 
         // random alpha/beta
         loop {
-            let alpha = field_element_from_shake_without_0::<F>(shake);
-            let mut beta = field_element_from_shake_without_0::<F>(shake);
+            let alpha = hash_to_non_zero_field::<F>(shake);
+            let mut beta = hash_to_non_zero_field::<F>(shake);
             // distinct
             while alpha == beta {
-                beta = field_element_from_shake_without_0::<F>(shake);
+                beta = hash_to_non_zero_field::<F>(shake);
             }
             let mut symbol = alpha;
             symbol.square_in_place();
@@ -181,7 +166,7 @@ impl<F: PrimeField> GriffinParams<F> {
             beta.mul_assign(&F::from((i * i) as u64));
             // distinct
             while alpha == beta {
-                beta = field_element_from_shake_without_0::<F>(shake);
+                beta = hash_to_non_zero_field::<F>(shake);
             }
 
             #[cfg(debug_assertions)]
