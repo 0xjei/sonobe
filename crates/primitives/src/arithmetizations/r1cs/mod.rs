@@ -3,6 +3,7 @@
 
 use ark_ff::Field;
 use ark_relations::gr1cs::{ConstraintSystem, Matrix, R1CS_PREDICATE_LABEL};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{cfg_into_iter, cfg_iter, iterable::Iterable};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -16,7 +17,7 @@ use crate::{
 pub mod circuits;
 
 /// [`R1CSConfig`] stores the shape parameters of an R1CS structure.
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct R1CSConfig {
     m: usize, // number of constraints
     n: usize, // number of variables
@@ -96,7 +97,7 @@ impl CCSVariant for R1CSConfig {
 /// [`R1CS`] holds the three sparse matrices `A`, `B`, `C` together with the
 /// configuration.
 #[allow(non_snake_case)]
-#[derive(Debug, Clone, Default, PartialEq)]
+#[derive(Debug, Clone, Default, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct R1CS<F: Field> {
     cfg: R1CSConfig,
     pub(super) A: Matrix<F>,
