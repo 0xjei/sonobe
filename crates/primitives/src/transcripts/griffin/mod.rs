@@ -45,6 +45,7 @@ use ark_r1cs_std::{
     fields::{FieldVar, fp::FpVar},
 };
 use ark_relations::gr1cs::SynthesisError;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use num_bigint::BigUint;
 use sha3::{
     Shake128, Shake128Reader,
@@ -57,7 +58,7 @@ pub mod sponge;
 /// permutation for a given prime field: state width `t`, S-box degree `d`,
 /// number of rounds, round constants, alpha/beta constants, and the MDS-like
 /// matrix.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
 pub struct GriffinParams<F: PrimeField> {
     round_constants: Vec<Vec<F>>,
     t: usize,

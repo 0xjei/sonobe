@@ -1,12 +1,25 @@
-//! Implementation of the CycleFold-based IVC compiler.
+//! Implementation of the CycleFold-based IVC compiler as described in this
+//! [paper].
 //!
 //! It turns any compatible folding scheme into a full IVC scheme by running the
 //! primary circuit on one curve and a "CycleFold" circuit on the secondary
 //! curve to handle emulated elliptic curve operations.
+//!
+//! [paper]: https://eprint.iacr.org/2023/1192.pdf
 
-use ark_ff::Zero;
+use ark_ff::field_hashers::hash_to_field;
 use ark_relations::gr1cs::{ConstraintSystem, SynthesisError};
-use ark_std::{borrow::Borrow, marker::PhantomData, rand::RngCore};
+use ark_serialize::CanonicalSerialize;
+use ark_std::{
+    borrow::Borrow,
+    io::{Error as IoError, Write},
+    marker::PhantomData,
+    rand::RngCore,
+};
+use sha3::{
+    Shake128,
+    digest::{ExtendableOutput, Update},
+};
 use sonobe_fs::{
     DeciderKey, FoldingInstance, FoldingSchemeDef, FoldingSchemeDefGadget,
     FoldingSchemeFullVerifierGadget, FoldingSchemePartialVerifierGadget,
@@ -214,7 +227,28 @@ where
         let dk1 = FS1::generate_keys(pp1, arith1)?;
         let dk2 = FS2::generate_keys(pp2, arith2)?;
 
-        let pp_hash = Zero::zero(); // TODO
+        struct HashMarshaller<'a>(&'a mut Shake128);
+
+        impl Write for HashMarshaller<'_> {
+            #[inline]
+            fn write(&mut self, buf: &[u8]) -> Result<usize, IoError> {
+                self.0.update(buf);
+                Ok(buf.len())
+            }
+
+            #[inline]
+            fn flush(&mut self) -> Result<(), IoError> {
+                Ok(())
+            }
+        }
+
+        let pp_hash = {
+            let mut shake = Shake128::default();
+            dk1.serialize_compressed(HashMarshaller(&mut shake))?;
+            dk2.serialize_compressed(HashMarshaller(&mut shake))?;
+            hash_config.serialize_compressed(HashMarshaller(&mut shake))?;
+            hash_to_field::<_, _, 128>(&mut shake.finalize_xof())
+        };
 
         Ok((
             Key(dk1.clone(), dk2.clone(), (hash_config.clone(), pp_hash)),

@@ -3,6 +3,7 @@
 use ark_ff::UniformRand;
 use ark_r1cs_std::{GR1CSVar, alloc::AllocVar, fields::fp::FpVar, select::CondSelectGadget};
 use ark_relations::gr1cs::SynthesisError;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{
     fmt::Debug,
     iter::Sum,
@@ -42,7 +43,7 @@ pub enum Error {
 
 /// [`CommitmentKey`] represents a commitment key (e.g., a vector of group
 /// generators for many group-based commitment schemes).
-pub trait CommitmentKey: Clone {
+pub trait CommitmentKey: Clone + Send + Sync + CanonicalSerialize + CanonicalDeserialize {
     /// [`CommitmentKey::max_scalars_len`] returns the maximum number of scalars
     /// that can be committed to with this key.
     fn max_scalars_len(&self) -> usize;

@@ -7,6 +7,7 @@
 //! R1CS is the only supported constraint system by ark-relations.
 
 use ark_relations::gr1cs::SynthesisError;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{fmt::Debug, log2};
 use thiserror::Error;
 
@@ -64,7 +65,7 @@ pub trait ArithConfig: Clone + Debug + Default + PartialEq {
 /// define methods to get and set configuration about the constraint system.
 /// In addition to the configuration, the implementor of this trait may also
 /// store the actual constraints and other information.
-pub trait Arith: Clone + Default {
+pub trait Arith: Clone + Default + Send + Sync + CanonicalSerialize + CanonicalDeserialize {
     /// [`Arith::Config`] specifies the arithmetization's configuration.
     type Config: ArithConfig;
 

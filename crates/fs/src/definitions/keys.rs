@@ -1,10 +1,11 @@
 //! Traits and abstractions for folding scheme keys.
 
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use sonobe_primitives::arithmetizations::ArithConfig;
 
 /// [`DeciderKey`] defines the information that a folding scheme's decider key
 /// should include or provide access to.
-pub trait DeciderKey {
+pub trait DeciderKey: CanonicalSerialize + CanonicalDeserialize {
     /// [`DeciderKey::ProverKey`] is the type of the prover key contained in the
     /// decider key.
     type ProverKey;
