@@ -264,3 +264,16 @@ impl<F: Field> AssignmentsExtractor<F> {
         Ok((F::one(), instance, witness).into())
     }
 }
+
+/// [`WitnessToPublic`] defines a helper trait for marking witness variables as
+/// public inputs in the constraint system.
+pub trait WitnessToPublic {
+    /// [`WitnessToPublic::mark_as_public`] marks a witness variable as public.
+    fn mark_as_public(&self) -> Result<(), SynthesisError>;
+}
+
+impl<T: WitnessToPublic> WitnessToPublic for [T] {
+    fn mark_as_public(&self) -> Result<(), SynthesisError> {
+        self.iter().try_for_each(|x| x.mark_as_public())
+    }
+}

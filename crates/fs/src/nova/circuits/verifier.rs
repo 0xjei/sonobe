@@ -12,8 +12,7 @@ use crate::{
     FoldingSchemeFullVerifierGadget, FoldingSchemePartialVerifierGadget, nova::AbstractNovaGadget,
 };
 
-impl<CM, const CHALLENGE_BITS: usize> FoldingSchemePartialVerifierGadget<1, 1>
-    for AbstractNovaGadget<CM, CHALLENGE_BITS>
+impl<CM, const B: usize> FoldingSchemePartialVerifierGadget<1, 1> for AbstractNovaGadget<CM, B>
 where
     CM: CommitmentDefGadget<Widget: GroupBasedCommitment>,
 {
@@ -25,12 +24,7 @@ where
         [u]: [&Self::IU; 1],
         proof: &Self::Proof<1, 1>,
     ) -> Result<(Self::RU, Self::Challenge), SynthesisError> {
-        let rho_bits = {
-            transcript.add(&U)?;
-            transcript.add(&u)?;
-            transcript.add(proof)?;
-            transcript.challenge_bits(CHALLENGE_BITS)?
-        };
+        let rho_bits = transcript.add(&U)?.add(&u)?.add(proof)?.challenge_bits(B)?;
         let rho = CM::ScalarVar::from_bits_le(&rho_bits)?;
 
         Ok((
@@ -64,8 +58,7 @@ where
     }
 }
 
-impl<CM, const CHALLENGE_BITS: usize> FoldingSchemePartialVerifierGadget<2, 0>
-    for AbstractNovaGadget<CM, CHALLENGE_BITS>
+impl<CM, const B: usize> FoldingSchemePartialVerifierGadget<2, 0> for AbstractNovaGadget<CM, B>
 where
     CM: CommitmentDefGadget<Widget: GroupBasedCommitment>,
 {
@@ -77,12 +70,7 @@ where
         _: [&Self::IU; 0],
         proof: &Self::Proof<2, 0>,
     ) -> Result<(Self::RU, Self::Challenge), SynthesisError> {
-        let rho_bits = {
-            transcript.add(&U1)?;
-            transcript.add(&U2)?;
-            transcript.add(proof)?;
-            transcript.challenge_bits(CHALLENGE_BITS)?
-        };
+        let rho_bits = transcript.add(&(U1, U2))?.add(proof)?.challenge_bits(B)?;
         let rho = CM::ScalarVar::from_bits_le(&rho_bits)?;
 
         Ok((
@@ -119,8 +107,7 @@ where
     }
 }
 
-impl<CM, const CHALLENGE_BITS: usize> FoldingSchemeFullVerifierGadget<1, 1>
-    for AbstractNovaGadget<CM, CHALLENGE_BITS>
+impl<CM, const B: usize> FoldingSchemeFullVerifierGadget<1, 1> for AbstractNovaGadget<CM, B>
 where
     CM: CommitmentDefGadget<Widget: GroupBasedCommitment>,
     CM::CommitmentVar: CurveVar<<CM::Widget as CommitmentDef>::Commitment, CM::ConstraintField>,
@@ -133,12 +120,7 @@ where
         [u]: [&Self::IU; 1],
         proof: &Self::Proof<1, 1>,
     ) -> Result<Self::RU, SynthesisError> {
-        let rho_bits = {
-            transcript.add(&U)?;
-            transcript.add(&u)?;
-            transcript.add(proof)?;
-            transcript.challenge_bits(CHALLENGE_BITS)?
-        };
+        let rho_bits = transcript.add(&U)?.add(&u)?.add(proof)?.challenge_bits(B)?;
         let rho = CM::ScalarVar::from_bits_le(&rho_bits)?;
 
         Ok(Self::RU {

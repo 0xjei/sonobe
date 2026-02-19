@@ -4,15 +4,10 @@
 //! [paper]: https://eprint.iacr.org/2021/370.pdf
 
 use ark_r1cs_std::boolean::Boolean;
-use ark_std::{UniformRand, marker::PhantomData, rand::RngCore, sync::Arc};
+use ark_std::marker::PhantomData;
 use sonobe_primitives::{
-    arithmetizations::{
-        Arith, ArithConfig, ArithRelation,
-        r1cs::{R1CS, RelaxedInstance, RelaxedWitness},
-    },
-    circuits::AssignmentsOwned,
-    commitments::{CommitmentDef, CommitmentDefGadget, CommitmentOps, GroupBasedCommitment},
-    relations::{Relation, WitnessInstanceSampler},
+    arithmetizations::r1cs::R1CS,
+    commitments::{CommitmentDef, CommitmentDefGadget, GroupBasedCommitment},
     traits::{CF2, SonobeField},
 };
 
@@ -24,143 +19,15 @@ use self::{
     witnesses::{IncomingWitness as IW, RunningWitness as RW},
 };
 use crate::{
-    DeciderKey, Error, FoldingSchemeDef, FoldingSchemeDefGadget, GroupBasedFoldingSchemePrimaryDef,
-    GroupBasedFoldingSchemeSecondaryDef, PlainInstance as PU, PlainWitness as PW,
+    FoldingSchemeDef, FoldingSchemeDefGadget, GroupBasedFoldingSchemePrimaryDef,
+    GroupBasedFoldingSchemeSecondaryDef, nova::keys::NovaKey,
 };
 
 pub mod algorithms;
 pub mod circuits;
 pub mod instances;
+pub mod keys;
 pub mod witnesses;
-
-/// [`NovaKey`] is Nova's decider key.
-#[derive(Clone)]
-pub struct NovaKey<A, CM: CommitmentDef> {
-    arith: Arc<A>,
-    ck: Arc<CM::Key>,
-}
-
-impl<A: Arith, CM: CommitmentDef> DeciderKey for NovaKey<A, CM> {
-    type ProverKey = Self;
-    type VerifierKey = ();
-    type ArithConfig = A::Config;
-
-    fn to_pk(&self) -> &Self::ProverKey {
-        self
-    }
-
-    fn to_vk(&self) -> &Self::VerifierKey {
-        &()
-    }
-
-    fn to_arith_config(&self) -> &Self::ArithConfig {
-        self.arith.config()
-    }
-}
-
-impl<A, CM> Relation<RW<CM>, RU<CM>> for NovaKey<A, CM>
-where
-    A: for<'a> ArithRelation<RelaxedWitness<&'a [CM::Scalar]>, RelaxedInstance<&'a [CM::Scalar]>>,
-    CM: CommitmentOps,
-{
-    type Error = Error;
-
-    fn check_relation(&self, w: &RW<CM>, u: &RU<CM>) -> Result<(), Self::Error> {
-        self.arith.check_relation(
-            &RelaxedWitness { w: &w.w, e: &w.e },
-            &RelaxedInstance { x: &u.x, u: &u.u },
-        )?;
-        CM::open(&self.ck, &w.w, &w.r_w, &u.cm_w)?;
-        CM::open(&self.ck, &w.e, &w.r_e, &u.cm_e)?;
-        Ok(())
-    }
-}
-
-impl<A, CM> Relation<IW<CM>, IU<CM>> for NovaKey<A, CM>
-where
-    A: ArithRelation<Vec<CM::Scalar>, Vec<CM::Scalar>>,
-    CM: CommitmentOps,
-{
-    type Error = Error;
-
-    fn check_relation(&self, w: &IW<CM>, u: &IU<CM>) -> Result<(), Self::Error> {
-        self.arith.check_relation(&w.w, &u.x)?;
-        CM::open(&self.ck, &w.w, &w.r_w, &u.cm_w)?;
-        Ok(())
-    }
-}
-
-impl<A, CM> Relation<PW<CM::Scalar>, PU<CM::Scalar>> for NovaKey<A, CM>
-where
-    A: ArithRelation<Vec<CM::Scalar>, Vec<CM::Scalar>>,
-    CM: CommitmentDef,
-{
-    type Error = Error;
-
-    fn check_relation(&self, w: &PW<CM::Scalar>, u: &PU<CM::Scalar>) -> Result<(), Self::Error> {
-        self.arith.check_relation(w, u)?;
-        Ok(())
-    }
-}
-
-impl<A, CM: CommitmentOps> WitnessInstanceSampler<IW<CM>, IU<CM>> for NovaKey<A, CM> {
-    type Source = AssignmentsOwned<CM::Scalar>;
-    type Error = Error;
-
-    fn sample(&self, z: Self::Source, rng: impl RngCore) -> Result<(IW<CM>, IU<CM>), Error> {
-        let (w, x) = (z.private, z.public);
-        let (cm_w, r_w) = CM::commit(&self.ck, &w, rng)?;
-        Ok((IW { w, r_w }, IU { cm_w, x }))
-    }
-}
-
-impl<A, CM: CommitmentDef> WitnessInstanceSampler<PW<CM::Scalar>, PU<CM::Scalar>>
-    for NovaKey<A, CM>
-{
-    type Source = AssignmentsOwned<CM::Scalar>;
-    type Error = Error;
-
-    fn sample(
-        &self,
-        z: Self::Source,
-        _rng: impl RngCore,
-    ) -> Result<(PW<CM::Scalar>, PU<CM::Scalar>), Error> {
-        Ok((z.private.into(), z.public.into()))
-    }
-}
-
-impl<A, CM> WitnessInstanceSampler<RW<CM>, RU<CM>> for NovaKey<A, CM>
-where
-    A: for<'a> ArithRelation<
-            RelaxedWitness<&'a [CM::Scalar]>,
-            RelaxedInstance<&'a [CM::Scalar]>,
-            Evaluation = Vec<CM::Scalar>,
-        >,
-    CM: CommitmentOps,
-{
-    type Source = ();
-    type Error = Error;
-
-    fn sample(&self, _: Self::Source, mut rng: impl RngCore) -> Result<(RW<CM>, RU<CM>), Error> {
-        let cfg = self.arith.config();
-
-        let u = CM::Scalar::rand(&mut rng);
-        let x = (0..cfg.n_public_inputs())
-            .map(|_| CM::Scalar::rand(&mut rng))
-            .collect::<Vec<_>>();
-        let w = (0..cfg.n_witnesses())
-            .map(|_| CM::Scalar::rand(&mut rng))
-            .collect::<Vec<_>>();
-        let e = self.arith.eval_relation(
-            &RelaxedWitness { w: &w, e: &[] },
-            &RelaxedInstance { x: &x, u: &u },
-        )?;
-
-        let (cm_w, r_w) = CM::commit(&self.ck, &w, &mut rng)?;
-        let (cm_e, r_e) = CM::commit(&self.ck, &e, &mut rng)?;
-        Ok((RW { w, r_w, e, r_e }, RU { cm_w, x, cm_e, u }))
-    }
-}
 
 // used for the RO challenges.
 // From [Srinath Setty](https://microsoft.com/en-us/research/people/srinath/): In Nova, soundness
@@ -200,48 +67,6 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> Fol
     type Proof<const M: usize, const N: usize> = CM::Commitment;
 }
 
-// used for the RO challenges.
-// From [Srinath Setty](https://microsoft.com/en-us/research/people/srinath/): In Nova, soundness
-// error ≤ 2/|S|, where S is the subset of the field F from which the challenges are drawn. In this
-// case, we keep the size of S close to 2^128.
-/// [`AbstractNova2`] implements the Nova folding scheme which can operate on
-/// both the primary and secondary curves.
-///
-/// This design is experimental, following the definition of accumulation
-/// schemes where the incoming witnesses and instances are simply plain vectors
-/// in the circuit's assignments.
-pub struct AbstractNova2<CM, TF, const CHALLENGE_BITS: usize = 128> {
-    _t: PhantomData<(CM, TF)>,
-}
-
-/// [`Nova2`] is the main Nova folding scheme on the primary curve.
-pub type Nova2<CM, const CHALLENGE_BITS: usize = 128> =
-    AbstractNova2<CM, <CM as CommitmentDef>::Scalar, CHALLENGE_BITS>;
-
-/// [`CycleFoldNova2`] is the Nova folding scheme on the secondary curve which
-/// can be used as the folding scheme for folding CycleFold instances.
-pub type CycleFoldNova2<CM, const CHALLENGE_BITS: usize = 128> =
-    AbstractNova2<CM, CF2<<CM as CommitmentDef>::Commitment>, CHALLENGE_BITS>;
-
-impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> FoldingSchemeDef
-    for AbstractNova2<CM, TF, CHALLENGE_BITS>
-{
-    type CM = CM;
-    type RW = RW<CM>;
-    type RU = RU<CM>;
-    type IW = PW<CM::Scalar>;
-    type IU = PU<CM::Scalar>;
-
-    type TranscriptField = TF;
-    type Arith = R1CS<CM::Scalar>;
-
-    type Config = usize;
-    type PublicParam = CM::Key;
-    type DeciderKey = NovaKey<Self::Arith, CM>;
-    type Challenge = [bool; CHALLENGE_BITS];
-    type Proof<const M: usize, const N: usize> = (CM::Commitment, CM::Commitment);
-}
-
 /// [`AbstractNovaGadget`] is the in-circuit gadget for [`AbstractNova`].
 pub struct AbstractNovaGadget<CM, const CHALLENGE_BITS: usize = 128> {
     _vc: PhantomData<CM>,
@@ -278,7 +103,10 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> GroupBasedFoldingSch
 mod tests {
     use ark_bn254::{Fq, Fr, G1Projective};
     use ark_ff::UniformRand;
-    use ark_std::{error::Error, rand::thread_rng};
+    use ark_std::{
+        error::Error,
+        rand::{RngCore, thread_rng},
+    };
     use sonobe_primitives::{
         circuits::utils::{CircuitForTest, satisfying_assignments_for_test},
         commitments::pedersen::Pedersen,
@@ -327,28 +155,6 @@ mod tests {
         )?;
 
         test_folding_scheme::<AbstractNova<Pedersen<G1Projective, false>, TF>, 2, 0>(
-            8,
-            CircuitForTest {
-                x: Fr::rand(&mut rng),
-            },
-            (0..rounds)
-                .map(|_| satisfying_assignments_for_test(Fr::rand(&mut rng)))
-                .collect(),
-            &mut rng,
-        )?;
-
-        test_folding_scheme::<AbstractNova2<Pedersen<G1Projective, true>, TF>, 1, 1>(
-            8,
-            CircuitForTest {
-                x: Fr::rand(&mut rng),
-            },
-            (0..rounds)
-                .map(|_| satisfying_assignments_for_test(Fr::rand(&mut rng)))
-                .collect(),
-            &mut rng,
-        )?;
-
-        test_folding_scheme::<AbstractNova2<Pedersen<G1Projective, false>, TF>, 1, 1>(
             8,
             CircuitForTest {
                 x: Fr::rand(&mut rng),

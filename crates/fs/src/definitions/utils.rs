@@ -12,6 +12,13 @@ use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::{
     borrow::Borrow,
     ops::{Deref, DerefMut},
+    slice::Iter,
+    vec::IntoIter,
+};
+use rayon::{
+    iter::{IntoParallelIterator, IntoParallelRefIterator},
+    slice::Iter as RayonIter,
+    vec::IntoIter as RayonIntoIter,
 };
 use sonobe_primitives::transcripts::{Absorbable, AbsorbableVar};
 
@@ -40,6 +47,44 @@ impl<V, const TAG: char> DerefMut for TaggedVec<V, TAG> {
 impl<V, const TAG: char> From<Vec<V>> for TaggedVec<V, TAG> {
     fn from(v: Vec<V>) -> Self {
         Self(v)
+    }
+}
+
+impl<V, const TAG: char> IntoIterator for TaggedVec<V, TAG> {
+    type Item = V;
+    type IntoIter = IntoIter<V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'a, V, const TAG: char> IntoIterator for &'a TaggedVec<V, TAG> {
+    type Item = &'a V;
+    type IntoIter = Iter<'a, V>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<V: Send, const TAG: char> IntoParallelIterator for TaggedVec<V, TAG> {
+    type Item = V;
+
+    type Iter = RayonIntoIter<V>;
+
+    fn into_par_iter(self) -> Self::Iter {
+        self.0.into_par_iter()
+    }
+}
+
+impl<'a, V: Sync, const TAG: char> IntoParallelIterator for &'a TaggedVec<V, TAG> {
+    type Iter = RayonIter<'a, V>;
+
+    type Item = &'a V;
+
+    fn into_par_iter(self) -> Self::Iter {
+        self.0.par_iter()
     }
 }
 
