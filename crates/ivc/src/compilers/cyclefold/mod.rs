@@ -3,8 +3,8 @@ use ark_relations::gr1cs::{ConstraintSystem, SynthesisError, SynthesisMode};
 use ark_std::{borrow::Borrow, marker::PhantomData, rand::RngCore};
 use sonobe_fs::{
     DeciderKey, FoldingInstance, FoldingSchemeDef, FoldingSchemeDefGadget,
-    FoldingSchemeFullVerifierGadget, FoldingSchemePartialVerifierGadget, GroupBasedFoldingSchemePrimary,
-    GroupBasedFoldingSchemeSecondary,
+    FoldingSchemeFullVerifierGadget, FoldingSchemePartialVerifierGadget,
+    GroupBasedFoldingSchemePrimary, GroupBasedFoldingSchemeSecondary,
 };
 use sonobe_primitives::{
     algebra::field::emulated::EmulatedFieldVar,
