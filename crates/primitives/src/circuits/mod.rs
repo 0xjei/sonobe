@@ -96,7 +96,7 @@ pub trait FCircuit {
     ///
     /// ### Tips
     ///
-    /// - Since this method uses `self`, the implementation store some (fixed)
+    /// - Since this method uses `self`, the implementation can store some fixed
     ///   info that is shared across all steps inside `self`.
     /// - Variables in the implementation should be allocated as witnesses (not
     ///   public inputs) in the implementation.
