@@ -22,6 +22,7 @@
 //!     - Proof verification: [`FoldingSchemeVerifier`]
 //! - `circuits/`: In-circuit (partial / full) gadgets, mainly for verification.
 //! - `instances/`: Instance types.
+//! - `keys/`: Key types.
 //! - `witnesses/`: Witness types.
 
 pub mod definitions;
