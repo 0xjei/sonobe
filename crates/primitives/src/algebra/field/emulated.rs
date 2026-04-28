@@ -672,7 +672,10 @@ impl<Base: SonobeField, Target: SonobeField, const LHS_ALIGNED: bool>
             let y = compose(other.limbs.value().unwrap_or_default());
             Ok((
                 (x - y).div_floor(&m),
-                Bounds(self.lbound().div_floor(&m), self.ubound().div_floor(&m)),
+                Bounds(
+                    (self.lbound() - other.ubound()).div_floor(&m),
+                    (self.ubound() - other.lbound()).div_floor(&m),
+                ),
             ))
         })?;
 
