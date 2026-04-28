@@ -279,3 +279,56 @@ impl<T: WitnessToPublic> WitnessToPublic for [T] {
         self.iter().try_for_each(|x| x.mark_as_public())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use ark_bn254::Fr;
+    use ark_ff::UniformRand;
+    use ark_relations::gr1cs::ConstraintSynthesizer;
+    use ark_std::{error::Error, rand::thread_rng};
+    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
+    use wasm_bindgen_test::wasm_bindgen_test as test;
+
+    use super::{
+        utils::{CircuitForTest, constraints_for_test, satisfying_assignments_for_test},
+        *,
+    };
+    use crate::arithmetizations::r1cs::R1CS;
+
+    #[test]
+    fn test_satisfiability() -> Result<(), Box<dyn Error>> {
+        let mut rng = thread_rng();
+        let circuit = CircuitForTest::<Fr> {
+            x: Fr::rand(&mut rng),
+        };
+        let cs = ConstraintSystem::new_ref();
+        circuit.generate_constraints(cs.clone())?;
+        assert!(cs.is_satisfied()?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_constraint_extraction() -> Result<(), Box<dyn Error>> {
+        let mut rng = thread_rng();
+        let circuit = CircuitForTest::<Fr> {
+            x: Fr::rand(&mut rng),
+        };
+        let cs = ArithExtractor::new();
+        cs.execute_synthesizer(circuit)?;
+        assert_eq!(cs.arith::<R1CS<_>>()?, constraints_for_test());
+        Ok(())
+    }
+
+    #[test]
+    fn test_witness_extraction() -> Result<(), Box<dyn Error>> {
+        let mut rng = thread_rng();
+        let x = Fr::rand(&mut rng);
+        let circuit = CircuitForTest::<Fr> { x };
+
+        let cs = AssignmentsExtractor::new();
+        cs.execute_synthesizer(circuit)?;
+        assert_eq!(cs.assignments()?, satisfying_assignments_for_test(x));
+        Ok(())
+    }
+}

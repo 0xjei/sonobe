@@ -4,189 +4,74 @@
 use ark_ff::Field;
 use ark_relations::gr1cs::{ConstraintSystem, Matrix, R1CS_PREDICATE_LABEL};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::{cfg_into_iter, cfg_iter, iterable::Iterable};
+use ark_std::{cfg_into_iter, cfg_iter};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-use super::{Arith, ArithRelation, Error, ccs::CCS};
-use crate::{
-    arithmetizations::{ArithConfig, ccs::CCSVariant},
-    circuits::Assignments,
-};
+use super::{Arith, ArithConfig, ArithRelation, Error, ccs::CCS};
+use crate::circuits::Assignments;
 
 pub mod circuits;
 
-/// [`R1CSConfig`] stores the shape parameters of an R1CS structure.
+/// [`R1CS`] holds the three sparse matrices `A`, `B`, `C` together with the
+/// configuration.
 #[derive(Debug, Clone, Default, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
-pub struct R1CSConfig {
+pub struct R1CS<F: Field> {
     m: usize, // number of constraints
     n: usize, // number of variables
     l: usize, // io len
-}
-
-impl R1CSConfig {
-    /// [`R1CSConfig::new`] creates a new R1CS configuration.
-    pub fn new(n_constraints: usize, n_variables: usize, n_public_inputs: usize) -> Self {
-        Self {
-            m: n_constraints,
-            n: n_variables,
-            l: n_public_inputs,
-        }
-    }
-}
-
-impl ArithConfig for R1CSConfig {
-    #[inline]
-    fn degree(&self) -> usize {
-        2
-    }
-
-    #[inline]
-    fn n_constraints(&self) -> usize {
-        self.m
-    }
-
-    #[inline]
-    fn n_variables(&self) -> usize {
-        self.n
-    }
-
-    #[inline]
-    fn n_public_inputs(&self) -> usize {
-        self.l
-    }
-
-    #[inline]
-    fn n_witnesses(&self) -> usize {
-        self.n_variables() - self.n_public_inputs() - 1
-    }
-}
-
-impl<F: Field> From<&ConstraintSystem<F>> for R1CSConfig {
-    fn from(cs: &ConstraintSystem<F>) -> Self {
-        Self::new(
-            cs.num_constraints(),
-            cs.num_instance_variables + cs.num_witness_variables,
-            cs.num_instance_variables - 1, // -1 to subtract the first '1'
-        )
-    }
-}
-
-impl CCSVariant for R1CSConfig {
-    #[inline]
-    fn n_matrices() -> usize {
-        3
-    }
-
-    #[inline]
-    fn degree() -> usize {
-        2
-    }
-
-    #[inline]
-    fn multisets_vec() -> Vec<Vec<usize>> {
-        vec![vec![0, 1], vec![2]]
-    }
-
-    #[inline]
-    fn coefficients_vec<F: Field>() -> Vec<F> {
-        vec![F::one(), -F::one()]
-    }
-}
-
-/// [`R1CS`] holds the three sparse matrices `A`, `B`, `C` together with the
-/// configuration.
-#[allow(non_snake_case)]
-#[derive(Debug, Clone, Default, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
-pub struct R1CS<F: Field> {
-    cfg: R1CSConfig,
-    pub(super) A: Matrix<F>,
-    pub(super) B: Matrix<F>,
-    pub(super) C: Matrix<F>,
-}
-
-type Row<F> = Vec<(F, usize)>;
-
-impl<F: Field> R1CS<F> {
-    /// [`R1CS::evaluate_rows`] evaluates the R1CS relation by applying the
-    /// provided function `f` to each triplet of rows `(A[i], B[i], C[i])`.
-    pub fn evaluate_rows(
-        &self,
-        f: impl Fn(((&Row<F>, &Row<F>), &Row<F>)) -> Result<F, Error> + Send + Sync,
-    ) -> Result<Vec<F>, Error> {
-        cfg_iter!(self.A).zip(&self.B).zip(&self.C).map(f).collect()
-    }
-
-    /// [`R1CS::evaluate_at`] evaluates the R1CS relation at a given vector of
-    /// assignments `z`.
-    pub fn evaluate_at(&self, z: Assignments<F, impl AsRef<[F]> + Sync>) -> Result<Vec<F>, Error> {
-        let cfg = &self.cfg;
-
-        let public_len = z.public.as_ref().len();
-        let private_len = z.private.as_ref().len();
-        if public_len != cfg.n_public_inputs() {
-            return Err(Error::MalformedAssignments(format!(
-                "The number of public inputs in R1CS ({}) does not match the length of the provided public inputs ({}).",
-                cfg.n_public_inputs(),
-                public_len
-            )));
-        }
-        if private_len != cfg.n_witnesses() {
-            return Err(Error::MalformedAssignments(format!(
-                "The number of witnesses in R1CS ({}) does not match the length of the provided witnesses ({}).",
-                cfg.n_witnesses(),
-                private_len
-            )));
-        }
-
-        self.evaluate_rows(|((a, b), c)| {
-            let az = a.iter().map(|(val, col)| z[*col] * val).sum::<F>();
-            let bz = b.iter().map(|(val, col)| z[*col] * val).sum::<F>();
-            let cz = c.iter().map(|(val, col)| z[*col] * val).sum::<F>();
-            // use `z[0]` here since the constant term at index 0 may not be 1
-            // for relaxed instances
-            Ok(az * bz - z[0] * cz)
-        })
-    }
+    matrices: [Matrix<F>; 3],
 }
 
 impl<F: Field> Arith for R1CS<F> {
-    type Config = R1CSConfig;
-
     #[inline]
-    fn config(&self) -> &Self::Config {
-        &self.cfg
+    fn config(&self) -> ArithConfig {
+        ArithConfig {
+            degree: 2,
+            n_constraints: self.m,
+            n_variables: self.n,
+            n_public_inputs: self.l,
+            n_witnesses: self.n - self.l - 1,
+        }
     }
+}
 
-    #[inline]
-    fn config_mut(&mut self) -> &mut Self::Config {
-        &mut self.cfg
+impl<F: Field> CCS for R1CS<F> {
+    type Field = F;
+
+    fn matrices(&self) -> &[Matrix<Self::Field>] {
+        &self.matrices[..]
     }
 }
 
 impl<F: Field> R1CS<F> {
     /// [`R1CS::new`] creates a new R1CS structure from the given configuration
     /// and matrices.
-    #[allow(non_snake_case)]
-    pub fn new(cfg: R1CSConfig, [A, B, C]: [Matrix<F>; 3]) -> Self {
-        Self { cfg, A, B, C }
+    pub fn new(
+        n_constraints: usize,
+        n_variables: usize,
+        n_public_inputs: usize,
+        matrices: [Matrix<F>; 3],
+    ) -> Self {
+        Self {
+            m: n_constraints,
+            l: n_public_inputs,
+            n: n_variables,
+            matrices,
+        }
     }
-}
 
-impl<F: Field> TryFrom<CCS<F, R1CSConfig>> for R1CS<F> {
-    type Error = Error;
-
-    fn try_from(ccs: CCS<F, R1CSConfig>) -> Result<Self, Error> {
-        let cfg = ccs.config();
-        Ok(Self::new(
-            R1CSConfig::new(
-                cfg.n_constraints(),
-                cfg.n_variables(),
-                cfg.n_public_inputs(),
-            ),
-            // `unwrap` is safe here because the type parameter T = 3
-            ccs.M.try_into().unwrap(),
-        ))
+    /// [`R1CS::evaluate_r1cs`] evaluates the R1CS relation at a given vector of
+    /// assignments `z`.
+    ///
+    /// This method is simply a wrapper of [`CCS::evaluate_ccs`] with fixed
+    /// coefficients and multisets.
+    pub fn evaluate_r1cs(
+        &self,
+        z: Assignments<F, impl AsRef<[F]> + Sync>,
+    ) -> Result<Vec<F>, Error> {
+        let u = z[0];
+        self.evaluate_ccs(z, [vec![0, 1], vec![2]], [F::one(), -u])
     }
 }
 
@@ -196,7 +81,12 @@ impl<F: Field> From<&ConstraintSystem<F>> for R1CS<F> {
         let r1cs_predicate = &cs.predicate_constraint_systems[R1CS_PREDICATE_LABEL];
         let matrices = r1cs_predicate.to_matrices(cs);
         // `unwrap` is safe here because R1CS always has 3 matrices
-        R1CS::new(cs.into(), matrices.try_into().unwrap())
+        R1CS::new(
+            cs.num_constraints(),
+            cs.num_instance_variables + cs.num_witness_variables,
+            cs.num_instance_variables - 1, // -1 to subtract the first '1'
+            matrices.try_into().unwrap(),
+        )
     }
 }
 
@@ -210,7 +100,7 @@ impl<F: Field, W: AsRef<[F]>, U: AsRef<[F]>> ArithRelation<W, U> for R1CS<F> {
     type Evaluation = Vec<F>;
 
     fn eval_relation(&self, w: &W, x: &U) -> Result<Self::Evaluation, Error> {
-        self.evaluate_at((F::one(), x.as_ref(), w.as_ref()).into())
+        self.evaluate_r1cs((F::one(), x.as_ref(), w.as_ref()).into())
     }
 
     fn check_evaluation(_w: &W, _x: &U, e: Self::Evaluation) -> Result<(), Error> {
@@ -251,7 +141,7 @@ impl<F: Field> ArithRelation<RelaxedWitness<&[F]>, RelaxedInstance<&[F]>> for R1
         w: &RelaxedWitness<&[F]>,
         u: &RelaxedInstance<&[F]>,
     ) -> Result<Self::Evaluation, Error> {
-        self.evaluate_at((*u.u, u.x, w.w).into())
+        self.evaluate_r1cs((*u.u, u.x, w.w).into())
     }
 
     fn check_evaluation(
@@ -281,51 +171,37 @@ impl<F: Field> ArithRelation<RelaxedWitness<&[F]>, RelaxedInstance<&[F]>> for R1
 mod tests {
     use ark_bn254::Fr;
     use ark_ff::UniformRand;
-    use ark_relations::gr1cs::ConstraintSynthesizer;
     use ark_std::{error::Error, rand::thread_rng};
-    #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
-    use wasm_bindgen_test::wasm_bindgen_test as test;
 
-    use super::*;
-    use crate::circuits::{
-        ArithExtractor, AssignmentsExtractor,
-        utils::{CircuitForTest, constraints_for_test, satisfying_assignments_for_test},
+    use crate::{
+        circuits::utils::{constraints_for_test, satisfying_assignments_for_test},
+        relations::Relation,
     };
 
     #[test]
-    fn test_satisfiability() -> Result<(), Box<dyn Error>> {
+    fn test_check() -> Result<(), Box<dyn Error>> {
         let mut rng = thread_rng();
-        let circuit = CircuitForTest::<Fr> {
-            x: Fr::rand(&mut rng),
-        };
-        let cs = ConstraintSystem::new_ref();
-        circuit.generate_constraints(cs.clone())?;
-        assert!(cs.is_satisfied()?);
+        let r1cs = constraints_for_test::<Fr>();
 
-        Ok(())
-    }
+        let assignments = satisfying_assignments_for_test(Fr::rand(&mut rng));
 
-    #[test]
-    fn test_constraint_extraction() -> Result<(), Box<dyn Error>> {
-        let mut rng = thread_rng();
-        let circuit = CircuitForTest::<Fr> {
-            x: Fr::rand(&mut rng),
-        };
-        let cs = ArithExtractor::new();
-        cs.execute_synthesizer(circuit)?;
-        assert_eq!(cs.arith::<R1CS<_>>()?, constraints_for_test());
-        Ok(())
-    }
+        assert!(
+            r1cs.check_relation(&assignments.private, &assignments.public)
+                .is_ok()
+        );
+        assert!(
+            r1cs.check_relation(
+                &[
+                    Fr::rand(&mut rng),
+                    Fr::rand(&mut rng),
+                    Fr::rand(&mut rng),
+                    Fr::rand(&mut rng),
+                ],
+                &[Fr::rand(&mut rng)]
+            )
+            .is_err()
+        );
 
-    #[test]
-    fn test_witness_extraction() -> Result<(), Box<dyn Error>> {
-        let mut rng = thread_rng();
-        let x = Fr::rand(&mut rng);
-        let circuit = CircuitForTest::<Fr> { x };
-
-        let cs = AssignmentsExtractor::new();
-        cs.execute_synthesizer(circuit)?;
-        assert_eq!(cs.assignments()?, satisfying_assignments_for_test(x));
         Ok(())
     }
 }
