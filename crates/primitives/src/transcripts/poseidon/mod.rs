@@ -1,7 +1,9 @@
 //! Poseidon-based transcript configurations and implementations.
 
 use ark_crypto_primitives::sponge::poseidon::{PoseidonConfig, find_poseidon_ark_and_mds};
-use ark_ff::PrimeField;
+use ark_ff::{One, PrimeField};
+use num_bigint::BigUint;
+use num_integer::Integer;
 
 pub mod sponge;
 
@@ -14,6 +16,11 @@ pub fn poseidon_custom_config<F: PrimeField>(
     rate: usize,
     capacity: usize,
 ) -> PoseidonConfig<F> {
+    assert_eq!(
+        BigUint::from(alpha).gcd(&(-F::one()).into()),
+        BigUint::one()
+    );
+
     let (ark, mds) = find_poseidon_ark_and_mds::<F>(
         F::MODULUS_BIT_SIZE as u64,
         rate,
