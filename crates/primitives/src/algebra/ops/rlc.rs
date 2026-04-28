@@ -9,6 +9,7 @@ use ark_std::{
     iter::Sum,
     ops::{Add, Mul},
 };
+use itertools::Itertools;
 
 /// [`ScalarRLC`] computes the random linear combination for a sequence of
 /// scalars (i.e., each $v_i$ is a scalar).
@@ -28,7 +29,7 @@ where
     type Value = I::Item;
 
     fn scalar_rlc(self, coeffs: &[Coeff]) -> Self::Value {
-        self.zip(coeffs).map(|(v, c)| v * c).sum::<I::Item>()
+        self.zip_eq(coeffs).map(|(v, c)| v * c).sum::<I::Item>()
     }
 }
 
@@ -53,12 +54,12 @@ where
 
     fn slice_rlc(self, coeffs: &[Coeff]) -> Vec<Self::Value> {
         let mut iter = self
-            .zip(coeffs)
+            .zip_eq(coeffs)
             .map(|(v, c)| v.iter().map(|x| x.clone() * c));
         let first = iter.next().unwrap();
 
         iter.fold(first.collect(), |acc, v| {
-            acc.into_iter().zip(v).map(|(a, b)| a + b).collect()
+            acc.into_iter().zip_eq(v).map(|(a, b)| a + b).collect()
         })
     }
 }

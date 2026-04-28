@@ -1,6 +1,8 @@
 //! Proof verification for Nova.
 
 use ark_std::{borrow::Borrow, cfg_iter, ops::Mul};
+#[cfg(not(feature = "parallel"))]
+use itertools::Itertools;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use sonobe_primitives::{
@@ -30,7 +32,10 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemeVer
             cm_e: U.cm_e + cm_t.mul(rho),
             u: U.u + rho,
             cm_w: U.cm_w + u.cm_w.mul(rho),
-            x: cfg_iter!(U.x).zip(&u.x).map(|(a, b)| rho * b + a).collect(),
+            x: cfg_iter!(U.x)
+                .zip_eq(&u.x)
+                .map(|(a, b)| rho * b + a)
+                .collect(),
         })
     }
 }
@@ -57,7 +62,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemeVer
             u: U1.u + rho * U2.u,
             cm_w: U1.cm_w + U2.cm_w.mul(rho),
             x: cfg_iter!(U1.x)
-                .zip(&U2.x)
+                .zip_eq(&U2.x)
                 .map(|(a, b)| rho * b + a)
                 .collect(),
         })
