@@ -5,6 +5,7 @@ use ark_r1cs_std::{GR1CSVar, alloc::AllocVar, fields::fp::FpVar};
 use ark_relations::gr1cs::{
     ConstraintSynthesizer, ConstraintSystem, ConstraintSystemRef, SynthesisError, SynthesisMode,
 };
+use ark_serialize::CanonicalSerialize;
 use ark_std::{
     fmt::Debug,
     ops::{Deref, Index, IndexMut},
@@ -67,7 +68,7 @@ pub trait FCircuit {
     /// It is usually an array of field elements, but we make our design quite
     /// flexible so that the implementation is free to choose any structure for
     /// it.
-    type State: Clone + PartialEq + Absorbable;
+    type State: Clone + PartialEq + Absorbable + CanonicalSerialize;
     /// [`FCircuit::StateVar`] is the in-circuit variable type for the state.
     ///
     /// If the implementation chooses custom structures for the state, it should
