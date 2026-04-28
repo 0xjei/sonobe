@@ -28,12 +28,12 @@ impl<CM: CommitmentDef> FoldingWitness<CM> for RunningWitness<CM> {
     }
 }
 
-impl<CM: CommitmentDef, Cfg: ArithConfig> Dummy<&Cfg> for RunningWitness<CM> {
-    fn dummy(cfg: &Cfg) -> Self {
+impl<CM: CommitmentDef> Dummy<&ArithConfig> for RunningWitness<CM> {
+    fn dummy(cfg: &ArithConfig) -> Self {
         Self {
-            e: vec![Default::default(); cfg.n_constraints()],
+            e: vec![Default::default(); cfg.n_constraints],
             r_e: Default::default(),
-            w: vec![Default::default(); cfg.n_witnesses()],
+            w: vec![Default::default(); cfg.n_witnesses],
             r_w: Default::default(),
         }
     }
@@ -56,10 +56,10 @@ impl<CM: CommitmentDef> FoldingWitness<CM> for IncomingWitness<CM> {
     }
 }
 
-impl<CM: CommitmentDef, Cfg: ArithConfig> Dummy<&Cfg> for IncomingWitness<CM> {
-    fn dummy(cfg: &Cfg) -> Self {
+impl<CM: CommitmentDef> Dummy<&ArithConfig> for IncomingWitness<CM> {
+    fn dummy(cfg: &ArithConfig) -> Self {
         Self {
-            w: vec![Default::default(); cfg.n_witnesses()],
+            w: vec![Default::default(); cfg.n_witnesses],
             r_w: Default::default(),
         }
     }

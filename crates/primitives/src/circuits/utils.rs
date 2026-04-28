@@ -9,11 +9,7 @@ use ark_r1cs_std::{
 use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError, Variable};
 
 use super::Assignments;
-use crate::{
-    arithmetizations::r1cs::{R1CS, R1CSConfig},
-    circuits::FCircuit,
-    traits::SonobeField,
-};
+use crate::{arithmetizations::r1cs::R1CS, circuits::FCircuit, traits::SonobeField};
 
 /// [`CircuitForTest`] implements a simple test circuit computing
 /// `y = x^3 + x + 5` with 4 R1CS constraints.
@@ -139,7 +135,7 @@ pub fn constraints_for_test<F: Field>() -> R1CS<F> {
         vec![(F::one(), 2)],
     ];
 
-    R1CS::<F>::new(R1CSConfig::new(4, 6, 1), [A, B, C])
+    R1CS::<F>::new(4, 6, 1, [A, B, C])
 }
 
 /// [`satisfying_assignments_for_test`] returns a satisfying assignment for the

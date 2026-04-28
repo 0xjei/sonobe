@@ -2,7 +2,7 @@
 
 use ark_std::sync::Arc;
 use sonobe_primitives::{
-    arithmetizations::{Arith, ArithConfig},
+    arithmetizations::Arith,
     commitments::{CommitmentKey, GroupBasedCommitment},
     traits::SonobeField,
 };
@@ -16,7 +16,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemeKey
         let ck = Arc::new(ck);
         let r1cs = Arc::new(r1cs);
         let cfg = r1cs.config();
-        if ck.max_scalars_len() < cfg.n_constraints().max(cfg.n_witnesses()) {
+        if ck.max_scalars_len() < cfg.n_constraints.max(cfg.n_witnesses) {
             return Err(Error::InvalidPublicParameters(
                 "The commitment key is too short for the R1CS instance".into(),
             ));

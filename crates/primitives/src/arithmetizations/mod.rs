@@ -34,31 +34,34 @@ pub enum Error {
 }
 
 /// [`ArithConfig`] describes the configuration of a constraint system.
-pub trait ArithConfig: Clone + Debug + Default + PartialEq {
-    /// [`ArithConfig::degree`] returns the degree of the constraint system.
-    fn degree(&self) -> usize;
+#[derive(Clone, Debug, Default, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
+pub struct ArithConfig {
+    /// [`ArithConfig::degree`] specifies the degree of the constraint system.
+    pub degree: usize,
 
-    /// [`ArithConfig::n_constraints`] returns the number of constraints in the
+    /// [`ArithConfig::n_constraints`] specifies the number of constraints in
+    /// the constraint system.
+    pub n_constraints: usize,
+
+    /// [`ArithConfig::n_variables`] specifies the number of variables in the
     /// constraint system.
-    fn n_constraints(&self) -> usize;
+    pub n_variables: usize,
 
+    /// [`ArithConfig::n_public_inputs`] specifies the number of public inputs
+    /// in the constraint system.
+    pub n_public_inputs: usize,
+
+    /// [`ArithConfig::n_witnesses`] specifies the number of witnesses in the
+    /// constraint system.
+    pub n_witnesses: usize,
+}
+
+impl ArithConfig {
     /// [`ArithConfig::log_constraints`] returns the base-2 logarithm of the
     /// number of constraints in the constraint system.
-    fn log_constraints(&self) -> usize {
-        log2(self.n_constraints()) as usize
+    pub fn log_constraints(&self) -> usize {
+        log2(self.n_constraints) as usize
     }
-
-    /// [`ArithConfig::n_variables`] returns the number of variables in the
-    /// constraint system.
-    fn n_variables(&self) -> usize;
-
-    /// [`ArithConfig::n_public_inputs`] returns the number of public inputs in
-    /// the constraint system.
-    fn n_public_inputs(&self) -> usize;
-
-    /// [`ArithConfig::n_witnesses`] returns the number of witnesses in the
-    /// constraint system.
-    fn n_witnesses(&self) -> usize;
 }
 
 /// [`Arith`] is a trait for constraint systems (R1CS, CCS, etc.), where we
@@ -66,16 +69,8 @@ pub trait ArithConfig: Clone + Debug + Default + PartialEq {
 /// In addition to the configuration, the implementor of this trait may also
 /// store the actual constraints and other information.
 pub trait Arith: Clone + Default + Send + Sync + CanonicalSerialize + CanonicalDeserialize {
-    /// [`Arith::Config`] specifies the arithmetization's configuration.
-    type Config: ArithConfig;
-
-    /// [`Arith::config`] returns a reference to the configuration of the
-    /// constraint system.
-    fn config(&self) -> &Self::Config;
-
-    /// [`Arith::config_mut`] returns a mutable reference to the configuration
-    /// of the constraint system.
-    fn config_mut(&mut self) -> &mut Self::Config;
+    /// [`Arith::config`] returns the configuration of the constraint system.
+    fn config(&self) -> ArithConfig;
 }
 
 /// [`ArithRelation`] treats a constraint system as a relation between a witness
