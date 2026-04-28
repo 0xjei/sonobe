@@ -2,9 +2,7 @@
 
 use ark_ff::PrimeField;
 use ark_r1cs_std::{
-    GR1CSVar,
-    alloc::AllocVar,
-    fields::{FieldVar, fp::FpVar},
+    GR1CSVar, alloc::AllocVar, eq::EqGadget, fields::{FieldVar, fp::FpVar}
 };
 use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use sonobe_fs::{
@@ -98,6 +96,9 @@ where
         let cf_U_dummy = AllocVar::new_constant(cs.clone(), FS2::RU::dummy(self.arith2_config))?;
         let cf_U = AllocVar::new_witness(cs.clone(), || Ok(cf_U))?;
         let cf_proofs = Vec::new_witness(cs.clone(), || Ok(cf_proofs))?;
+
+        // 0. Check initial state consistency
+        initial_state.conditional_enforce_equal(&current_state, &is_basecase)?;
 
         // 1. Fold primary instances.
         // 1.a. Derive the public input to the primary (augmented) circuit in
