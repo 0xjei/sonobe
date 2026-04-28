@@ -27,7 +27,7 @@ use sonobe_fs::{
 };
 use sonobe_primitives::{
     algebra::field::emulated::EmulatedFieldVar,
-    arithmetizations::Arith,
+    arithmetizations::{Arith, ArithConfig},
     circuits::{ArithExtractor, AssignmentsExtractor, FCircuit},
     commitments::CommitmentDef,
     relations::WitnessInstanceSampler,
@@ -109,8 +109,8 @@ pub struct Proof<FS1: FoldingSchemeDef, FS2: FoldingSchemeDef>(
 
 impl<FS1: FoldingSchemeDef, FS2: FoldingSchemeDef, T> Dummy<&Key<FS1, FS2, T>> for Proof<FS1, FS2> {
     fn dummy(pk: &Key<FS1, FS2, T>) -> Self {
-        let cfg1 = pk.0.to_arith_config();
-        let cfg2 = pk.1.to_arith_config();
+        let cfg1 = &pk.0.to_arith_config();
+        let cfg2 = &pk.1.to_arith_config();
         Self(
             FS1::RW::dummy(cfg1),
             FS1::RU::dummy(cfg1),
@@ -205,23 +205,30 @@ where
         // To break this circular dependency, we use a fixed-point iteration
         // where we start from a default arithmetization and repeatedly update
         // it until its configuration stabilizes.
-        let mut arith1 = FS1::Arith::default();
+        let mut arith1_config = ArithConfig {
+            n_public_inputs: 1,
+            ..Default::default()
+        };
+        let arith2_config = &arith2.config();
 
+        let arith1;
         loop {
             let new_arith1 = {
                 let cs = ArithExtractor::new();
-                cs.execute_synthesizer(AugmentedCircuit::<FS1, FS2, FC, T> {
-                    hash_config: hash_config.clone(),
-                    arith1_config: arith1.config(),
-                    arith2_config: arith2.config(),
+                cs.execute_synthesizer(AugmentedCircuit::<FS1, FS2, FC, T>::new(
+                    &hash_config,
+                    &arith1_config,
+                    arith2_config,
                     step_circuit,
-                })?;
+                ))?;
                 cs.arith::<FS1::Arith>()?
             };
-            if new_arith1.config() == arith1.config() {
+            let new_arith1_config = new_arith1.config();
+            if new_arith1_config == arith1_config {
+                arith1 = new_arith1;
                 break;
             }
-            arith1 = new_arith1;
+            arith1_config = new_arith1_config;
         }
 
         let dk1 = FS1::generate_keys(pp1, arith1)?;
@@ -270,8 +277,8 @@ where
         let hash = T::new_with_pp_hash(hash_config, *pp_hash);
         let mut transcript = hash.separate_domain("transcript".as_ref());
 
-        let arith1_config = dk1.to_arith_config();
-        let arith2_config = dk2.to_arith_config();
+        let arith1_config = &dk1.to_arith_config();
+        let arith2_config = &dk2.to_arith_config();
 
         let (mut WW, mut UU) = (Dummy::dummy(arith1_config), Dummy::dummy(arith1_config));
         let mut proof = Dummy::dummy(arith1_config);
@@ -313,12 +320,12 @@ where
 
         let cs = AssignmentsExtractor::new();
         let (next_state, external_outputs) = cs.execute_fn(|cs| {
-            let augmented_circuit = AugmentedCircuit::<FS1, FS2, FC, T> {
-                hash_config: hash_config.clone(),
+            let augmented_circuit = AugmentedCircuit::<FS1, FS2, FC, T>::new(
+                hash_config,
                 arith1_config,
                 arith2_config,
                 step_circuit,
-            };
+            );
             augmented_circuit.compute_next_state(
                 cs,
                 *pp_hash,

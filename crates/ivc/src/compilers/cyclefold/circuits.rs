@@ -9,12 +9,13 @@ use ark_r1cs_std::{
 };
 use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use ark_serialize::CanonicalSerialize;
+use ark_std::marker::PhantomData;
 use sonobe_fs::{
     FoldingInstanceVar, FoldingSchemeFullVerifierGadget, FoldingSchemePartialVerifierGadget,
     GroupBasedFoldingSchemePrimary, GroupBasedFoldingSchemeSecondary,
 };
 use sonobe_primitives::{
-    arithmetizations::Arith,
+    arithmetizations::ArithConfig,
     circuits::{FCircuit, WitnessToPublic},
     commitments::CommitmentDef,
     traits::{Dummy, SonobeCurve},
@@ -32,10 +33,36 @@ pub struct AugmentedCircuit<
     FC: FCircuit,
     T: Transcript<FC::Field>,
 > {
-    pub(super) hash_config: T::Config,
-    pub(super) arith1_config: &'a <FS1::Arith as Arith>::Config,
-    pub(super) arith2_config: &'a <FS2::Arith as Arith>::Config,
-    pub(super) step_circuit: &'a FC,
+    _fs: PhantomData<(FS1, FS2)>,
+    hash_config: &'a T::Config,
+    arith1_config: &'a ArithConfig,
+    arith2_config: &'a ArithConfig,
+    step_circuit: &'a FC,
+}
+
+impl<'a, FS1, FS2, FC, T> AugmentedCircuit<'a, FS1, FS2, FC, T>
+where
+    FS1: GroupBasedFoldingSchemePrimary<1, 1>,
+    FS2: GroupBasedFoldingSchemeSecondary<1, 1>,
+    FC: FCircuit,
+    T: Transcript<FC::Field>,
+{
+    /// [`AugmentedCircuit::new`] creates an instance of the augmented circuit
+    /// for the given step circuit.
+    pub fn new(
+        hash_config: &'a T::Config,
+        arith1_config: &'a ArithConfig,
+        arith2_config: &'a ArithConfig,
+        step_circuit: &'a FC,
+    ) -> Self {
+        Self {
+            _fs: PhantomData,
+            hash_config,
+            arith1_config,
+            arith2_config,
+            step_circuit,
+        }
+    }
 }
 
 impl<'a, FS1, FS2, FC, T> AugmentedCircuit<'a, FS1, FS2, FC, T>
@@ -79,7 +106,7 @@ where
         cf_proofs: Vec<FS2::Proof<1, 1>>,
     ) -> Result<(FC::State, FC::ExternalOutputs), SynthesisError> {
         let hash = T::Gadget::new_with_pp_hash(
-            &self.hash_config,
+            self.hash_config,
             &FpVar::new_witness(cs.clone(), || Ok(pp_hash))?,
         )?;
         let sponge = hash.separate_domain("sponge".as_ref())?;
@@ -131,9 +158,9 @@ where
         let actual_UU = is_basecase.select(&U_dummy, &UU)?;
 
         // 2. Fold secondary instances.
-            // 2.a. Derive the public inputs to the secondary (CycleFold)
-            //      circuits in the `i`-th step, which are obtained by calling
-            //      the implementation of `FoldingSchemeCycleFoldExt`.
+        // 2.a. Derive the public inputs to the secondary (CycleFold)
+        //      circuits in the `i`-th step, which are obtained by calling
+        //      the implementation of `FoldingSchemeCycleFoldExt`.
         let cf_u_xs = FS1::to_cyclefold_inputs([U], [u], UU, proof, rho)?;
         if [cf_us.len(), cf_u_xs.len(), cf_proofs.len()] != [FS1::N_CYCLEFOLDS; 3] {
             return Err(SynthesisError::Unsatisfiable);

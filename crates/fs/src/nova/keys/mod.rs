@@ -29,7 +29,6 @@ pub struct NovaKey<A: Arith, CM: CommitmentDef> {
 impl<A: Arith, CM: CommitmentDef> DeciderKey for NovaKey<A, CM> {
     type ProverKey = Self;
     type VerifierKey = ();
-    type ArithConfig = A::Config;
 
     fn to_pk(&self) -> &Self::ProverKey {
         self
@@ -39,7 +38,7 @@ impl<A: Arith, CM: CommitmentDef> DeciderKey for NovaKey<A, CM> {
         &()
     }
 
-    fn to_arith_config(&self) -> &Self::ArithConfig {
+    fn to_arith_config(&self) -> ArithConfig {
         self.arith.config()
     }
 }
@@ -131,10 +130,10 @@ where
         let cfg = self.arith.config();
 
         let u = CM::Scalar::rand(&mut rng);
-        let x = (0..cfg.n_public_inputs())
+        let x = (0..cfg.n_public_inputs)
             .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
-        let w = (0..cfg.n_witnesses())
+        let w = (0..cfg.n_witnesses)
             .map(|_| CM::Scalar::rand(&mut rng))
             .collect::<Vec<_>>();
         let e = self.arith.eval_relation(

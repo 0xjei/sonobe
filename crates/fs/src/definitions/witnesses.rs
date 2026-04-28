@@ -12,7 +12,7 @@ use super::utils::TaggedVec;
 
 /// [`FoldingWitness`] defines the operations that a folding scheme's witness
 /// should support.
-pub trait FoldingWitness<CM: CommitmentDef>: Debug {
+pub trait FoldingWitness<CM: CommitmentDef>: Debug + for<'a> Dummy<&'a ArithConfig> {
     /// [`FoldingWitness::N_OPENINGS`] defines the number of openings contained
     /// in the witness.
     const N_OPENINGS: usize;
@@ -33,9 +33,9 @@ pub trait FoldingWitness<CM: CommitmentDef>: Debug {
 /// `'w'` for it.
 pub type PlainWitness<V> = TaggedVec<V, 'w'>;
 
-impl<V: Default + Clone, A: ArithConfig> Dummy<&A> for PlainWitness<V> {
-    fn dummy(cfg: &A) -> Self {
-        vec![V::default(); cfg.n_witnesses()].into()
+impl<V: Default + Clone> Dummy<&ArithConfig> for PlainWitness<V> {
+    fn dummy(cfg: &ArithConfig) -> Self {
+        vec![V::default(); cfg.n_witnesses].into()
     }
 }
 

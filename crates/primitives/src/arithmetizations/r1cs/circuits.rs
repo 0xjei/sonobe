@@ -44,9 +44,21 @@ impl<F: PrimeField, ConstraintF: PrimeField, FVar: AllocVar<F, ConstraintF>>
             let val = val.borrow();
 
             Ok(Self {
-                A: SparseMatrixVar::<FVar>::new_variable(cs.clone(), || Ok(&val.A), mode)?,
-                B: SparseMatrixVar::<FVar>::new_variable(cs.clone(), || Ok(&val.B), mode)?,
-                C: SparseMatrixVar::<FVar>::new_variable(cs.clone(), || Ok(&val.C), mode)?,
+                A: SparseMatrixVar::<FVar>::new_variable(
+                    cs.clone(),
+                    || Ok(&val.matrices[0]),
+                    mode,
+                )?,
+                B: SparseMatrixVar::<FVar>::new_variable(
+                    cs.clone(),
+                    || Ok(&val.matrices[1]),
+                    mode,
+                )?,
+                C: SparseMatrixVar::<FVar>::new_variable(
+                    cs.clone(),
+                    || Ok(&val.matrices[2]),
+                    mode,
+                )?,
             })
         })
     }
@@ -115,13 +127,13 @@ mod tests {
         let r1cs = constraints_for_test::<Fr>();
 
         assert!(
-            r1cs.evaluate_at(satisfying_assignments_for_test(Fr::rand(&mut rng)))?
+            r1cs.evaluate_r1cs(satisfying_assignments_for_test(Fr::rand(&mut rng)))?
                 .into_iter()
                 .all(|e| e.is_zero())
         );
         assert!(
             !r1cs
-                .evaluate_at(Assignments::from((
+                .evaluate_r1cs(Assignments::from((
                     Fr::one(),
                     vec![Fr::rand(&mut rng)],
                     vec![

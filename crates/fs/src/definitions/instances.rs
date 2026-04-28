@@ -14,7 +14,9 @@ use super::utils::TaggedVec;
 
 /// [`FoldingInstance`] defines the operations that a folding scheme's instance
 /// should support.
-pub trait FoldingInstance<CM: CommitmentDef>: Clone + Debug + PartialEq + Eq + Absorbable {
+pub trait FoldingInstance<CM: CommitmentDef>:
+    Clone + Debug + PartialEq + Eq + Absorbable + for<'a> Dummy<&'a ArithConfig>
+{
     /// [`FoldingInstance::N_COMMITMENTS`] defines the number of commitments
     /// contained in the instance.
     const N_COMMITMENTS: usize;
@@ -44,9 +46,9 @@ pub trait FoldingInstance<CM: CommitmentDef>: Clone + Debug + PartialEq + Eq + A
 /// `'u'` for it.
 pub type PlainInstance<V> = TaggedVec<V, 'u'>;
 
-impl<V: Default + Clone, A: ArithConfig> Dummy<&A> for PlainInstance<V> {
-    fn dummy(cfg: &A) -> Self {
-        vec![V::default(); cfg.n_public_inputs()].into()
+impl<V: Default + Clone> Dummy<&ArithConfig> for PlainInstance<V> {
+    fn dummy(cfg: &ArithConfig) -> Self {
+        vec![V::default(); cfg.n_public_inputs].into()
     }
 }
 

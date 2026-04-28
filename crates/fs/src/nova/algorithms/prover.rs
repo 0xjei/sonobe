@@ -32,7 +32,7 @@ fn cross_term<'a, F: Field>(
 
     // Compute the cross term `T` by following the optimized approach in
     // [Mova](https://eprint.iacr.org/2024/1220.pdf)'s section 5.2.
-    let v = arith.evaluate_at(AssignmentsOwned::from((
+    let v = arith.evaluate_r1cs(AssignmentsOwned::from((
         z1.constant + z2.constant,
         cfg_iter!(z1.public)
             .zip_eq(z2.public)

@@ -40,13 +40,13 @@ impl<CM: CommitmentDef> FoldingInstance<CM> for RunningInstance<CM> {
     }
 }
 
-impl<CM: CommitmentDef, Cfg: ArithConfig> Dummy<&Cfg> for RunningInstance<CM> {
-    fn dummy(cfg: &Cfg) -> Self {
+impl<CM: CommitmentDef> Dummy<&ArithConfig> for RunningInstance<CM> {
+    fn dummy(cfg: &ArithConfig) -> Self {
         Self {
             cm_e: Default::default(),
             u: Default::default(),
             cm_w: Default::default(),
-            x: vec![Default::default(); cfg.n_public_inputs()],
+            x: vec![Default::default(); cfg.n_public_inputs],
         }
     }
 }
@@ -85,11 +85,11 @@ impl<CM: CommitmentDef> FoldingInstance<CM> for IncomingInstance<CM> {
     }
 }
 
-impl<CM: CommitmentDef, Cfg: ArithConfig> Dummy<&Cfg> for IncomingInstance<CM> {
-    fn dummy(cfg: &Cfg) -> Self {
+impl<CM: CommitmentDef> Dummy<&ArithConfig> for IncomingInstance<CM> {
+    fn dummy(cfg: &ArithConfig) -> Self {
         Self {
             cm_w: Default::default(),
-            x: vec![Default::default(); cfg.n_public_inputs()],
+            x: vec![Default::default(); cfg.n_public_inputs],
         }
     }
 }
