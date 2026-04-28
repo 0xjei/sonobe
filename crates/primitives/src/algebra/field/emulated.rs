@@ -803,22 +803,6 @@ impl<F: SonobeField, Cfg> EqGadget<F> for LimbedVar<F, Cfg, true> {
         Ok(())
     }
 
-    fn enforce_not_equal(&self, other: &Self) -> Result<(), SynthesisError> {
-        if self.limbs.len() != other.limbs.len() {
-            return Err(SynthesisError::Unsatisfiable);
-        }
-        if self.bounds.len() != other.bounds.len() {
-            return Err(SynthesisError::Unsatisfiable);
-        }
-        for i in 0..self.limbs.len() {
-            if self.bounds[i] != other.bounds[i] {
-                return Err(SynthesisError::Unsatisfiable);
-            }
-            self.limbs[i].enforce_not_equal(&other.limbs[i])?;
-        }
-        Ok(())
-    }
-
     fn conditional_enforce_equal(
         &self,
         other: &Self,
