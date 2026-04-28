@@ -259,6 +259,14 @@ impl<F: Field> ArithRelation<RelaxedWitness<&[F]>, RelaxedInstance<&[F]>> for R1
         _u: &RelaxedInstance<&[F]>,
         v: Self::Evaluation,
     ) -> Result<(), Error> {
+        if w.e.len() != v.len() {
+            return Err(Error::MalformedAssignments(format!(
+                "The number of constraints in R1CS ({}) does not match the length of the provided relaxed witness's error term ({}).",
+                v.len(),
+                w.e.len()
+            )));
+        }
+
         cfg_iter!(w.e)
             .zip(&v)
             .all(|(e, v)| e == v)

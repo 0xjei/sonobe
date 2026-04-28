@@ -2,6 +2,8 @@
 
 use ark_ff::{Field, One};
 use ark_std::{borrow::Borrow, cfg_into_iter, cfg_iter, ops::Mul, rand::RngCore};
+#[cfg(not(feature = "parallel"))]
+use itertools::Itertools;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 use sonobe_primitives::{
@@ -33,16 +35,16 @@ fn cross_term<'a, F: Field>(
     let v = arith.evaluate_at(AssignmentsOwned::from((
         z1.constant + z2.constant,
         cfg_iter!(z1.public)
-            .zip(z2.public)
+            .zip_eq(z2.public)
             .map(|(a, b)| *a + b)
             .collect(),
         cfg_iter!(z1.private)
-            .zip(z2.private)
+            .zip_eq(z2.private)
             .map(|(a, b)| *a + b)
             .collect(),
     )))?;
     Ok(cfg_into_iter!(v)
-        .zip(e)
+        .zip_eq(e)
         .map(|(a, b)| a - b.borrow())
         .collect())
 }
@@ -72,16 +74,25 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemePro
         let rho = CM::Scalar::from_bits_le(&rho_bits);
 
         let WW = Self::RW {
-            e: cfg_iter!(W.e).zip(&t).map(|(a, b)| rho * b + a).collect(),
+            e: cfg_iter!(W.e)
+                .zip_eq(&t)
+                .map(|(a, b)| rho * b + a)
+                .collect(),
             r_e: W.r_e + r_t * rho,
-            w: cfg_iter!(W.w).zip(&w.w).map(|(a, b)| rho * b + a).collect(),
+            w: cfg_iter!(W.w)
+                .zip_eq(&w.w)
+                .map(|(a, b)| rho * b + a)
+                .collect(),
             r_w: W.r_w + w.r_w * rho,
         };
         let UU = Self::RU {
             cm_e: U.cm_e + cm_t.mul(rho),
             u: U.u + rho,
             cm_w: U.cm_w + u.cm_w.mul(rho),
-            x: cfg_iter!(U.x).zip(&u.x).map(|(a, b)| rho * b + a).collect(),
+            x: cfg_iter!(U.x)
+                .zip_eq(&u.x)
+                .map(|(a, b)| rho * b + a)
+                .collect(),
         };
         Ok((WW, UU, cm_t, rho_bits.try_into().unwrap()))
     }
@@ -104,7 +115,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemePro
         let (W2, U2) = (W2.borrow(), U2.borrow());
 
         let (z1, z2) = ((U1.u, &U1.x[..], &W1.w[..]), (U2.u, &U2.x[..], &W2.w[..]));
-        let e = cfg_iter!(W1.e).zip(&W2.e).map(|(a, b)| *a + b);
+        let e = cfg_iter!(W1.e).zip_eq(&W2.e).map(|(a, b)| *a + b);
         let t = cross_term(&pk.arith, z1, z2, e)?;
 
         let (cm_t, r_t) = CM::commit(&pk.ck, &t, rng)?;
@@ -115,13 +126,13 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemePro
 
         let WW = Self::RW {
             e: cfg_iter!(W1.e)
-                .zip(&t)
-                .zip(&W2.e)
+                .zip_eq(&t)
+                .zip_eq(&W2.e)
                 .map(|((a, b), c)| rho_squared * c + rho * b + a)
                 .collect(),
             r_e: W1.r_e + r_t * rho + W2.r_e * rho_squared,
             w: cfg_iter!(W1.w)
-                .zip(&W2.w)
+                .zip_eq(&W2.w)
                 .map(|(a, b)| rho * b + a)
                 .collect(),
             r_w: W1.r_w + W2.r_w * rho,
@@ -131,7 +142,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemePro
             u: U1.u + rho * U2.u,
             cm_w: U1.cm_w + U2.cm_w.mul(rho),
             x: cfg_iter!(U1.x)
-                .zip(&U2.x)
+                .zip_eq(&U2.x)
                 .map(|(a, b)| rho * b + a)
                 .collect(),
         };

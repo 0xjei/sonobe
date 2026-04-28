@@ -25,6 +25,10 @@ impl<F: PrimeField> EquivalenceGadget<FpVar<F>> for FpVar<F> {
 
 impl<T: EquivalenceGadget<T>> EquivalenceGadget<[T]> for [T] {
     fn enforce_equivalent(&self, other: &[T]) -> Result<(), SynthesisError> {
+        if self.len() != other.len() {
+            return Err(SynthesisError::Unsatisfiable);
+        }
+
         self.iter()
             .zip(other)
             .try_for_each(|(a, b)| a.enforce_equivalent(b))
