@@ -358,10 +358,15 @@ where
                 .ok_or(Error::IVCVerificationFail);
         }
 
+        if initial_state.uncompressed_size() != current_state.uncompressed_size() {
+            return Err(Error::IVCVerificationFail);
+        }
+
         let hash = T::new_with_pp_hash(hash_config, *pp_hash);
         let mut sponge = hash.separate_domain("sponge".as_ref());
 
         let u_x = sponge
+            .add(&initial_state.uncompressed_size())
             .add(&i)
             .add(initial_state)
             .add(current_state)
