@@ -825,7 +825,7 @@ impl<F: SonobeField, Cfg> EqGadget<F> for LimbedVar<F, Cfg, true> {
             if should_enforce.value()? {
                 return self.enforce_equal(other);
             } else {
-                return self.enforce_not_equal(other);
+                return Ok(()); // No constraint when should_enforce is false
             }
         }
         self.is_eq(other)?
