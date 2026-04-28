@@ -1105,8 +1105,8 @@ impl<F: SonobeField, G: SonobeField, Cfg> AllocVar<G, F> for LimbedVar<F, Cfg, t
             || {
                 f().map(|v| {
                     (
-                        BigInt::from_biguint(Sign::Plus, (*v.borrow()).into()),
-                        Bounds(Zero::zero(), G::MODULUS.into().into()),
+                        v.borrow().into_bigint().into().into(),
+                        Bounds(Zero::zero(), (-G::one()).into_bigint().into().into()),
                     )
                 })
             },
