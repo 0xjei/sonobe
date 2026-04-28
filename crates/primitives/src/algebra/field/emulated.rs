@@ -1366,24 +1366,29 @@ mod tests {
         let rng = &mut thread_rng();
 
         let size = 1024;
-        let mut lbs = vec![BigInt::zero()];
-        let mut ubs: Vec<BigInt> = vec![(BigInt::one() << size) - BigInt::one()];
-        lbs.push(-ubs[0].clone());
-        ubs.push(BigInt::zero());
-        lbs.push(-ubs[0].clone());
-        ubs.push(ubs[0].clone());
-        lbs.push(rng.gen_bigint_range(&-&ubs[0], &BigInt::zero()));
-        ubs.push(BigInt::zero());
-        lbs.push(BigInt::zero());
-        ubs.push(rng.gen_bigint_range(&BigInt::zero(), &ubs[0]));
-        lbs.push(rng.gen_bigint_range(&-&ubs[0], &BigInt::zero()));
-        ubs.push(rng.gen_bigint_range(&BigInt::zero(), &ubs[0]));
-        lbs.push(rng.gen_bigint_range(&-&ubs[0], &BigInt::zero()));
-        ubs.push(rng.gen_bigint_range(lbs.last().unwrap(), &BigInt::zero()));
-        lbs.push(rng.gen_bigint_range(&BigInt::zero(), &ubs[0]));
-        ubs.push(rng.gen_bigint_range(lbs.last().unwrap(), &ubs[0]));
+        let zero = BigInt::zero();
+        let max: BigInt = (BigInt::one() << size) - BigInt::one();
 
-        for (lb, ub) in lbs.into_iter().zip(ubs) {
+        let mut bounds = vec![(zero.clone(), max.clone())];
+
+        bounds.push((-&max, zero.clone()));
+        bounds.push((-&max, max.clone()));
+        bounds.push((rng.gen_bigint_range(&-&max, &zero), zero.clone()));
+        bounds.push((zero.clone(), rng.gen_bigint_range(&zero, &max)));
+        bounds.push((
+            rng.gen_bigint_range(&-&max, &zero),
+            rng.gen_bigint_range(&zero, &max),
+        ));
+        bounds.push({
+            let lb = rng.gen_bigint_range(&-&max, &zero);
+            (lb.clone(), rng.gen_bigint_range(&lb, &zero))
+        });
+        bounds.push({
+            let lb = rng.gen_bigint_range(&zero, &max);
+            (lb.clone(), rng.gen_bigint_range(&lb, &max))
+        });
+
+        for (lb, ub) in bounds {
             let mut v = vec![
                 lb.clone(),
                 ub.clone(),
@@ -1632,17 +1637,18 @@ mod tests {
         let rng = &mut thread_rng();
         let a = (0..len).map(|_| Fq::rand(rng)).collect::<Vec<Fq>>();
         let b = (0..len).map(|_| Fq::rand(rng)).collect::<Vec<Fq>>();
-        let c = a.iter().zip(b.iter()).map(|(a, b)| a * b).sum::<Fq>();
 
-        let a_var = Vec::<EmulatedFieldVar<Fr, Fq>>::new_witness(cs.clone(), || Ok(a))?;
-        let b_var = Vec::<EmulatedFieldVar<Fr, Fq>>::new_witness(cs.clone(), || Ok(b))?;
-        let c_var = EmulatedFieldVar::new_witness(cs.clone(), || Ok(c))?;
+        let a_var = Vec::<EmulatedFieldVar<Fr, Fq>>::new_witness(cs.clone(), || Ok(&a[..]))?;
+        let b_var = Vec::<EmulatedFieldVar<Fr, Fq>>::new_witness(cs.clone(), || Ok(&b[..]))?;
 
+        let mut c = Fq::zero();
         let mut r_var: LimbedVar<Fr, Fq, false> =
             EmulatedFieldVar::constant(BigUint::zero().into()).into();
-        for (a, b) in a_var.into_iter().zip(b_var) {
-            r_var = r_var.add_unaligned(&a.mul_unaligned(&b)?)?;
+        for i in 0..len {
+            c += a[i] * b[i];
+            r_var = r_var.add_unaligned(&a_var[i].mul_unaligned(&b_var[i])?)?;
         }
+        let c_var = EmulatedFieldVar::new_witness(cs.clone(), || Ok(c))?;
         r_var.enforce_congruent(&c_var)?;
 
         assert!(cs.is_satisfied()?);

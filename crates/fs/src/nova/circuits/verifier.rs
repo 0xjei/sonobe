@@ -27,6 +27,10 @@ where
         let rho_bits = transcript.add(&U)?.add(&u)?.add(proof)?.challenge_bits(B)?;
         let rho = CM::ScalarVar::from_bits_le(&rho_bits)?;
 
+        if U.x.len() != u.x.len() {
+            return Err(SynthesisError::Unsatisfiable);
+        }
+
         Ok((
             Self::RU {
                 u: (U.u.clone() + &rho)
@@ -72,6 +76,10 @@ where
     ) -> Result<(Self::RU, Self::Challenge), SynthesisError> {
         let rho_bits = transcript.add(&(U1, U2))?.add(proof)?.challenge_bits(B)?;
         let rho = CM::ScalarVar::from_bits_le(&rho_bits)?;
+
+        if U1.x.len() != U2.x.len() {
+            return Err(SynthesisError::Unsatisfiable);
+        }
 
         Ok((
             Self::RU {
@@ -122,6 +130,10 @@ where
     ) -> Result<Self::RU, SynthesisError> {
         let rho_bits = transcript.add(&U)?.add(&u)?.add(proof)?.challenge_bits(B)?;
         let rho = CM::ScalarVar::from_bits_le(&rho_bits)?;
+
+        if U.x.len() != u.x.len() {
+            return Err(SynthesisError::Unsatisfiable);
+        }
 
         Ok(Self::RU {
             u: (U.u.clone() + &rho)

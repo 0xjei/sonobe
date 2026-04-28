@@ -46,6 +46,7 @@ use ark_r1cs_std::{
 };
 use ark_relations::gr1cs::SynthesisError;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use itertools::Itertools;
 use num_bigint::BigUint;
 use sha3::{
     Shake128, Shake128Reader,
@@ -236,7 +237,10 @@ impl Griffin {
         input.iter().skip(1).for_each(|el| sum.add_assign(el));
 
         if round < params.rounds - 1 {
-            for (el, rc) in input.iter_mut().zip(params.round_constants[round].iter()) {
+            for (el, rc) in input
+                .iter_mut()
+                .zip_eq(params.round_constants[round].iter())
+            {
                 el.add_assign(&sum);
                 el.add_assign(rc); // add round constant
             }
@@ -277,7 +281,10 @@ impl Griffin {
         input[3] = t_4;
 
         if round < params.rounds - 1 {
-            for (i, rc) in input.iter_mut().zip(params.round_constants[round].iter()) {
+            for (i, rc) in input
+                .iter_mut()
+                .zip_eq(params.round_constants[round].iter())
+            {
                 i.add_assign(rc);
             }
         }
@@ -468,7 +475,7 @@ impl GriffinGadget {
         current_state = params
             .mat
             .iter()
-            .map(|row| current_state.iter().zip(row).map(|(a, b)| a * *b).sum())
+            .map(|row| current_state.iter().zip_eq(row).map(|(a, b)| a * *b).sum())
             .collect();
 
         for r in 0..params.rounds {
@@ -476,12 +483,12 @@ impl GriffinGadget {
             current_state = params
                 .mat
                 .iter()
-                .map(|row| current_state.iter().zip(row).map(|(a, b)| a * *b).sum())
+                .map(|row| current_state.iter().zip_eq(row).map(|(a, b)| a * *b).sum())
                 .collect();
             if r < params.rounds - 1 {
                 current_state = current_state
                     .iter()
-                    .zip(&params.round_constants[r])
+                    .zip_eq(&params.round_constants[r])
                     .map(|(c, rc)| c + *rc)
                     .collect();
             }

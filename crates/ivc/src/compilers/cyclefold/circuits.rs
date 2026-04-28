@@ -131,15 +131,15 @@ where
         let actual_UU = is_basecase.select(&U_dummy, &UU)?;
 
         // 2. Fold secondary instances.
-        let mut cf_UU = cf_U;
-        for ((cf_u, cf_u_x), cf_proof) in cf_us
-            .iter()
             // 2.a. Derive the public inputs to the secondary (CycleFold)
             //      circuits in the `i`-th step, which are obtained by calling
             //      the implementation of `FoldingSchemeCycleFoldExt`.
-            .zip(FS1::to_cyclefold_inputs([U], [u], UU, proof, rho)?)
-            .zip(&cf_proofs)
-        {
+        let cf_u_xs = FS1::to_cyclefold_inputs([U], [u], UU, proof, rho)?;
+        if [cf_us.len(), cf_u_xs.len(), cf_proofs.len()] != [FS1::N_CYCLEFOLDS; 3] {
+            return Err(SynthesisError::Unsatisfiable);
+        }
+        let mut cf_UU = cf_U;
+        for ((cf_u, cf_u_x), cf_proof) in cf_us.iter().zip(cf_u_xs).zip(&cf_proofs) {
             // 2.b. Construct the incoming instance `cf_u` representing the
             //      corresponding execution of secondary (CycleFold) circuit
             //      with the derived public inputs.
