@@ -1,7 +1,7 @@
 //! This module defines circuits and helpers used by Sonobe.
 
 use ark_ff::{Field, PrimeField};
-use ark_r1cs_std::{GR1CSVar, alloc::AllocVar, fields::fp::FpVar};
+use ark_r1cs_std::{GR1CSVar, alloc::AllocVar, eq::EqGadget, fields::fp::FpVar};
 use ark_relations::gr1cs::{
     ConstraintSynthesizer, ConstraintSystem, ConstraintSystemRef, SynthesisError, SynthesisMode,
 };
@@ -75,7 +75,8 @@ pub trait FCircuit {
     /// implement the required traits for the corresponding variable type.
     type StateVar: GR1CSVar<Self::Field, Value = Self::State>
         + AllocVar<Self::State, Self::Field>
-        + AbsorbableVar<Self::Field>;
+        + AbsorbableVar<Self::Field>
+        + EqGadget<Self::Field>;
     /// [`FCircuit::ExternalInputs`] is the type of external inputs provided to
     /// each step of the circuit.
     type ExternalInputs;
