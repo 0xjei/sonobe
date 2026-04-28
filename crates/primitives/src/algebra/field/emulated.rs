@@ -771,20 +771,24 @@ impl<Base: SonobeField, Target: SonobeField> TwoStageFieldVar for LimbedVar<Base
 // Only implement `EqGadget` for aligned variables.
 impl<F: SonobeField, Cfg> EqGadget<F> for LimbedVar<F, Cfg, true> {
     fn is_eq(&self, other: &Self) -> Result<Boolean<F>, SynthesisError> {
-        let mut result = Boolean::TRUE;
         if self.limbs.len() != other.limbs.len() {
             return Err(SynthesisError::Unsatisfiable);
         }
         if self.bounds.len() != other.bounds.len() {
             return Err(SynthesisError::Unsatisfiable);
         }
+        let mut bits = vec![];
         for i in 0..self.limbs.len() {
             if self.bounds[i] != other.bounds[i] {
                 return Err(SynthesisError::Unsatisfiable);
             }
-            result &= self.limbs[i].is_eq(&other.limbs[i])?;
+            bits.push(self.limbs[i].is_eq(&other.limbs[i])?);
         }
-        Ok(result)
+        if bits.len() == 0 {
+            Ok(Boolean::TRUE)
+        } else {
+            Boolean::kary_and(&bits)
+        }
     }
 
     fn enforce_equal(&self, other: &Self) -> Result<(), SynthesisError> {
