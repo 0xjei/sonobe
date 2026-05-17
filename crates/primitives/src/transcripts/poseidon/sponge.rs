@@ -95,13 +95,13 @@ mod tests {
 
     use crate::{
         algebra::group::emulated::EmulatedAffineVar,
-        transcripts::{Transcript, TranscriptGadget, poseidon::poseidon_canonical_config},
+        transcripts::{Transcript, TranscriptGadget, poseidon::poseidon_circom_config},
     };
 
     // Test with value taken from https://github.com/iden3/circomlibjs/blob/43cc582b100fc3459cf78d903a6f538e5d7f38ee/test/poseidon.js#L32
     #[test]
     fn check_against_circom_poseidon() -> Result<(), Box<dyn Error>> {
-        let config = poseidon_canonical_config::<Fr>();
+        let config = poseidon_circom_config::<Fr>();
         let mut poseidon_sponge = PoseidonSponge::new(&config);
         let v = vec![1, 2, 3, 4]
             .into_iter()
@@ -122,7 +122,7 @@ mod tests {
     #[test]
     fn test_challenge_field_element() -> Result<(), Box<dyn Error>> {
         // Create a transcript outside of the circuit
-        let config = poseidon_canonical_config::<Fr>();
+        let config = poseidon_circom_config::<Fr>();
         let mut tr = PoseidonSponge::<Fr>::new(&config);
         tr.add(&Fr::from(42_u32));
         let c = tr.challenge_field_element();
@@ -145,7 +145,7 @@ mod tests {
         let nbits = 128;
 
         // Create a transcript outside of the circuit
-        let config = poseidon_canonical_config::<Fq>();
+        let config = poseidon_circom_config::<Fq>();
         let mut tr = PoseidonSponge::<Fq>::new(&config);
         tr.add(&Fq::from(42_u32));
         let c = tr.challenge_bits(nbits);
@@ -166,7 +166,7 @@ mod tests {
     #[test]
     fn test_absorb_canonical_point() -> Result<(), Box<dyn Error>> {
         // Create a transcript outside of the circuit
-        let config = poseidon_canonical_config::<Fq>();
+        let config = poseidon_circom_config::<Fq>();
         let mut tr = PoseidonSponge::<Fq>::new(&config);
         let rng = &mut thread_rng();
 
@@ -190,7 +190,7 @@ mod tests {
     #[test]
     fn test_absorb_emulated_point() -> Result<(), Box<dyn Error>> {
         // Create a transcript outside of the circuit
-        let config = poseidon_canonical_config::<Fr>();
+        let config = poseidon_circom_config::<Fr>();
         let mut tr = PoseidonSponge::<Fr>::new(&config);
         let rng = &mut thread_rng();
 
