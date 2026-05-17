@@ -2,7 +2,10 @@
 
 use ark_ff::PrimeField;
 use ark_r1cs_std::{
-    GR1CSVar, alloc::AllocVar, eq::EqGadget, fields::{FieldVar, fp::FpVar}
+    GR1CSVar,
+    alloc::AllocVar,
+    eq::EqGadget,
+    fields::{FieldVar, fp::FpVar},
 };
 use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError};
 use sonobe_fs::{
