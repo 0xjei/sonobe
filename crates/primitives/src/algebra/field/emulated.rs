@@ -784,7 +784,7 @@ impl<F: SonobeField, Cfg> EqGadget<F> for LimbedVar<F, Cfg, true> {
             }
             bits.push(self.limbs[i].is_eq(&other.limbs[i])?);
         }
-        if bits.len() == 0 {
+        if bits.is_empty() {
             Ok(Boolean::TRUE)
         } else {
             Boolean::kary_and(&bits)
