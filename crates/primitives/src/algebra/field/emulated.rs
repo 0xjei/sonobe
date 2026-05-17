@@ -1392,7 +1392,7 @@ mod tests {
         lbs.push(rng.gen_bigint_range(&BigInt::zero(), &ubs[0]));
         ubs.push(rng.gen_bigint_range(lbs.last().unwrap(), &ubs[0]));
 
-        for (lb, ub) in lbs.into_iter().zip(ubs.into_iter()) {
+        for (lb, ub) in lbs.into_iter().zip(ubs) {
             let mut v = vec![
                 lb.clone(),
                 ub.clone(),
@@ -1649,7 +1649,7 @@ mod tests {
 
         let mut r_var: LimbedVar<Fr, Fq, false> =
             EmulatedFieldVar::constant(BigUint::zero().into()).into();
-        for (a, b) in a_var.into_iter().zip(b_var.into_iter()) {
+        for (a, b) in a_var.into_iter().zip(b_var) {
             r_var = r_var.add_unaligned(&a.mul_unaligned(&b)?)?;
         }
         r_var.enforce_congruent(&c_var)?;
