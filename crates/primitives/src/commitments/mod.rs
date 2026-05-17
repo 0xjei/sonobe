@@ -134,7 +134,7 @@ pub trait CommitmentDefGadget: Clone {
 
     /// [`CommitmentDefGadget::KeyVar`] is the in-circuit variable type for the
     /// commitment key.
-    type KeyVar;
+    type KeyVar: AllocVar<<Self::Widget as CommitmentDef>::Key, Self::ConstraintField>;
     /// [`CommitmentDefGadget::ScalarVar`] is the in-circuit variable type for
     /// the scalars being committed to.
     type ScalarVar: AbsorbableVar<Self::ConstraintField>
@@ -162,7 +162,7 @@ pub trait CommitmentDefGadget: Clone {
 
 /// [`CommitmentOpsGadget`] defines algorithms (majorly the opening algorithm)
 /// for commitment schemes in-circuit.
-pub trait CommitmentOpsGadget: CommitmentDefGadget {
+pub trait CommitmentOpsGadget: CommitmentDefGadget<Widget: CommitmentOps> {
     /// [`CommitmentOpsGadget::open`] defines the commitment opening gadget
     /// that matches its out-of-circuit widget [`CommitmentOps::open`].
     fn open(
@@ -201,6 +201,7 @@ pub trait GroupBasedCommitment:
 #[cfg(test)]
 mod tests {
     use ark_ff::UniformRand;
+    use ark_relations::gr1cs::ConstraintSystem;
     use ark_std::error::Error;
 
     use super::*;
@@ -216,6 +217,31 @@ mod tests {
         let ck = CM::generate_key(len, &mut rng)?;
         let (cm, r) = CM::commit(&ck, &v, &mut rng)?;
         CM::open(&ck, &v, &r, &cm)?;
+        Ok(())
+    }
+
+    pub fn test_commitment_gadget_correctness<CM: CommitmentOpsGadget>(
+        mut rng: impl RngCore,
+        len: usize,
+    ) -> Result<(), Box<dyn Error>> {
+        let v = (0..len)
+            .map(|_| UniformRand::rand(&mut rng))
+            .collect::<Vec<_>>();
+
+        let ck = CM::Widget::generate_key(len, &mut rng)?;
+        let (cm, r) = CM::Widget::commit(&ck, &v, &mut rng)?;
+
+        let cs = ConstraintSystem::new_ref();
+
+        let v_var = Vec::new_witness(cs.clone(), || Ok(v))?;
+        let r_var = AllocVar::new_witness(cs.clone(), || Ok(r))?;
+        let ck_var = AllocVar::new_constant(cs.clone(), ck)?;
+        let cm_var = AllocVar::new_witness(cs.clone(), || Ok(cm))?;
+
+        CM::open(&ck_var, &v_var, &r_var, &cm_var)?;
+
+        assert!(cs.is_satisfied()?);
+
         Ok(())
     }
 }
