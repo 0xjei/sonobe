@@ -9,12 +9,11 @@ repository.workspace = true
 ark-crypto-primitives = { workspace = true, features = ["constraints", "sponge", "crh"] }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true, features = ["asm"] }
-ark-std = { workspace = true, features = ["getrandom"] }
 ark-poly = { workspace = true }
-ark-poly-commit = { workspace = true }
 ark-relations = { workspace = true }
 ark-r1cs-std = { workspace = true }
 ark-serialize = { workspace = true }
+ark-std = { workspace = true, features = ["getrandom"] }
 num-bigint = { workspace = true, features = ["rand"] }
 num-integer = { workspace = true }
 num-traits = { workspace = true }
@@ -35,7 +34,12 @@ wasm-bindgen-test = { workspace = true }
 [features]
 default = []
 parallel = [
-    "ark-poly-commit/parallel",
+    "ark-crypto-primitives/parallel",
+    "ark-ec/parallel",
+    "ark-ff/parallel",
+    "ark-poly/parallel",
     "ark-relations/parallel",
     "ark-r1cs-std/parallel",
+    "ark-serialize/parallel",
+    "ark-std/parallel",
 ]
