@@ -211,26 +211,71 @@ pub type NovaNovaIVC<VC1, VC2, T, const CHALLENGE_BITS: usize = 128> =
 
 #[cfg(test)]
 mod tests {
-    use ark_bn254::{Fr, G1Projective as C1};
+    use ark_bn254::{Bn254, Fq, Fr, G1Projective as C1};
     use ark_ff::UniformRand;
     use ark_grumpkin::Projective as C2;
     use ark_std::{error::Error, rand::thread_rng, sync::Arc};
+    use sonobe_fs::{
+        GroupBasedFoldingSchemePrimaryDef, GroupBasedFoldingSchemeSecondaryDef,
+        definitions::circuits::FoldingSchemeDeciderGadget,
+        nova::{
+            AbstractNovaGadget, instances::circuits::RunningInstanceVar,
+            keys::circuits::NovaKeyVar, witnesses::circuits::RunningWitnessVar,
+        },
+    };
     use sonobe_primitives::{
-        circuits::utils::CircuitForTest,
-        commitments::pedersen::Pedersen,
+        algebra::{field::TwoStageFieldVar, ops::{eq::EquivalenceGadget, vector::VectorMulGadget}},
+        arithmetizations::{
+            ArithRelationGadget,
+            r1cs::{RelaxedInstance, RelaxedWitness, circuits::R1CSVar},
+        },
+        circuits::{Assignments, utils::CircuitForTest},
+        commitments::pedersen::{Pedersen, PedersenCommitAndProveGadget},
+        relations::RelationGadget,
         transcripts::griffin::{GriffinParams, sponge::GriffinSponge},
     };
+    use sonobe_snarks::cp::groth16::LegoGroth16;
     #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
     use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::*;
-    use crate::tests::test_ivc;
+    use crate::{
+        compilers::cyclefold::CycleFoldBasedIVCDecider,
+        tests::{test_ivc, test_ivc_decider},
+    };
 
     #[test]
     fn test_nova_nova() -> Result<(), Box<dyn Error>> {
         let mut rng = thread_rng();
 
         test_ivc::<NovaNovaIVC<Pedersen<C1, true>, Pedersen<C2, true>, GriffinSponge<_>>, _>(
+            (65536, 2048, Arc::new(GriffinParams::new(16, 5, 9))),
+            CircuitForTest {
+                x: Fr::rand(&mut rng),
+            },
+            vec![(); 20],
+            &mut rng,
+        )?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_nova_nova_decider() -> Result<(), Box<dyn Error>> {
+        let mut rng = thread_rng();
+
+        // f::<<<CycleFoldNova<Pedersen<C2, true>> as GroupBasedFoldingSchemeSecondaryDef>::Gadget as FoldingSchemeDefGadget>::DeciderKey>();
+        // g::<EmulatedFieldVar<Fr, Fq>>();
+
+        test_ivc_decider::<
+            CycleFoldBasedIVCDecider<
+                Nova<Pedersen<C1, true>>,
+                CycleFoldNova<Pedersen<C2, true>>,
+                GriffinSponge<_>,
+                LegoGroth16<Bn254>,
+            >,
+            _,
+        >(
             (65536, 2048, Arc::new(GriffinParams::new(16, 5, 9))),
             CircuitForTest {
                 x: Fr::rand(&mut rng),

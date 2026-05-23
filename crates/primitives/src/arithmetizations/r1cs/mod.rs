@@ -9,7 +9,7 @@ use ark_std::{cfg_into_iter, cfg_iter};
 use rayon::prelude::*;
 
 use super::{Arith, ArithConfig, ArithRelation, Error, ccs::CCS};
-use crate::circuits::Assignments;
+use crate::circuits::{Assignments};
 
 pub mod circuits;
 

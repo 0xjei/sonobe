@@ -67,7 +67,7 @@ impl<F: SonobeField> FCircuit for CircuitForTest<F> {
 
     fn dummy_external_inputs(&self) -> Self::ExternalInputs {}
 
-    fn generate_step_constraints(
+    fn synthesize_step(
         &self,
         _i: FpVar<Self::Field>,
         z_i: Self::StateVar,
