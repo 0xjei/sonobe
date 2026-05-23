@@ -38,6 +38,7 @@ use crate::{
             bits::{FromBitsGadget, ToBitsGadgetExt},
             eq::EquivalenceGadget,
             matrix::{MatrixGadget, SparseMatrixVar},
+            vector::VectorMulGadget,
         },
     },
     transcripts::AbsorbableVar,
@@ -784,7 +785,17 @@ impl<Base: SonobeField, Target: SonobeField> TryFrom<LimbedVar<Base, Target, fal
 }
 
 impl<Base: SonobeField, Target: SonobeField> TwoStageFieldVar for LimbedVar<Base, Target, true> {
+    type ValueField = Target;
+    type ConstraintField = Base;
     type Intermediate = LimbedVar<Base, Target, false>;
+
+    fn additive_identity() -> Self {
+        Self::constant(BigInt::zero())
+    }
+
+    fn multiplicative_identity() -> Self {
+        Self::constant(BigInt::one())
+    }
 }
 
 // Only implement `EqGadget` for aligned variables.
@@ -911,6 +922,59 @@ impl<F: PrimeField, Cfg> AbsorbableVar<F> for LimbedVar<F, Cfg, true> {
     }
 }
 
+impl<
+    CF: SonobeField,
+    Cfg,
+    Other: Index<usize, Output = LimbedVar<CF, Cfg, RHS_ALIGNED>>,
+    const LHS_ALIGNED: bool,
+    const RHS_ALIGNED: bool,
+> VectorMulGadget<Other> for [(LimbedVar<CF, Cfg, LHS_ALIGNED>, usize)]
+{
+    type Output = LimbedVar<CF, Cfg, false>;
+
+    fn mul(&self, other: &Other) -> Result<Self::Output, SynthesisError> {
+        let len = self
+            .iter()
+            .map(|(value, index)| value.limbs.len() + other[*index].limbs.len() - 1)
+            .max()
+            .unwrap_or(0);
+        // This is a combination of `mul_unaligned` and `add_unaligned`
+        // that results in more flattened `LinearCombination`s.
+        // Consequently, `ConstraintSystem::inline_all_lcs` costs less
+        // time, thus making trusted setup and proof generation faster.
+        let bounds = (0..len)
+            .map(|i| {
+                Bounds::add_many(
+                    &self
+                        .iter()
+                        .flat_map(|(value, index)| {
+                            let start =
+                                max(i + 1, other[*index].bounds.len()) - other[*index].bounds.len();
+                            let end = min(i + 1, value.bounds.len());
+                            (start..end).map(|j| value.bounds[j].mul(&other[*index].bounds[i - j]))
+                        })
+                        .collect::<Vec<_>>(),
+                )
+                .filter_safe::<CF>()
+            })
+            .collect::<Option<Vec<_>>>()
+            .ok_or(SynthesisError::Unsatisfiable)?;
+        let limbs = (0..len)
+            .map(|i| {
+                self.iter()
+                    .flat_map(|(value, index)| {
+                        let start =
+                            max(i + 1, other[*index].limbs.len()) - other[*index].limbs.len();
+                        let end = min(i + 1, value.limbs.len());
+                        (start..end).map(|j| &value.limbs[j] * &other[*index].limbs[i - j])
+                    })
+                    .sum()
+            })
+            .collect();
+        Ok(LimbedVar::new(limbs, bounds))
+    }
+}
+
 impl<CF: SonobeField, Cfg> MatrixGadget<LimbedVar<CF, Cfg, false>>
     for SparseMatrixVar<LimbedVar<CF, Cfg, false>>
 {
@@ -918,50 +982,7 @@ impl<CF: SonobeField, Cfg> MatrixGadget<LimbedVar<CF, Cfg, false>>
         &self,
         v: &impl Index<usize, Output = LimbedVar<CF, Cfg, false>>,
     ) -> Result<Vec<LimbedVar<CF, Cfg, false>>, SynthesisError> {
-        self.0
-            .iter()
-            .map(|row| {
-                let len = row
-                    .iter()
-                    .map(|(value, col_i)| value.limbs.len() + v[*col_i].limbs.len() - 1)
-                    .max()
-                    .unwrap_or(0);
-                // This is a combination of `mul_unaligned` and `add_unaligned`
-                // that results in more flattened `LinearCombination`s.
-                // Consequently, `ConstraintSystem::inline_all_lcs` costs less
-                // time, thus making trusted setup and proof generation faster.
-                let bounds = (0..len)
-                    .map(|i| {
-                        Bounds::add_many(
-                            &row.iter()
-                                .flat_map(|(value, col_i)| {
-                                    let start =
-                                        max(i + 1, v[*col_i].bounds.len()) - v[*col_i].bounds.len();
-                                    let end = min(i + 1, value.bounds.len());
-                                    (start..end)
-                                        .map(|j| value.bounds[j].mul(&v[*col_i].bounds[i - j]))
-                                })
-                                .collect::<Vec<_>>(),
-                        )
-                        .filter_safe::<CF>()
-                    })
-                    .collect::<Option<Vec<_>>>()
-                    .ok_or(SynthesisError::Unsatisfiable)?;
-                let limbs = (0..len)
-                    .map(|i| {
-                        row.iter()
-                            .flat_map(|(value, col_i)| {
-                                let start =
-                                    max(i + 1, v[*col_i].limbs.len()) - v[*col_i].limbs.len();
-                                let end = min(i + 1, value.limbs.len());
-                                (start..end).map(|j| &value.limbs[j] * &v[*col_i].limbs[i - j])
-                            })
-                            .sum()
-                    })
-                    .collect();
-                Ok(LimbedVar::new(limbs, bounds))
-            })
-            .collect()
+        self.0.iter().map(|row| row.mul(v)).collect()
     }
 }
 
@@ -1060,6 +1081,7 @@ impl<F: SonobeField, Cfg> AllocVar<(BigInt, Bounds), F> for LimbedVar<F, Cfg, tr
             && ub + BigInt::one() == BigInt::one() << len
         {
         } else {
+            // TODO: strict range checks are not always necessary
             var.enforce_lt(&Self::constant(ub + BigInt::one()))?;
             Self::constant(lb - BigInt::one()).enforce_lt(&var)?;
         }

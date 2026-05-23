@@ -7,10 +7,19 @@
 //!
 //! [paper]: https://eprint.iacr.org/2023/1192.pdf
 
+use ark_ec::CurveGroup;
 use ark_ff::field_hashers::hash_to_field;
-use ark_relations::gr1cs::{ConstraintSystem, SynthesisError};
+use ark_r1cs_std::{
+    alloc::AllocVar,
+    eq::EqGadget,
+    fields::{FieldVar, fp::FpVar},
+};
+use ark_relations::gr1cs::{
+    ConstraintSynthesizer, ConstraintSystem, ConstraintSystemRef, SynthesisError,
+};
 use ark_serialize::CanonicalSerialize;
 use ark_std::{
+    any::TypeId,
     borrow::Borrow,
     io::{Error as IoError, Write},
     marker::PhantomData,
@@ -21,26 +30,31 @@ use sha3::{
     digest::{ExtendableOutput, Update},
 };
 use sonobe_fs::{
-    DeciderKey, FoldingInstance, FoldingSchemeDef, FoldingSchemeDefGadget,
+    DeciderKey, FoldingInstance, FoldingInstanceVar, FoldingSchemeDef, FoldingSchemeDefGadget,
     FoldingSchemeFullVerifierGadget, FoldingSchemePartialVerifierGadget,
     GroupBasedFoldingSchemePrimary, GroupBasedFoldingSchemeSecondary,
+    definitions::circuits::FoldingSchemeDeciderGadget,
 };
 use sonobe_primitives::{
     algebra::field::emulated::EmulatedFieldVar,
     arithmetizations::{Arith, ArithConfig},
-    circuits::{ArithExtractor, AssignmentsExtractor, FCircuit},
-    commitments::CommitmentDef,
+    circuits::{
+        ArithExtractor, AssignmentsExtractor, FCircuit,
+        alloc::{CommitmentCache, CommitmentKeyCache, CommittedCache, RandomnessCache, UsizeSet},
+    },
+    commitments::{CommitmentDef, CommitmentDefGadget},
     relations::WitnessInstanceSampler,
-    traits::{CF1, CF2, Dummy, SonobeCurve},
+    traits::{CF1, CF2, Dummy, Inputize, SonobeCurve},
     transcripts::{
         Transcript, TranscriptGadget,
         recording::RecordingTranscript,
         replay::{ReplayTranscript, ReplayTranscriptVar},
     },
 };
+use sonobe_snarks::cp::CPSNARK;
 
 use crate::{
-    Error, IVC,
+    Error, IVCKeyGenerator, IVCPreprocessor, IVCProofCompressor, IVCProver, IVCTypes, IVCVerifier,
     compilers::cyclefold::circuits::{AugmentedCircuit, CycleFoldCircuit},
 };
 
@@ -139,7 +153,46 @@ pub struct CycleFoldBasedIVC<FS1, FS2, T> {
     _d: PhantomData<(FS1, FS2, T)>,
 }
 
-impl<FS1, FS2, T> IVC for CycleFoldBasedIVC<FS1, FS2, T>
+impl<FS1, FS2, T> IVCTypes for CycleFoldBasedIVC<FS1, FS2, T>
+where
+    FS1: FoldingSchemeCycleFoldExt<1, 1>,
+    FS2: GroupBasedFoldingSchemeSecondary<1, 1>,
+    T: Transcript<CF1<<FS1::CM as CommitmentDef>::Commitment>>,
+{
+    type Field = <FS1::CM as CommitmentDef>::Scalar;
+
+    type Config = (FS1::Config, FS2::Config, T::Config);
+
+    type PublicParam = (FS1::PublicParam, FS2::PublicParam, T::Config);
+
+    type ProverKey<FC: FCircuit> =
+        Key<FS1::DeciderKey, FS2::DeciderKey, (T::Config, Self::Field, FC::State)>;
+
+    type VerifierKey<FC: FCircuit> =
+        Key<FS1::DeciderKey, FS2::DeciderKey, (T::Config, Self::Field, FC::State)>;
+
+    type Proof<FC: FCircuit> = Proof<FS1, FS2>;
+}
+
+impl<FS1, FS2, T> IVCPreprocessor for CycleFoldBasedIVC<FS1, FS2, T>
+where
+    FS1: FoldingSchemeCycleFoldExt<1, 1>,
+    FS2: GroupBasedFoldingSchemeSecondary<1, 1>,
+    T: Transcript<CF1<<FS1::CM as CommitmentDef>::Commitment>>,
+{
+    fn preprocess(
+        (cfg1, cfg2, hash_config): Self::Config,
+        mut rng: impl RngCore,
+    ) -> Result<Self::PublicParam, Error> {
+        Ok((
+            FS1::preprocess(cfg1, &mut rng)?,
+            FS2::preprocess(cfg2, &mut rng)?,
+            hash_config,
+        ))
+    }
+}
+
+impl<FS1, FS2, T> IVCKeyGenerator for CycleFoldBasedIVC<FS1, FS2, T>
 where
     FS1: FoldingSchemeCycleFoldExt<
             1,
@@ -166,31 +219,6 @@ where
     T: Transcript<CF1<<FS1::CM as CommitmentDef>::Commitment>, Config: CanonicalSerialize>,
     T::Gadget: TranscriptGadget<CF1<<FS1::CM as CommitmentDef>::Commitment>, Config = T::Config>,
 {
-    type Field = <FS1::CM as CommitmentDef>::Scalar;
-
-    type Config = (FS1::Config, FS2::Config, T::Config);
-
-    type PublicParam = (FS1::PublicParam, FS2::PublicParam, T::Config);
-
-    type ProverKey<FC: FCircuit> =
-        Key<FS1::DeciderKey, FS2::DeciderKey, (T::Config, Self::Field, FC::State)>;
-
-    type VerifierKey<FC: FCircuit> =
-        Key<FS1::DeciderKey, FS2::DeciderKey, (T::Config, Self::Field, FC::State)>;
-
-    type Proof<FC: FCircuit> = Proof<FS1, FS2>;
-
-    fn preprocess(
-        (cfg1, cfg2, hash_config): Self::Config,
-        mut rng: impl RngCore,
-    ) -> Result<Self::PublicParam, Error> {
-        Ok((
-            FS1::preprocess(cfg1, &mut rng)?,
-            FS2::preprocess(cfg2, &mut rng)?,
-            hash_config,
-        ))
-    }
-
     fn generate_keys<FC: FCircuit<Field = Self::Field>>(
         (pp1, pp2, hash_config): Self::PublicParam,
         step_circuit: &FC,
@@ -198,7 +226,7 @@ where
         // Run the CycleFold circuit to extract the arithmetization on the
         // secondary curve.
         let arith2 = {
-            let cs = ArithExtractor::new();
+            let mut cs = ArithExtractor::new();
             cs.execute_fn(|cs| FS1::CFCircuit::default().verify_point_rlc(cs))?;
             cs.arith::<FS2::Arith>()?
         };
@@ -220,7 +248,7 @@ where
         let arith1;
         loop {
             let new_arith1 = {
-                let cs = ArithExtractor::new();
+                let mut cs = ArithExtractor::new();
                 cs.execute_synthesizer(AugmentedCircuit::<FS1, FS2, FC, T::Gadget>::new(
                     &hash_config,
                     &arith1_config,
@@ -267,7 +295,33 @@ where
 
         Ok((key.clone(), key))
     }
+}
 
+impl<FS1, FS2, T> IVCProver for CycleFoldBasedIVC<FS1, FS2, T>
+where
+    FS1: FoldingSchemeCycleFoldExt<
+            1,
+            1,
+            // TODO (@winderica):
+            // All folding schemes we currently support have an empty verifier
+            // key, so I used `()` here, but this should be generalized in the
+            // future.
+            Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
+            CM: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS2::CM as CommitmentDef>::Scalar>,
+            >,
+        >,
+    FS2: GroupBasedFoldingSchemeSecondary<
+            1,
+            1,
+            Gadget: FoldingSchemeFullVerifierGadget<1, 1, VerifierKey = ()>,
+            CM: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS1::CM as CommitmentDef>::Scalar>,
+            >,
+        >,
+    T: Transcript<CF1<<FS1::CM as CommitmentDef>::Commitment>>,
+    T::Gadget: TranscriptGadget<CF1<<FS1::CM as CommitmentDef>::Commitment>, Config = T::Config>,
+{
     #[allow(non_snake_case)]
     fn prove<FC: FCircuit<Field = Self::Field>>(
         Key(dk1, dk2, (hash_config, pp_hash, _)): &Self::ProverKey<FC>,
@@ -305,7 +359,7 @@ where
             let cf_circuits =
                 FS1::to_cyclefold_circuits(&[U], &[u], &proof, transcript.clone().into());
             for (i, cf_circuit) in cf_circuits.into_iter().enumerate() {
-                let cs = AssignmentsExtractor::new();
+                let mut cs = AssignmentsExtractor::new();
                 cs.execute_fn(|cs| cf_circuit.verify_point_rlc(cs))?;
 
                 let (cf_w, cf_u) = dk2.sample(cs.assignments()?, &mut rng)?;
@@ -323,7 +377,7 @@ where
             }
         }
 
-        let cs = AssignmentsExtractor::new();
+        let mut cs = AssignmentsExtractor::new();
         let (next_state, external_outputs) = cs.execute_fn(|cs| {
             let augmented_circuit = AugmentedCircuit::<FS1, FS2, FC, T::Gadget>::new(
                 hash_config,
@@ -355,7 +409,14 @@ where
             Proof(WW, UU, ww, uu, cf_WW, cf_UU),
         ))
     }
+}
 
+impl<FS1, FS2, T> IVCVerifier for CycleFoldBasedIVC<FS1, FS2, T>
+where
+    FS1: FoldingSchemeCycleFoldExt<1, 1>,
+    FS2: GroupBasedFoldingSchemeSecondary<1, 1>,
+    T: Transcript<CF1<<FS1::CM as CommitmentDef>::Commitment>>,
+{
     #[allow(non_snake_case)]
     fn verify<FC: FCircuit<Field = Self::Field>>(
         Key(dk1, dk2, (hash_config, pp_hash, reference_state)): &Self::VerifierKey<FC>,
@@ -401,6 +462,284 @@ where
         FS1::decide_running(dk1, W, U)?;
         FS1::decide_incoming(dk1, w, u)?;
         FS2::decide_running(dk2, cf_W, cf_U)?;
+
+        Ok(())
+    }
+}
+
+pub struct CycleFoldBasedIVCDecider<FS1, FS2, T, S> {
+    _p: PhantomData<(FS1, FS2, T, S)>,
+}
+
+impl<
+    FS1: FoldingSchemeCycleFoldExt<
+            1,
+            1,
+            Arith: From<ConstraintSystem<CF1<<FS1::CM as CommitmentDef>::Commitment>>>,
+            // TODO (@winderica):
+            // All folding schemes we currently support have an empty verifier
+            // key, so I used `()` here, but this should be generalized in the
+            // future.
+            Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>
+                        + FoldingSchemeDeciderGadget,
+            CM: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS2::CM as CommitmentDef>::Scalar>,
+            >,
+        >,
+    FS2: GroupBasedFoldingSchemeSecondary<
+            1,
+            1,
+            Arith: From<ConstraintSystem<CF1<<FS2::CM as CommitmentDef>::Commitment>>>,
+            Gadget: FoldingSchemeFullVerifierGadget<1, 1, VerifierKey = ()>
+                        + FoldingSchemeDeciderGadget,
+            CM: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS1::CM as CommitmentDef>::Scalar>,
+            >,
+        >,
+    T: Transcript<
+            CF1<<FS1::CM as CommitmentDef>::Commitment>,
+            Config: CanonicalSerialize,
+            Gadget: TranscriptGadget<
+                CF1<<FS1::CM as CommitmentDef>::Commitment>,
+                Config = T::Config,
+            >,
+        >,
+    S: CPSNARK<
+            Field = <FS1::CM as CommitmentDef>::Scalar,
+            Relation = (FS1::Arith, UsizeSet),
+            CommitmentKey = <FS1::CM as CommitmentDef>::Key,
+            Commitment = <<FS1::CM as CommitmentDef>::Commitment as CurveGroup>::Affine,
+            CommitmentOpening = <FS1::CM as CommitmentDef>::Scalar,
+            Error = SynthesisError,
+        >,
+> IVCProofCompressor for CycleFoldBasedIVCDecider<FS1, FS2, T, S>
+{
+    type IVC = CycleFoldBasedIVC<FS1, FS2, T>;
+
+    type ProverKey<FC: FCircuit> = (
+        S::ProverKey,
+        Key<FS1::DeciderKey, FS2::DeciderKey, (T::Config, FC::Field)>,
+    );
+
+    type VerifierKey<FC: FCircuit> = (S::VerifierKey, FC::State);
+
+    type CompressedProof<FC: FCircuit> = (S::Proof, Vec<<FS1::CM as CommitmentDef>::Commitment>);
+
+    type Error = Error;
+
+    fn preprocess_and_generate_keys<FC: FCircuit<Field = <Self::IVC as IVCTypes>::Field>>(
+        circuit: &FC,
+        Key(dk1, dk2, (hash_config, pp_hash, reference_state)): <Self::IVC as IVCTypes>::VerifierKey<FC>,
+        rng: impl RngCore,
+    ) -> Result<(Self::ProverKey<FC>, Self::VerifierKey<FC>), Self::Error> {
+        let mut cs = ArithExtractor::new();
+        {
+            let mut cache = cs.cache_map.borrow_mut();
+            cache.insert(
+                TypeId::of::<CommittedCache>(),
+                Box::new(UsizeSet::default()),
+            );
+            cache.insert(
+                TypeId::of::<CommitmentKeyCache>(),
+                Box::new(Vec::<<FS1::CM as CommitmentDef>::Key>::new()),
+            );
+        }
+
+        let ivc_vk = Key(dk1, dk2, (hash_config, pp_hash));
+
+        cs.execute_synthesizer(CycleFoldBasedIVCDeciderCircuit::<FS1, FS2, T, FC> {
+            vk: &ivc_vk,
+            i: 0,
+            initial_state: &circuit.dummy_state(),
+            current_state: &circuit.dummy_state(),
+            proof: &Proof::dummy(&ivc_vk),
+        })?;
+        let (committed_variable_indices, ck) = {
+            let mut cache = cs.cache_map.borrow_mut();
+            let committed_variable_indices = *cache
+                .remove(&TypeId::of::<CommittedCache>())
+                .ok_or(SynthesisError::AssignmentMissing)?
+                .downcast::<UsizeSet>()
+                .map_err(|_| SynthesisError::AssignmentMissing)?;
+            let ck = *cache
+                .remove(&TypeId::of::<CommitmentKeyCache>())
+                .ok_or(SynthesisError::AssignmentMissing)?
+                .downcast::<Vec<<FS1::CM as CommitmentDef>::Key>>()
+                .map_err(|_| SynthesisError::AssignmentMissing)?;
+
+            (committed_variable_indices, ck)
+        };
+
+        let (pk, vk) = S::generate_keys((cs.arith()?, committed_variable_indices), &ck, rng)?;
+
+        Ok(((pk, ivc_vk), (vk, reference_state)))
+    }
+
+    fn prove<FC: FCircuit<Field = <Self::IVC as IVCTypes>::Field>>(
+        (pk, ivc_vk): &Self::ProverKey<FC>,
+        i: usize,
+        initial_state: &FC::State,
+        current_state: &FC::State,
+        proof: &<Self::IVC as IVCTypes>::Proof<FC>,
+        rng: impl RngCore,
+    ) -> Result<Self::CompressedProof<FC>, Self::Error> {
+        let mut cs = AssignmentsExtractor::new();
+        {
+            let mut cache = cs.cache_map.borrow_mut();
+            cache.insert(
+                TypeId::of::<CommittedCache>(),
+                Box::new(UsizeSet::default()),
+            );
+            cache.insert(
+                TypeId::of::<RandomnessCache>(),
+                Box::new(Vec::<<Self::IVC as IVCTypes>::Field>::new()),
+            );
+            cache.insert(
+                TypeId::of::<CommitmentCache>(),
+                Box::new(Vec::<<FS1::CM as CommitmentDef>::Commitment>::new()),
+            );
+        }
+        cs.execute_synthesizer(CycleFoldBasedIVCDeciderCircuit::<FS1, FS2, T, FC> {
+            vk: ivc_vk,
+            i,
+            initial_state,
+            current_state,
+            proof,
+        })?;
+        let w = &cs.assignments.witness_assignment;
+        let x = &cs.assignments.instance_assignment;
+        let mut cache = cs.cache_map.borrow_mut();
+        let o = *cache
+            .remove(&TypeId::of::<RandomnessCache>())
+            .ok_or(SynthesisError::AssignmentMissing)?
+            .downcast::<Vec<<Self::IVC as IVCTypes>::Field>>()
+            .map_err(|_| SynthesisError::AssignmentMissing)?;
+        let c = *cache
+            .remove(&TypeId::of::<CommitmentCache>())
+            .ok_or(SynthesisError::AssignmentMissing)?
+            .downcast::<Vec<<FS1::CM as CommitmentDef>::Commitment>>()
+            .map_err(|_| SynthesisError::AssignmentMissing)?;
+
+        let proof = S::prove(pk, &x[1..], &w, &o, rng)?;
+
+        Ok((proof, c))
+    }
+
+    fn verify<FC: FCircuit<Field = <Self::IVC as IVCTypes>::Field>>(
+        (vk, reference_state): &Self::VerifierKey<FC>,
+        i: usize,
+        initial_state: &FC::State,
+        current_state: &FC::State,
+        (proof, commitments): &Self::CompressedProof<FC>,
+    ) -> Result<(), Self::Error> {
+        if !FC::same_state_shape(reference_state, initial_state)
+            || !FC::same_state_shape(reference_state, current_state)
+        {
+            return Err(Error::IVCVerificationFail);
+        }
+
+        if i == 0 {
+            return (initial_state == current_state)
+                .then_some(())
+                .ok_or(Error::IVCVerificationFail);
+        }
+
+        let x = &[
+            vec![<Self::IVC as IVCTypes>::Field::from(i as u64)],
+            FC::StateVar::inputize(initial_state),
+            FC::StateVar::inputize(current_state),
+            commitments.iter().flat_map(<<FS1::Gadget as FoldingSchemeDefGadget>::CM as CommitmentDefGadget>::CommitmentVar::inputize).collect::<Vec<_>>()
+        ]
+        .concat();
+        let c = CurveGroup::normalize_batch(commitments);
+
+        S::verify(vk, x, &c, proof)?;
+
+        Ok(())
+    }
+}
+
+pub struct CycleFoldBasedIVCDeciderCircuit<
+    'a,
+    FS1: FoldingSchemeDef,
+    FS2: FoldingSchemeDef,
+    T: Transcript<FC::Field>,
+    FC: FCircuit,
+> {
+    vk: &'a Key<FS1::DeciderKey, FS2::DeciderKey, (T::Config, FC::Field)>,
+    i: usize,
+    initial_state: &'a FC::State,
+    current_state: &'a FC::State,
+    proof: &'a Proof<FS1, FS2>,
+}
+
+impl<
+    'a,
+    FS1: FoldingSchemeCycleFoldExt<
+            1,
+            1,
+            Gadget: FoldingSchemeDeciderGadget,
+            CM: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS2::CM as CommitmentDef>::Scalar>,
+            >,
+        >,
+    FS2: GroupBasedFoldingSchemeSecondary<
+            1,
+            1,
+            Gadget: FoldingSchemeDeciderGadget,
+            CM: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS1::CM as CommitmentDef>::Scalar>,
+            >,
+        >,
+    T: Transcript<
+            CF1<<FS1::CM as CommitmentDef>::Commitment>,
+            Gadget: TranscriptGadget<
+                CF1<<FS1::CM as CommitmentDef>::Commitment>,
+                Config = T::Config,
+            >,
+        >,
+    FC: FCircuit<Field = CF1<<FS1::CM as CommitmentDef>::Commitment>>,
+> ConstraintSynthesizer<FC::Field> for CycleFoldBasedIVCDeciderCircuit<'a, FS1, FS2, T, FC>
+{
+    fn generate_constraints(
+        self,
+        cs: ConstraintSystemRef<FC::Field>,
+    ) -> Result<(), SynthesisError> {
+        let i = FpVar::new_input(cs.clone(), || Ok(FC::Field::from(self.i as u64)))?;
+        let initial_state = FC::StateVar::new_input(cs.clone(), || Ok(self.initial_state))?;
+        let current_state = FC::StateVar::new_input(cs.clone(), || Ok(self.current_state))?;
+
+        let Key(dk1, dk2, (hash_config, pp_hash)) = &self.vk;
+        let dk1 = AllocVar::new_constant(cs.clone(), dk1)?;
+        let dk2 = AllocVar::new_constant(cs.clone(), dk2)?;
+        let pp_hash = FpVar::new_constant(cs.clone(), pp_hash)?;
+
+        let Proof(W, U, w, u, cf_W, cf_U) = &self.proof;
+        let W = AllocVar::new_witness(cs.clone(), || Ok(W))?;
+        let U = AllocVar::new_witness(cs.clone(), || Ok(U))?;
+        let w = AllocVar::new_witness(cs.clone(), || Ok(w))?;
+        let u = AllocVar::new_witness(cs.clone(), || Ok(u))?;
+        let cf_W = AllocVar::new_witness(cs.clone(), || Ok(cf_W))?;
+        let cf_U = AllocVar::new_witness(cs.clone(), || Ok(cf_U))?;
+
+        i.enforce_not_equal(&FpVar::zero())?;
+
+        FS1::Gadget::decide_running(&dk1, &W, &U)?;
+        FS1::Gadget::decide_incoming(&dk1, &w, &u)?;
+        FS2::Gadget::decide_running(&dk2, &cf_W, &cf_U)?;
+
+        let hash = T::Gadget::new_with_pp_hash(hash_config.clone(), &pp_hash)?;
+        let mut sponge = hash.separate_domain("sponge".as_ref())?;
+
+        let u_x = sponge
+            .add(&i)?
+            .add(&initial_state)?
+            .add(&current_state)?
+            .add(&U)?
+            .add(&cf_U)?
+            .get_field_element()?;
+
+        u.public_inputs().enforce_equal(&vec![u_x])?;
 
         Ok(())
     }

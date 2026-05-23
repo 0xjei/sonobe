@@ -155,10 +155,7 @@ mod tests {
     use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::*;
-    use crate::{
-        traits::{Inputize, InputizeEmulated},
-        transcripts::Absorbable,
-    };
+    use crate::{traits::Inputize, transcripts::Absorbable};
 
     #[test]
     fn test_alloc_zero() {
@@ -195,14 +192,14 @@ mod tests {
         let p_var = EmulatedAffineVar::<Fr, Projective>::new_witness(cs.clone(), || Ok(p))?;
         assert_eq!(
             [p_var.x.limbs.value()?, p_var.y.limbs.value()?].concat(),
-            p.inputize_emulated()
+            EmulatedAffineVar::inputize(&p)
         );
 
         let cs = ConstraintSystem::<Fq>::new_ref();
         let p_var = ProjectiveVar::<PallasConfig, FpVar<Fq>>::new_witness(cs.clone(), || Ok(p))?;
         assert_eq!(
             vec![p_var.x.value()?, p_var.y.value()?, p_var.z.value()?],
-            p.inputize()
+            ProjectiveVar::inputize(&p)
         );
         Ok(())
     }
