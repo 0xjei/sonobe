@@ -27,8 +27,8 @@ pub struct RunningInstance<CM: CommitmentDef> {
 impl<CM: CommitmentDef> FoldingInstance<CM> for RunningInstance<CM> {
     const N_COMMITMENTS: usize = 2;
 
-    fn commitments(&self) -> Vec<&CM::Commitment> {
-        vec![&self.cm_e, &self.cm_w]
+    fn commitments(&self) -> Vec<CM::Commitment> {
+        vec![self.cm_e.clone(), self.cm_w.clone()]
     }
 
     fn public_inputs(&self) -> &[CM::Scalar] {
@@ -72,8 +72,8 @@ pub struct IncomingInstance<CM: CommitmentDef> {
 impl<CM: CommitmentDef> FoldingInstance<CM> for IncomingInstance<CM> {
     const N_COMMITMENTS: usize = 1;
 
-    fn commitments(&self) -> Vec<&CM::Commitment> {
-        vec![&self.cm_w]
+    fn commitments(&self) -> Vec<CM::Commitment> {
+        vec![self.cm_w.clone()]
     }
 
     fn public_inputs(&self) -> &[CM::Scalar] {
