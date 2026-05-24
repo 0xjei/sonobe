@@ -1,5 +1,4 @@
 use ark_ff::Field;
-use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystem};
 use ark_std::{borrow::Borrow, rand::RngCore};
 
 pub mod groth16;

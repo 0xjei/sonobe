@@ -5,8 +5,6 @@
 //! where `g` and `h` are generators, `r` is a random scalar, and `<g, v>` is
 //! the multi-scalar multiplication of `g` and `v`.
 
-use std::any::TypeId;
-
 use ark_ec::AffineRepr;
 use ark_r1cs_std::{
     GR1CSVar,
@@ -19,7 +17,9 @@ use ark_r1cs_std::{
 };
 use ark_relations::gr1cs::{Namespace, SynthesisError};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::{UniformRand, borrow::Borrow, iter::repeat_with, marker::PhantomData, rand::RngCore};
+use ark_std::{
+    UniformRand, any::TypeId, borrow::Borrow, iter::repeat_with, marker::PhantomData, rand::RngCore,
+};
 
 use super::{CommitmentDef, CommitmentDefGadget, CommitmentKey, CommitmentOps, Error};
 use crate::{
@@ -28,10 +28,8 @@ use crate::{
         group::{JointScalarMul, emulated::EmulatedAffineVar},
     },
     circuits::{
-        WitnessToCommitted, WitnessToPublic, alloc::{
-            CommitmentCache, CommitmentKeyCache, CommittedCache, RandomnessCache,
-            UsizeSet,
-        }
+        WitnessToPublic,
+        alloc::{CommitmentKeyCache, CommittedCache, RandomnessCache, UsizeSet},
     },
     commitments::{CommitmentOpsGadget, GroupBasedCommitment},
     traits::{CF1, CF2, SonobeCurve},
@@ -438,12 +436,6 @@ impl<C: SonobeCurve> CommitmentOpsGadget for PedersenCommitAndProveGadget<C, tru
                 .downcast_mut::<Vec<CF1<C>>>()
                 .ok_or(SynthesisError::AssignmentMissing)?
                 .push(r.value()?);
-            cache
-                .get_mut(&TypeId::of::<CommitmentCache>())
-                .ok_or(SynthesisError::AssignmentMissing)?
-                .downcast_mut::<Vec<C>>()
-                .ok_or(SynthesisError::AssignmentMissing)?
-                .push(cm.value()?);
         } else {
             cache
                 .get_mut(&TypeId::of::<CommitmentKeyCache>())

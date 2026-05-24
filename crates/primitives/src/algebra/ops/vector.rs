@@ -1,14 +1,10 @@
 //! This module provides definitions and implementations of in-circuit vector
 //! operations.
 
-use std::ops::Index;
-
 use ark_ff::PrimeField;
-use ark_r1cs_std::{
-    GR1CSVar,
-    fields::{FieldVar, fp::FpVar},
-};
+use ark_r1cs_std::fields::fp::FpVar;
 use ark_relations::gr1cs::SynthesisError;
+use ark_std::ops::Index;
 
 /// [`VectorMulGadget`] defines the multiplication (dot product) operation on
 /// in-circuit vector variables.

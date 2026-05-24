@@ -6,13 +6,8 @@
 use ark_r1cs_std::boolean::Boolean;
 use ark_std::marker::PhantomData;
 use sonobe_primitives::{
-    arithmetizations::{
-        Arith, ArithConfig, ArithRelation, ArithRelationGadget,
-        r1cs::{R1CS, RelaxedInstance, RelaxedWitness, circuits::R1CSVar},
-    },
-    circuits::{AssignmentsOwned, WitnessToCommitted},
-    commitments::{CommitmentDef, CommitmentDefGadget, CommitmentOps, GroupBasedCommitment},
-    relations::{Relation, WitnessInstanceSampler},
+    arithmetizations::r1cs::{R1CS, circuits::R1CSVar},
+    commitments::{CommitmentDef, CommitmentDefGadget, GroupBasedCommitment},
     traits::{CF2, SonobeField},
 };
 

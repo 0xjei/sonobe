@@ -44,7 +44,7 @@ impl LinearSubspaceSNARK {
         w: &[<E::ScalarField as PrimeField>::BigInt],
     ) -> E::G1Affine {
         assert_eq!(ek.p.len(), w.len());
-        E::G1::msm_bigint(&ek.p, &w).into_affine()
+        E::G1::msm_bigint(&ek.p, w).into_affine()
     }
 
     pub fn verify<E: Pairing>(vk: &VerifierKey<E>, x: &[E::G1Affine], pi: &E::G1Affine) -> bool {

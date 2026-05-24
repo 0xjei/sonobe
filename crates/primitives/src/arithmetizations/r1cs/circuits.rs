@@ -1,23 +1,14 @@
 //! This module implements in-circuit R1CS variables and relation check gadgets.
 
-use ark_ff::{Field, PrimeField, Zero};
 use ark_r1cs_std::alloc::{AllocVar, AllocationMode};
 use ark_relations::gr1cs::{Namespace, SynthesisError};
-use ark_std::{
-    One,
-    borrow::Borrow,
-    ops::{Index, Mul, Sub},
-};
+use ark_std::{borrow::Borrow, ops::Index};
 
 use super::{R1CS, RelaxedInstance, RelaxedWitness};
 use crate::{
     algebra::{
         field::TwoStageFieldVar,
-        ops::{
-            eq::EquivalenceGadget,
-            matrix::{MatrixGadget, SparseMatrixVar},
-            vector::VectorMulGadget,
-        },
+        ops::{eq::EquivalenceGadget, matrix::SparseMatrixVar, vector::VectorMulGadget},
     },
     arithmetizations::{ArithGadget, ArithRelationGadget, ccs::CCSGadget},
     circuits::Assignments,
@@ -47,9 +38,7 @@ impl<FVar: TwoStageFieldVar> CCSGadget for R1CSVar<FVar> {
     }
 }
 
-impl<FVar: TwoStageFieldVar>
-    AllocVar<R1CS<FVar::Value>, FVar::ConstraintField> for R1CSVar<FVar>
-{
+impl<FVar: TwoStageFieldVar> AllocVar<R1CS<FVar::Value>, FVar::ConstraintField> for R1CSVar<FVar> {
     fn new_variable<T: Borrow<R1CS<FVar::Value>>>(
         cs: impl Into<Namespace<FVar::ConstraintField>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,

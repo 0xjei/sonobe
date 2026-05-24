@@ -1,11 +1,4 @@
-use ark_ff::{Field, PrimeField};
-use ark_r1cs_std::fields::fp::{AllocatedFp, FpVar};
-use ark_relations::gr1cs::{ConstraintSystem, ConstraintSystemRef, SynthesisError, Variable};
-use ark_std::{
-    any::{Any, TypeId},
-    collections::BTreeMap,
-    hash::{BuildHasherDefault, Hasher},
-};
+use ark_std::hash::{BuildHasherDefault, Hasher};
 use hashbrown::HashSet;
 
 #[derive(Default)]
@@ -30,6 +23,5 @@ impl Hasher for IdentityHasher {
 pub type UsizeSet = HashSet<usize, BuildHasherDefault<IdentityHasher>>;
 
 pub struct CommittedCache;
-pub struct CommitmentCache;
 pub struct CommitmentKeyCache;
 pub struct RandomnessCache;
