@@ -9,13 +9,10 @@ use ark_groth16::{
     r1cs_to_qap::{LibsnarkReduction, R1CSToQAP},
 };
 use ark_poly::{EvaluationDomain, GeneralEvaluationDomain};
-use ark_relations::gr1cs::{
-    ConstraintSynthesizer, ConstraintSystem, Matrix, OptimizationGoal, R1CS_PREDICATE_LABEL,
-    SynthesisError, SynthesisMode,
-};
+use ark_relations::gr1cs::SynthesisError;
 use ark_std::{
-    any::TypeId, borrow::Borrow, cfg_into_iter, cfg_iter, cfg_iter_mut, end_timer,
-    hash::BuildHasherDefault, marker::PhantomData, rand::RngCore, rc::Rc, start_timer,
+    borrow::Borrow, cfg_into_iter, cfg_iter, cfg_iter_mut, end_timer, hash::BuildHasherDefault,
+    marker::PhantomData, rand::RngCore, start_timer,
 };
 use hashbrown::HashSet;
 #[cfg(not(feature = "parallel"))]
@@ -24,7 +21,7 @@ use itertools::{Either, Itertools};
 use rayon::{iter::Either, prelude::*};
 use sonobe_primitives::{
     arithmetizations::{Arith, ccs::CCS, r1cs::R1CS},
-    circuits::alloc::{CommittedCache, IdentityHasher, UsizeSet},
+    circuits::alloc::{IdentityHasher, UsizeSet},
     commitments::pedersen::PedersenKey,
     traits::{SonobeCurve, SonobeField},
 };
@@ -385,7 +382,7 @@ impl<E: Pairing<G1: SonobeCurve, BaseField: SonobeField, ScalarField: SonobeFiel
         let witness_map_time = start_timer!(|| "R1CS to QAP witness map");
         let h = {
             QAP::witness_map_from_matrices::<_, GeneralEvaluationDomain<_>>(
-                &pk.r1cs.matrices(),
+                pk.r1cs.matrices(),
                 num_inputs,
                 num_constraints,
                 &assignment,
@@ -425,8 +422,8 @@ impl<E: Pairing<G1: SonobeCurve, BaseField: SonobeField, ScalarField: SonobeFiel
 
         // Compute C
         let c_time = start_timer!(|| "Compute C");
-        let mut g_c = g_a * &s;
-        g_c += g1_b * &r;
+        let mut g_c = g_a * s;
+        g_c += g1_b * r;
         g_c -= pk.cc_pk.delta_g1 * (r * s);
 
         let (witness_bigint, committed_bigint) = cfg_into_iter!(assignment_bigint)
@@ -505,11 +502,8 @@ impl<E: Pairing<G1: SonobeCurve, BaseField: SonobeField, ScalarField: SonobeFiel
             return Err(SynthesisError::Unsatisfiable);
         }
 
-        if !LinearSubspaceSNARK::verify(
-            &vk.link_vk,
-            &[&c[..], &[proof.d][..]].concat(),
-            &proof.link_pi,
-        ) {
+        if !LinearSubspaceSNARK::verify(&vk.link_vk, &[c, &[proof.d][..]].concat(), &proof.link_pi)
+        {
             return Err(SynthesisError::Unsatisfiable);
         }
 
@@ -520,7 +514,10 @@ impl<E: Pairing<G1: SonobeCurve, BaseField: SonobeField, ScalarField: SonobeFiel
 #[cfg(test)]
 mod tests {
     use ark_bn254::Bn254;
-    use ark_relations::{gr1cs::ConstraintSystemRef, lc};
+    use ark_relations::{
+        gr1cs::{ConstraintSynthesizer, ConstraintSystemRef},
+        lc,
+    };
     use ark_std::rand::thread_rng;
     use sonobe_primitives::circuits::{ArithExtractor, AssignmentsExtractor};
 

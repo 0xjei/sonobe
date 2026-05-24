@@ -17,7 +17,7 @@ use ark_std::{
 
 use crate::{
     algebra::{Val, field::emulated::EmulatedFieldVar},
-    circuits::{WitnessToCommitted, WitnessToPublic},
+    circuits::WitnessToPublic,
     traits::Inputize,
     transcripts::{Absorbable, AbsorbableVar},
 };
@@ -149,6 +149,7 @@ pub trait TwoStageFieldVar:
     + GR1CSVar<Self::ConstraintField, Value = Self::ValueField>
     + AllocVar<Self::Value, Self::ConstraintField>
 {
+    // TODO: seems that using GR1CSVar's Value breaks the compiler...
     type ValueField: Field;
     type ConstraintField: Field;
 

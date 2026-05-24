@@ -3,9 +3,8 @@
 
 use ark_ff::{Field, PrimeField};
 use ark_r1cs_std::{
-    GR1CSVar,
     alloc::{AllocVar, AllocationMode},
-    fields::{FieldVar, fp::FpVar},
+    fields::fp::FpVar,
 };
 use ark_relations::gr1cs::{Matrix, Namespace, SynthesisError};
 use ark_std::{borrow::Borrow, ops::Index};
@@ -26,9 +25,7 @@ pub trait MatrixGadget<FV> {
 #[derive(Debug, Clone)]
 pub struct SparseMatrixVar<FV>(pub Vec<Vec<(FV, usize)>>);
 
-impl<F: Field, CF: Field, FV: AllocVar<F, CF>> AllocVar<Matrix<F>, CF>
-    for SparseMatrixVar<FV>
-{
+impl<F: Field, CF: Field, FV: AllocVar<F, CF>> AllocVar<Matrix<F>, CF> for SparseMatrixVar<FV> {
     fn new_variable<T: Borrow<Matrix<F>>>(
         cs: impl Into<Namespace<CF>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
@@ -58,12 +55,6 @@ impl<F: PrimeField> MatrixGadget<FpVar<F>> for SparseMatrixVar<FpVar<F>> {
         &self,
         v: &impl Index<usize, Output = FpVar<F>>,
     ) -> Result<Vec<FpVar<F>>, SynthesisError> {
-        self
-            .0
-            .iter()
-            .map(|row| {
-                row.mul(v)
-            })
-            .collect()
+        self.0.iter().map(|row| row.mul(v)).collect()
     }
 }

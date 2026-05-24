@@ -167,7 +167,10 @@ pub trait CCSGadget {
                     for i in s {
                         // TODO: intermediate
                         // let v = matrices[*i].0[row].mul(&z)?;
-                        let v = matrices[*i].0[row].mul(&z)?.try_into().map_err(|_| SynthesisError::Unsatisfiable)?;
+                        let v = matrices[*i].0[row]
+                            .mul(&z)?
+                            .try_into()
+                            .map_err(|_| SynthesisError::Unsatisfiable)?;
                         prod = prod * v;
                     }
                     sum = match sum {

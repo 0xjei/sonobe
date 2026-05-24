@@ -118,9 +118,7 @@ impl<P: SWCurveConfig<BaseField: PrimeField>> WitnessToPublic
     }
 }
 
-impl<Base: SonobeField, Target: SonobeCurve> WitnessToPublic
-    for EmulatedAffineVar<Base, Target>
-{
+impl<Base: SonobeField, Target: SonobeCurve> WitnessToPublic for EmulatedAffineVar<Base, Target> {
     fn mark_as_public(&self) -> Result<(), SynthesisError> {
         self.x.mark_as_public()?;
         self.y.mark_as_public()?;

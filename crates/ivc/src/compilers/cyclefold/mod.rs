@@ -40,7 +40,7 @@ use sonobe_primitives::{
     arithmetizations::{Arith, ArithConfig},
     circuits::{
         ArithExtractor, AssignmentsExtractor, FCircuit,
-        alloc::{CommitmentCache, CommitmentKeyCache, CommittedCache, RandomnessCache, UsizeSet},
+        alloc::{CommitmentKeyCache, CommittedCache, RandomnessCache, UsizeSet},
     },
     commitments::{CommitmentDef, CommitmentDefGadget},
     relations::WitnessInstanceSampler,
@@ -561,7 +561,6 @@ impl<
             current_state: &circuit.dummy_state(),
             proof: &Dummy::dummy(cfg1),
             WW: &Dummy::dummy(cfg1),
-            UU: &Dummy::dummy(cfg1),
             U: &Dummy::dummy(cfg1),
             u: &Dummy::dummy(cfg1),
             cf_W: &Dummy::dummy(cfg2),
@@ -607,8 +606,8 @@ impl<
         let hash = T::new_with_pp_hash(ivc_vk.2.0.clone(), ivc_vk.2.1);
         let mut transcript = hash.separate_domain("transcript".as_ref());
 
-        let (WW, UU, folding_proof) = FS1::prove(
-            &ivc_vk.0.to_pk(),
+        let (WW, _, folding_proof) = FS1::prove(
+            ivc_vk.0.to_pk(),
             &mut transcript,
             &[W],
             &[U],
@@ -628,10 +627,6 @@ impl<
                 TypeId::of::<RandomnessCache>(),
                 Box::new(Vec::<<Self::IVC as IVCTypes>::Field>::new()),
             );
-            cache.insert(
-                TypeId::of::<CommitmentCache>(),
-                Box::new(Vec::<<FS1::CM as CommitmentDef>::Commitment>::new()),
-            );
         }
 
         cs.execute_synthesizer(CycleFoldBasedIVCDeciderCircuit::<FS1, FS2, T, FC> {
@@ -641,7 +636,6 @@ impl<
             current_state,
             proof: &folding_proof,
             WW: &WW,
-            UU: &UU,
             U,
             u,
             cf_W,
@@ -655,13 +649,8 @@ impl<
             .ok_or(SynthesisError::AssignmentMissing)?
             .downcast::<Vec<<Self::IVC as IVCTypes>::Field>>()
             .map_err(|_| SynthesisError::AssignmentMissing)?;
-        let c = *cache
-            .remove(&TypeId::of::<CommitmentCache>())
-            .ok_or(SynthesisError::AssignmentMissing)?
-            .downcast::<Vec<<FS1::CM as CommitmentDef>::Commitment>>()
-            .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        let compressed_proof = S::prove(pk, &x[1..], &w, &o, &mut rng)?;
+        let compressed_proof = S::prove(pk, &x[1..], w, &o, &mut rng)?;
 
         Ok((compressed_proof, U.clone(), u.clone(), folding_proof))
     }
@@ -695,7 +684,7 @@ impl<
             vec![<Self::IVC as IVCTypes>::Field::from(i as u64)],
             FC::StateVar::inputize(initial_state),
             FC::StateVar::inputize(current_state),
-            commitments.iter().flat_map(|c| <<FS1::Gadget as FoldingSchemeDefGadget>::CM as CommitmentDefGadget>::CommitmentVar::inputize(c)).collect::<Vec<_>>()
+            commitments.iter().flat_map(<<FS1::Gadget as FoldingSchemeDefGadget>::CM as CommitmentDefGadget>::CommitmentVar::inputize).collect::<Vec<_>>()
         ]
         .concat();
         let c = CurveGroup::normalize_batch(&commitments);
@@ -719,7 +708,6 @@ pub struct CycleFoldBasedIVCDeciderCircuit<
     current_state: &'a FC::State,
     proof: &'a FS1::Proof<1, 1>,
     WW: &'a FS1::RW,
-    UU: &'a FS1::RU,
     U: &'a FS1::RU,
     u: &'a FS1::IU,
     cf_W: &'a FS2::RW,

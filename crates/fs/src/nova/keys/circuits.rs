@@ -1,38 +1,20 @@
-use ark_r1cs_std::{
-    GR1CSVar,
-    alloc::{AllocVar, AllocationMode},
-    boolean::Boolean,
-};
+use ark_r1cs_std::alloc::{AllocVar, AllocationMode};
 use ark_relations::gr1cs::{Namespace, SynthesisError};
-use ark_std::{borrow::Borrow, marker::PhantomData};
+use ark_std::borrow::Borrow;
 use sonobe_primitives::{
     arithmetizations::{
-        Arith, ArithConfig, ArithGadget, ArithRelation, ArithRelationGadget,
-        r1cs::{R1CS, RelaxedInstance, RelaxedWitness},
+        ArithGadget, ArithRelationGadget,
+        r1cs::{RelaxedInstance, RelaxedWitness},
     },
-    circuits::{AssignmentsOwned, WitnessToCommitted},
-    commitments::{
-        CommitmentDef, CommitmentDefGadget, CommitmentOps, CommitmentOpsGadget,
-        GroupBasedCommitment,
-    },
-    relations::{Relation, RelationGadget, WitnessInstanceSampler},
-    traits::{CF2, SonobeField},
+    commitments::{CommitmentDefGadget, CommitmentOpsGadget},
+    relations::RelationGadget,
 };
 
 use super::super::{
-    instances::{
-        IncomingInstance as IU, RunningInstance as RU,
-        circuits::{IncomingInstanceVar as IUVar, RunningInstanceVar as RUVar},
-    },
-    witnesses::{
-        IncomingWitness as IW, RunningWitness as RW,
-        circuits::{IncomingWitnessVar as IWVar, RunningWitnessVar as RWVar},
-    },
+    instances::circuits::{IncomingInstanceVar as IUVar, RunningInstanceVar as RUVar},
+    witnesses::circuits::{IncomingWitnessVar as IWVar, RunningWitnessVar as RWVar},
 };
-use crate::{
-    FoldingSchemeDef, FoldingSchemeDefGadget, GroupBasedFoldingSchemePrimaryDef,
-    GroupBasedFoldingSchemeSecondaryDef, nova::keys::NovaKey,
-};
+use crate::nova::keys::NovaKey;
 
 #[derive(Clone)]
 pub struct NovaKeyVar<A, CM: CommitmentDefGadget> {
