@@ -510,9 +510,14 @@ impl<
 
     type ProverKey<FC> = (S::ProverKey, <Self::IVC as IVCTypes>::VerifierKey<FC>);
 
-    type VerifierKey<FC> = S::VerifierKey;
+    type VerifierKey<FC> = (
+        S::VerifierKey,
+        <FS1::DeciderKey as DeciderKey>::VerifierKey,
+        T::Config,
+        <Self::IVC as IVCTypes>::Field,
+    );
 
-    type CompressedProof<FC> = (S::Proof, Vec<<FS1::CM as CommitmentDef>::Commitment>);
+    type CompressedProof<FC> = (S::Proof, FS1::RU, FS1::IU, FS1::Proof<1, 1>);
 
     type Error = Error;
 
@@ -522,6 +527,9 @@ impl<
         ivc_vk: <Self::IVC as IVCTypes>::VerifierKey<FC>,
         rng: impl RngCore,
     ) -> Result<(Self::ProverKey<FC>, Self::VerifierKey<FC>), Self::Error> {
+        let cfg1 = &ivc_pk.0.to_arith_config();
+        let cfg2 = &ivc_pk.1.to_arith_config();
+
         let mut cs = ArithExtractor::new();
         {
             let mut cache = cs.cache_map.borrow_mut();
@@ -539,7 +547,13 @@ impl<
             i: 0,
             initial_state: &circuit.dummy_state(),
             current_state: &circuit.dummy_state(),
-            proof: &Proof::dummy(&ivc_pk),
+            proof: &Dummy::dummy(cfg1),
+            WW: &Dummy::dummy(cfg1),
+            UU: &Dummy::dummy(cfg1),
+            U: &Dummy::dummy(cfg1),
+            u: &Dummy::dummy(cfg1),
+            cf_W: &Dummy::dummy(cfg2),
+            cf_U: &Dummy::dummy(cfg2),
         })?;
         let (committed_variable_indices, ck) = {
             let mut cache = cs.cache_map.borrow_mut();
@@ -559,6 +573,8 @@ impl<
 
         let (pk, vk) = S::generate_keys((cs.arith()?, committed_variable_indices), &ck, rng)?;
 
+        let vk = (vk, ivc_vk.0.to_vk().clone(), ivc_vk.2.0.clone(), ivc_vk.2.1);
+
         Ok(((pk, ivc_vk), vk))
     }
 
@@ -567,9 +583,22 @@ impl<
         i: usize,
         initial_state: &FC::State,
         current_state: &FC::State,
-        proof: &<Self::IVC as IVCTypes>::Proof<FC>,
-        rng: impl RngCore,
+        Proof(W, U, w, u, cf_W, cf_U): &<Self::IVC as IVCTypes>::Proof<FC>,
+        mut rng: impl RngCore,
     ) -> Result<Self::CompressedProof<FC>, Self::Error> {
+        let hash = T::new_with_pp_hash(ivc_vk.2.0.clone(), ivc_vk.2.1);
+        let mut transcript = hash.separate_domain("transcript".as_ref());
+
+        let (WW, UU, folding_proof) = FS1::prove(
+            &ivc_vk.0.to_pk(),
+            &mut transcript,
+            &[W],
+            &[U],
+            &[w],
+            &[u],
+            &mut rng,
+        )?;
+
         let mut cs = AssignmentsExtractor::new();
         {
             let mut cache = cs.cache_map.borrow_mut();
@@ -586,12 +615,19 @@ impl<
                 Box::new(Vec::<<FS1::CM as CommitmentDef>::Commitment>::new()),
             );
         }
+
         cs.execute_synthesizer(CycleFoldBasedIVCDeciderCircuit::<FS1, FS2, T, FC> {
             vk: ivc_vk,
             i,
             initial_state,
             current_state,
-            proof,
+            proof: &folding_proof,
+            WW: &WW,
+            UU: &UU,
+            U,
+            u,
+            cf_W,
+            cf_U,
         })?;
         let w = &cs.assignments.witness_assignment;
         let x = &cs.assignments.instance_assignment;
@@ -607,33 +643,40 @@ impl<
             .downcast::<Vec<<FS1::CM as CommitmentDef>::Commitment>>()
             .map_err(|_| SynthesisError::AssignmentMissing)?;
 
-        let proof = S::prove(pk, &x[1..], &w, &o, rng)?;
+        let compressed_proof = S::prove(pk, &x[1..], &w, &o, &mut rng)?;
 
-        Ok((proof, c))
+        Ok((compressed_proof, U.clone(), u.clone(), folding_proof))
     }
 
     fn verify<FC: FCircuit<Field = <Self::IVC as IVCTypes>::Field>>(
-        vk: &Self::VerifierKey<FC>,
+        (vk, folding_vk, hash_config, pp_hash): &Self::VerifierKey<FC>,
         i: usize,
         initial_state: &FC::State,
         current_state: &FC::State,
-        (proof, commitments): &Self::CompressedProof<FC>,
+        (compressed_proof, U, u, folding_proof): &Self::CompressedProof<FC>,
     ) -> Result<(), Self::Error> {
         if i == 0 {
             return (initial_state == current_state)
                 .then_some(())
                 .ok_or(Error::IVCVerificationFail);
         }
+
+        let hash = T::new_with_pp_hash(hash_config.clone(), *pp_hash);
+        let mut transcript = hash.separate_domain("transcript".as_ref());
+
+        let UU = FS1::verify(folding_vk, &mut transcript, &[U], &[u], folding_proof)?;
+        let commitments = UU.commitments();
+
         let x = &[
             vec![<Self::IVC as IVCTypes>::Field::from(i as u64)],
             FC::StateVar::inputize(initial_state),
             FC::StateVar::inputize(current_state),
-            commitments.iter().flat_map(<<FS1::Gadget as FoldingSchemeDefGadget>::CM as CommitmentDefGadget>::CommitmentVar::inputize).collect::<Vec<_>>()
+            commitments.iter().flat_map(|c| <<FS1::Gadget as FoldingSchemeDefGadget>::CM as CommitmentDefGadget>::CommitmentVar::inputize(c)).collect::<Vec<_>>()
         ]
         .concat();
-        let c = CurveGroup::normalize_batch(commitments);
+        let c = CurveGroup::normalize_batch(&commitments);
 
-        S::verify(vk, x, &c, proof)?;
+        S::verify(vk, x, &c, compressed_proof)?;
 
         Ok(())
     }
@@ -650,7 +693,13 @@ pub struct CycleFoldBasedIVCDeciderCircuit<
     i: usize,
     initial_state: &'a FC::State,
     current_state: &'a FC::State,
-    proof: &'a Proof<FS1, FS2>,
+    proof: &'a FS1::Proof<1, 1>,
+    WW: &'a FS1::RW,
+    UU: &'a FS1::RU,
+    U: &'a FS1::RU,
+    u: &'a FS1::IU,
+    cf_W: &'a FS2::RW,
+    cf_U: &'a FS2::RU,
 }
 
 impl<
@@ -658,7 +707,8 @@ impl<
     FS1: FoldingSchemeCycleFoldExt<
             1,
             1,
-            Gadget: FoldingSchemeDeciderGadget,
+            Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>
+                        + FoldingSchemeDeciderGadget,
             CM: CommitmentDef<
                 Commitment: SonobeCurve<BaseField = <FS2::CM as CommitmentDef>::Scalar>,
             >,
@@ -696,22 +746,23 @@ impl<
         let dk2 = AllocVar::new_constant(cs.clone(), dk2)?;
         let pp_hash = FpVar::new_constant(cs.clone(), pp_hash)?;
 
-        let Proof(W, U, w, u, cf_W, cf_U) = &self.proof;
-        let W = AllocVar::new_witness(cs.clone(), || Ok(W))?;
-        let U = AllocVar::new_witness(cs.clone(), || Ok(U))?;
-        let w = AllocVar::new_witness(cs.clone(), || Ok(w))?;
-        let u = AllocVar::new_witness(cs.clone(), || Ok(u))?;
-        let cf_W = AllocVar::new_witness(cs.clone(), || Ok(cf_W))?;
-        let cf_U = AllocVar::new_witness(cs.clone(), || Ok(cf_U))?;
+        let WW = AllocVar::new_witness(cs.clone(), || Ok(self.WW))?;
+        let U = AllocVar::new_witness(cs.clone(), || Ok(self.U))?;
+        let u = AllocVar::new_witness(cs.clone(), || Ok(self.u))?;
+        let cf_W = AllocVar::new_witness(cs.clone(), || Ok(self.cf_W))?;
+        let cf_U = AllocVar::new_witness(cs.clone(), || Ok(self.cf_U))?;
+        let proof = AllocVar::new_witness(cs.clone(), || Ok(self.proof))?;
 
         i.enforce_not_equal(&FpVar::zero())?;
 
-        FS1::Gadget::decide_running(&dk1, &W, &U)?;
-        FS1::Gadget::decide_incoming(&dk1, &w, &u)?;
-        FS2::Gadget::decide_running(&dk2, &cf_W, &cf_U)?;
-
         let hash = T::Gadget::new_with_pp_hash(hash_config.clone(), &pp_hash)?;
         let mut sponge = hash.separate_domain("sponge".as_ref())?;
+        let mut transcript = hash.separate_domain("transcript".as_ref())?;
+
+        let UU = FS1::Gadget::verify_hinted(&(), &mut transcript, [&U], [&u], &proof)?;
+
+        FS1::Gadget::decide_running(&dk1, &WW, &UU)?;
+        FS2::Gadget::decide_running(&dk2, &cf_W, &cf_U)?;
 
         let u_x = sponge
             .add(&state_size)?

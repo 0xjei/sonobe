@@ -502,7 +502,6 @@ impl<E: Pairing<G1: SonobeCurve, BaseField: SonobeField, ScalarField: SonobeFiel
             ],
         ) != vk.cc_vk.alpha_g1_beta_g2
         {
-            println!("xxx");
             return Err(SynthesisError::Unsatisfiable);
         }
 
@@ -511,7 +510,6 @@ impl<E: Pairing<G1: SonobeCurve, BaseField: SonobeField, ScalarField: SonobeFiel
             &[&c[..], &[proof.d][..]].concat(),
             &proof.link_pi,
         ) {
-            println!("yyy");
             return Err(SynthesisError::Unsatisfiable);
         }
 

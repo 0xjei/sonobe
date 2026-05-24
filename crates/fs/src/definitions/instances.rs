@@ -25,7 +25,7 @@ pub trait FoldingInstance<CM: CommitmentDef>:
     /// the instance.
     // TODO (@winderica): consider the scenario where the instance has multiple
     // commitments of different types.
-    fn commitments(&self) -> Vec<&CM::Commitment>;
+    fn commitments(&self) -> Vec<CM::Commitment>;
 
     /// [`FoldingInstance::public_inputs`] returns the reference to the public
     /// inputs contained in the instance.
@@ -55,7 +55,7 @@ impl<V: Default + Clone> Dummy<&ArithConfig> for PlainInstance<V> {
 impl<CM: CommitmentDef> FoldingInstance<CM> for PlainInstance<CM::Scalar> {
     const N_COMMITMENTS: usize = 0;
 
-    fn commitments(&self) -> Vec<&CM::Commitment> {
+    fn commitments(&self) -> Vec<CM::Commitment> {
         vec![]
     }
 
