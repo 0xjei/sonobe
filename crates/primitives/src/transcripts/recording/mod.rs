@@ -1,5 +1,5 @@
 //! Implementation of transcripts that can automatically record generated
-//! challenges, eliminating the need to pass challenges thoughout protocols.
+//! challenges, eliminating the need to pass challenges throughout protocols.
 
 use ark_ff::PrimeField;
 use ark_r1cs_std::fields::fp::FpVar;
