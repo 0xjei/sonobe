@@ -18,7 +18,11 @@ use sonobe_primitives::{
     },
     circuits::WitnessToPublic,
     commitments::GroupBasedCommitment,
-    traits::{CF2, SonobeCurve},
+    traits::{CF1, CF2, SonobeCurve},
+    transcripts::{
+        Transcript, TranscriptGadget,
+        replay::{ReplayTranscript, ReplayTranscriptVar},
+    },
 };
 
 use crate::compilers::cyclefold::{
@@ -68,15 +72,16 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
         [U]: &[impl Borrow<Self::RU>; 1],
         [u]: &[impl Borrow<Self::IU>; 1],
         proof: &Self::Proof<1, 1>,
-        rho: Self::Challenge,
+        mut transcript: ReplayTranscript<CF1<CM::Commitment>>,
     ) -> Vec<Self::CFCircuit> {
+        let rho = transcript.challenge_bits(CHALLENGE_BITS);
         vec![
             NovaCycleFoldCircuit {
-                r: rho.into(),
+                r: rho.clone(),
                 points: vec![U.borrow().cm_e, *proof],
             },
             NovaCycleFoldCircuit {
-                r: rho.into(),
+                r: rho,
                 points: vec![U.borrow().cm_w, u.borrow().cm_w],
             },
         ]
@@ -88,9 +93,9 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
         [u]: [<Self::Gadget as FoldingSchemeDefGadget>::IU; 1],
         UU: <Self::Gadget as FoldingSchemeDefGadget>::RU,
         proof: <Self::Gadget as FoldingSchemeDefGadget>::Proof<1, 1>,
-        rho: <Self::Gadget as FoldingSchemeDefGadget>::Challenge,
+        mut transcript: ReplayTranscriptVar<CF1<CM::Commitment>>,
     ) -> Result<Vec<Vec<EmulatedFieldVar<CM::Scalar, CF2<CM::Commitment>>>>, SynthesisError> {
-        let mut rho = rho.to_vec();
+        let mut rho = transcript.challenge_bits(CHALLENGE_BITS)?;
         rho.resize(
             CF2::<CM::Commitment>::MODULUS_BIT_SIZE as usize,
             Boolean::FALSE,
@@ -130,20 +135,21 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
         [U1, U2]: &[impl Borrow<Self::RU>; 2],
         _: &[impl Borrow<Self::IU>; 0],
         proof: &Self::Proof<2, 0>,
-        rho_bits: Self::Challenge,
+        mut transcript: ReplayTranscript<CF1<CM::Commitment>>,
     ) -> Vec<Self::CFCircuit> {
+        let rho_bits = transcript.challenge_bits(CHALLENGE_BITS);
         let rho = CM::Scalar::from_bits_le(&rho_bits);
         vec![
             NovaCycleFoldCircuit {
-                r: rho_bits.into(),
+                r: rho_bits.clone(),
                 points: vec![*proof, U2.borrow().cm_e],
             },
             NovaCycleFoldCircuit {
-                r: rho_bits.into(),
+                r: rho_bits.clone(),
                 points: vec![U1.borrow().cm_e, U2.borrow().cm_e * rho + proof],
             },
             NovaCycleFoldCircuit {
-                r: rho_bits.into(),
+                r: rho_bits,
                 points: vec![U1.borrow().cm_w, U2.borrow().cm_w],
             },
         ]
@@ -155,9 +161,9 @@ impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> FoldingSchemeCycleFo
         _: [<Self::Gadget as FoldingSchemeDefGadget>::IU; 0],
         UU: <Self::Gadget as FoldingSchemeDefGadget>::RU,
         proof: <Self::Gadget as FoldingSchemeDefGadget>::Proof<2, 0>,
-        rho_bits: <Self::Gadget as FoldingSchemeDefGadget>::Challenge,
+        mut transcript: ReplayTranscriptVar<CF1<CM::Commitment>>,
     ) -> Result<Vec<Vec<EmulatedFieldVar<CM::Scalar, CF2<CM::Commitment>>>>, SynthesisError> {
-        let mut rho_bits = rho_bits.to_vec();
+        let mut rho_bits = transcript.challenge_bits(CHALLENGE_BITS)?;
         rho_bits.resize(
             CF2::<CM::Commitment>::MODULUS_BIT_SIZE as usize,
             Boolean::FALSE,

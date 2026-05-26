@@ -1,11 +1,8 @@
 //! Implementation of transcript traits for Griffin sponge.
 
 use ark_crypto_primitives::sponge::DuplexSpongeMode;
-use ark_ff::{BigInteger, PrimeField};
-use ark_r1cs_std::{
-    fields::{FieldVar, fp::FpVar},
-    prelude::{Boolean, ToBitsGadget},
-};
+use ark_ff::PrimeField;
+use ark_r1cs_std::fields::{FieldVar, fp::FpVar};
 use ark_relations::gr1cs::SynthesisError;
 use ark_std::sync::Arc;
 
@@ -187,7 +184,7 @@ impl<F: PrimeField> Transcript<F> for GriffinSponge<F> {
     type Config = Arc<GriffinParams<F>>;
     type Gadget = GriffinSpongeVar<F>;
 
-    fn new(parameters: &Arc<GriffinParams<F>>) -> Self {
+    fn new(parameters: Arc<GriffinParams<F>>) -> Self {
         let state = vec![F::zero(); parameters.rate + parameters.capacity];
         let mode = DuplexSpongeMode::Absorbing {
             next_absorb_index: 0,
@@ -223,22 +220,6 @@ impl<F: PrimeField> Transcript<F> for GriffinSponge<F> {
         self
     }
 
-    fn get_bits(&mut self, num_bits: usize) -> Vec<bool> {
-        let usable_bits = (F::MODULUS_BIT_SIZE - 1) as usize;
-
-        let num_elements = num_bits.div_ceil(usable_bits);
-        let src_elements = self.get_field_elements(num_elements);
-
-        let mut bits: Vec<bool> = Vec::with_capacity(usable_bits * num_elements);
-        for elem in &src_elements {
-            let elem_bits = elem.into_bigint().to_bits_le();
-            bits.extend_from_slice(&elem_bits[..usable_bits]);
-        }
-
-        bits.truncate(num_bits);
-        bits
-    }
-
     fn get_field_elements(&mut self, num_elements: usize) -> Vec<F> {
         let mut squeezed_elems = vec![F::zero(); num_elements];
         match self.mode {
@@ -263,9 +244,10 @@ impl<F: PrimeField> Transcript<F> for GriffinSponge<F> {
 }
 
 impl<F: PrimeField> TranscriptGadget<F> for GriffinSpongeVar<F> {
+    type Config = Arc<GriffinParams<F>>;
     type Widget = GriffinSponge<F>;
 
-    fn new(parameters: &Arc<GriffinParams<F>>) -> Self
+    fn new(parameters: Arc<GriffinParams<F>>) -> Self
     where
         Self: Sized,
     {
@@ -282,10 +264,7 @@ impl<F: PrimeField> TranscriptGadget<F> for GriffinSpongeVar<F> {
         }
     }
 
-    fn add<A: AbsorbableVar<F> + ?Sized>(
-        &mut self,
-        input: &A,
-    ) -> Result<&mut Self, SynthesisError> {
+    fn add<A: AbsorbableVar<F>>(&mut self, input: &A) -> Result<&mut Self, SynthesisError> {
         let input = {
             let mut result = Vec::new();
             input.absorb_into(&mut result)?;
@@ -313,21 +292,6 @@ impl<F: PrimeField> TranscriptGadget<F> for GriffinSpongeVar<F> {
         };
 
         Ok(self)
-    }
-
-    fn get_bits(&mut self, num_bits: usize) -> Result<Vec<Boolean<F>>, SynthesisError> {
-        let usable_bits = (F::MODULUS_BIT_SIZE - 1) as usize;
-
-        let num_elements = num_bits.div_ceil(usable_bits);
-        let src_elements = self.get_field_elements(num_elements)?;
-
-        let mut bits: Vec<Boolean<F>> = Vec::with_capacity(usable_bits * num_elements);
-        for elem in &src_elements {
-            bits.extend_from_slice(&elem.to_bits_le()?[..usable_bits]);
-        }
-
-        bits.truncate(num_bits);
-        Ok(bits)
     }
 
     fn get_field_elements(&mut self, num_elements: usize) -> Result<Vec<FpVar<F>>, SynthesisError> {
@@ -374,13 +338,13 @@ mod tests {
     fn test_challenge_field_element() -> Result<(), Box<dyn Error>> {
         // Create a transcript outside of the circuit
         let config = Arc::new(GriffinParams::<Fr>::new(3, 5, 12));
-        let mut tr = GriffinSponge::<Fr>::new(&config);
+        let mut tr = GriffinSponge::<Fr>::new(config.clone());
         tr.add(&Fr::from(42_u32));
         let c = tr.challenge_field_element();
 
         // Create a transcript inside of the circuit
         let cs = ConstraintSystem::<Fr>::new_ref();
-        let mut tr_var = GriffinSpongeVar::<Fr>::new(&config);
+        let mut tr_var = GriffinSpongeVar::<Fr>::new(config);
         let v = FpVar::<Fr>::new_witness(cs.clone(), || Ok(Fr::from(42_u32)))?;
         tr_var.add(&v)?;
         let c_var = tr_var.challenge_field_element()?;
@@ -397,13 +361,13 @@ mod tests {
 
         // Create a transcript outside of the circuit
         let config = Arc::new(GriffinParams::<Fq>::new(3, 5, 12));
-        let mut tr = GriffinSponge::<Fq>::new(&config);
+        let mut tr = GriffinSponge::<Fq>::new(config.clone());
         tr.add(&Fq::from(42_u32));
         let c = tr.challenge_bits(nbits);
 
         // Create a transcript inside of the circuit
         let cs = ConstraintSystem::<Fq>::new_ref();
-        let mut tr_var = GriffinSpongeVar::<Fq>::new(&config);
+        let mut tr_var = GriffinSpongeVar::<Fq>::new(config);
         let v = FpVar::<Fq>::new_witness(cs.clone(), || Ok(Fq::from(42_u32)))?;
         tr_var.add(&v)?;
         let c_var = tr_var.challenge_bits(nbits)?;
@@ -418,7 +382,7 @@ mod tests {
     fn test_absorb_canonical_point() -> Result<(), Box<dyn Error>> {
         // Create a transcript outside of the circuit
         let config = Arc::new(GriffinParams::<Fq>::new(3, 5, 12));
-        let mut tr = GriffinSponge::<Fq>::new(&config);
+        let mut tr = GriffinSponge::<Fq>::new(config.clone());
         let rng = &mut thread_rng();
 
         let p = G1::rand(rng);
@@ -427,7 +391,7 @@ mod tests {
 
         // Create a transcript inside of the circuit
         let cs = ConstraintSystem::<Fq>::new_ref();
-        let mut tr_var = GriffinSpongeVar::<Fq>::new(&config);
+        let mut tr_var = GriffinSpongeVar::<Fq>::new(config);
         let p_var = ProjectiveVar::<Config, FpVar<Fq>>::new_witness(cs, || Ok(p))?;
         tr_var.add(&p_var)?;
         let c_var = tr_var.challenge_field_element()?;
@@ -442,7 +406,7 @@ mod tests {
     fn test_absorb_emulated_point() -> Result<(), Box<dyn Error>> {
         // Create a transcript outside of the circuit
         let config = Arc::new(GriffinParams::<Fr>::new(3, 5, 12));
-        let mut tr = GriffinSponge::<Fr>::new(&config);
+        let mut tr = GriffinSponge::<Fr>::new(config.clone());
         let rng = &mut thread_rng();
 
         let p = G1::rand(rng);
@@ -451,7 +415,7 @@ mod tests {
 
         // Create a transcript inside of the circuit
         let cs = ConstraintSystem::<Fr>::new_ref();
-        let mut tr_var = GriffinSpongeVar::<Fr>::new(&config);
+        let mut tr_var = GriffinSpongeVar::<Fr>::new(config);
         let p_var = EmulatedAffineVar::new_witness(cs, || Ok(p))?;
         tr_var.add(&p_var)?;
         let c_var = tr_var.challenge_field_element()?;

@@ -8,15 +8,16 @@
 //! sub-modules.
 
 use ark_ff::{BigInteger, PrimeField};
-use ark_r1cs_std::{boolean::Boolean, fields::fp::FpVar};
+use ark_r1cs_std::{boolean::Boolean, convert::ToBitsGadget, fields::fp::FpVar};
 use ark_relations::gr1cs::SynthesisError;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 pub use self::absorbable::{Absorbable, AbsorbableVar};
 
 pub mod absorbable;
 pub mod griffin;
 pub mod poseidon;
+pub mod recording;
+pub mod replay;
 
 /// [`Transcript`] is the out-of-circuit widget for transcripts and sponges.
 ///
@@ -25,7 +26,7 @@ pub mod poseidon;
 pub trait Transcript<F: PrimeField>: Clone {
     /// [`Transcript::Config`] is the configuration for the underlying hash
     /// function of the transcript.
-    type Config: Clone + CanonicalSerialize + CanonicalDeserialize;
+    type Config: Clone;
 
     /// [`Transcript::Gadget`] is the in-circuit gadget corresponding to this
     /// widget.
@@ -33,12 +34,12 @@ pub trait Transcript<F: PrimeField>: Clone {
 
     /// [`Transcript::new`] creates a new transcript / sponge under the given
     /// configuration `config`.
-    fn new(config: &Self::Config) -> Self;
+    fn new(config: Self::Config) -> Self;
 
     /// [`Transcript::new_with_pp_hash`] is a convenience method for creating a
     /// new transcript / sponge under the given configuration `config` and
     /// additionally absorbing a hash of the public parameters `pp_hash`.
-    fn new_with_pp_hash(config: &Self::Config, pp_hash: F) -> Self {
+    fn new_with_pp_hash(config: Self::Config, pp_hash: F) -> Self {
         let mut sponge = Self::new(config);
         sponge.add_field_elements(&[pp_hash]);
         sponge
@@ -59,7 +60,21 @@ pub trait Transcript<F: PrimeField>: Clone {
 
     /// [`Transcript::get_bits`] squeezes `num_bits` bits from the transcript /
     /// sponge.
-    fn get_bits(&mut self, num_bits: usize) -> Vec<bool>;
+    fn get_bits(&mut self, num_bits: usize) -> Vec<bool> {
+        let usable_bits = (F::MODULUS_BIT_SIZE - 1) as usize;
+
+        let num_elements = num_bits.div_ceil(usable_bits);
+        let src_elements = self.get_field_elements(num_elements);
+
+        let mut bits: Vec<bool> = Vec::with_capacity(usable_bits * num_elements);
+        for elem in &src_elements {
+            let elem_bits = elem.into_bigint().to_bits_le();
+            bits.extend_from_slice(&elem_bits[..usable_bits]);
+        }
+
+        bits.truncate(num_bits);
+        bits
+    }
 
     /// [`Transcript::get_field_element`] squeezes a single field element from
     /// the transcript / sponge.
@@ -132,22 +147,23 @@ pub trait Transcript<F: PrimeField>: Clone {
 
 /// [`TranscriptGadget`] is the in-circuit gadget for transcripts and sponges.
 pub trait TranscriptGadget<F: PrimeField>: Clone {
+    /// [`TranscriptGadget::Config`] is the configuration for the underlying
+    /// hash function of the transcript gadget.
+    type Config: Clone;
+
     /// [`TranscriptGadget::Widget`] points to the out-of-circuit widget for
     /// this transcript gadget.
     type Widget: Transcript<F, Gadget = Self>;
 
     /// [`TranscriptGadget::new`] creates a new transcript / sponge variable
     /// under the given configuration `config`.
-    fn new(config: &<Self::Widget as Transcript<F>>::Config) -> Self;
+    fn new(config: Self::Config) -> Self;
 
     /// [`TranscriptGadget::new_with_pp_hash`] is a convenience method for
     /// creating a new transcript / sponge variable under the given
     /// configuration `config` and additionally absorbing a hash of the public
     /// parameters `pp_hash`.
-    fn new_with_pp_hash(
-        config: &<Self::Widget as Transcript<F>>::Config,
-        pp_hash: &FpVar<F>,
-    ) -> Result<Self, SynthesisError> {
+    fn new_with_pp_hash(config: Self::Config, pp_hash: &FpVar<F>) -> Result<Self, SynthesisError> {
         let mut sponge = Self::new(config);
         sponge.add(&pp_hash)?;
         Ok(sponge)
@@ -156,12 +172,24 @@ pub trait TranscriptGadget<F: PrimeField>: Clone {
     /// [`TranscriptGadget::add`] absorbs a message `input` that can be any type
     /// implementing the [`AbsorbableGadget`] trait into the transcript / sponge
     /// variable.
-    fn add<A: AbsorbableVar<F> + ?Sized>(&mut self, input: &A)
-    -> Result<&mut Self, SynthesisError>;
+    fn add<A: AbsorbableVar<F>>(&mut self, input: &A) -> Result<&mut Self, SynthesisError>;
 
     /// [`TranscriptGadget::get_bits`] squeezes `num_bits` bit variables from
     /// the transcript / sponge variable.
-    fn get_bits(&mut self, num_bits: usize) -> Result<Vec<Boolean<F>>, SynthesisError>;
+    fn get_bits(&mut self, num_bits: usize) -> Result<Vec<Boolean<F>>, SynthesisError> {
+        let usable_bits = (F::MODULUS_BIT_SIZE - 1) as usize;
+
+        let num_elements = num_bits.div_ceil(usable_bits);
+        let src_elements = self.get_field_elements(num_elements)?;
+
+        let mut bits: Vec<Boolean<F>> = Vec::with_capacity(usable_bits * num_elements);
+        for elem in &src_elements {
+            bits.extend_from_slice(&elem.to_bits_le()?[..usable_bits]);
+        }
+
+        bits.truncate(num_bits);
+        Ok(bits)
+    }
 
     /// [`TranscriptGadget::get_field_element`] squeezes a single field element
     /// variable from the transcript / sponge variable.

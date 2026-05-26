@@ -94,8 +94,8 @@ mod tests {
 
         let config = Arc::new(GriffinParams::new(16, 5, 9));
 
-        let mut transcript_p = GriffinSponge::new(&config);
-        let mut transcript_v = GriffinSponge::new(&config);
+        let mut transcript_p = GriffinSponge::new(config.clone());
+        let mut transcript_v = GriffinSponge::new(config);
 
         for assignments in assignments_vec {
             let mut ws = vec![];
@@ -113,7 +113,7 @@ mod tests {
             let ws = ws.try_into().unwrap();
             let us = us.try_into().unwrap();
 
-            let (WW, UU, pi, _) = FS::prove(pk, &mut transcript_p, &Ws, &Us, &ws, &us, &mut rng)?;
+            let (WW, UU, pi) = FS::prove(pk, &mut transcript_p, &Ws, &Us, &ws, &us, &mut rng)?;
             FS::decide_running(&dk, &WW, &UU)?;
             assert_eq!(FS::verify(vk, &mut transcript_v, &Us, &us, &pi)?, UU);
 

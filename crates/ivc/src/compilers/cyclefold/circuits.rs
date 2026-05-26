@@ -19,7 +19,7 @@ use sonobe_primitives::{
     circuits::{FCircuit, WitnessToPublic},
     commitments::CommitmentDef,
     traits::{Dummy, SonobeCurve},
-    transcripts::{Transcript, TranscriptGadget},
+    transcripts::{TranscriptGadget, recording::RecordingTranscriptVar},
 };
 
 use crate::compilers::cyclefold::FoldingSchemeCycleFoldExt;
@@ -31,7 +31,7 @@ pub struct AugmentedCircuit<
     FS1: GroupBasedFoldingSchemePrimary<1, 1>,
     FS2: GroupBasedFoldingSchemeSecondary<1, 1>,
     FC: FCircuit,
-    T: Transcript<FC::Field>,
+    T: TranscriptGadget<FC::Field>,
 > {
     _fs: PhantomData<(FS1, FS2)>,
     hash_config: &'a T::Config,
@@ -45,7 +45,7 @@ where
     FS1: GroupBasedFoldingSchemePrimary<1, 1>,
     FS2: GroupBasedFoldingSchemeSecondary<1, 1>,
     FC: FCircuit,
-    T: Transcript<FC::Field>,
+    T: TranscriptGadget<FC::Field>,
 {
     /// [`AugmentedCircuit::new`] creates an instance of the augmented circuit
     /// for the given step circuit.
@@ -84,7 +84,7 @@ where
             >,
         >,
     FC: FCircuit<Field = <FS1::CM as CommitmentDef>::Scalar>,
-    T: Transcript<FC::Field>,
+    T: TranscriptGadget<FC::Field>,
 {
     /// [`AugmentedCircuit::compute_next_state`] invokes the step circuit on the
     /// current state and external inputs to compute the next state and external
@@ -105,12 +105,13 @@ where
         cf_us: Vec<FS2::IU>,
         cf_proofs: Vec<FS2::Proof<1, 1>>,
     ) -> Result<(FC::State, FC::ExternalOutputs), SynthesisError> {
-        let hash = T::Gadget::new_with_pp_hash(
-            self.hash_config,
+        let hash = T::new_with_pp_hash(
+            self.hash_config.clone(),
             &FpVar::new_witness(cs.clone(), || Ok(pp_hash))?,
         )?;
         let sponge = hash.separate_domain("sponge".as_ref())?;
-        let mut transcript = hash.separate_domain("transcript".as_ref())?;
+        let mut transcript =
+            RecordingTranscriptVar::new(hash.separate_domain("transcript".as_ref())?);
 
         let i = FpVar::new_witness(cs.clone(), || Ok(FC::Field::from(i as u64)))?;
         let ii = &i + FpVar::one();
@@ -152,7 +153,7 @@ where
         // 1.c. Fold the primary running instance `U` and incoming instance `u`
         //      using the provided proof to obtain the next running instance
         //      `UU`.
-        let (UU, rho) = FS1::Gadget::verify_hinted(&(), &mut transcript, [&U], [&u], &proof)?;
+        let UU = FS1::Gadget::verify_hinted(&(), &mut transcript, [&U], [&u], &proof)?;
         // 1.d. If this is the base case (`i = 0`), then we should instead use
         //      the dummy running instance as the next running instance.
         let actual_UU = is_basecase.select(&U_dummy, &UU)?;
@@ -161,7 +162,7 @@ where
         // 2.a. Derive the public inputs to the secondary (CycleFold)
         //      circuits in the `i`-th step, which are obtained by calling
         //      the implementation of `FoldingSchemeCycleFoldExt`.
-        let cf_u_xs = FS1::to_cyclefold_inputs([U], [u], UU, proof, rho)?;
+        let cf_u_xs = FS1::to_cyclefold_inputs([U], [u], UU, proof, transcript.clone().into())?;
         if [cf_us.len(), cf_u_xs.len(), cf_proofs.len()] != [FS1::N_CYCLEFOLDS; 3] {
             return Err(SynthesisError::Unsatisfiable);
         }
@@ -224,7 +225,7 @@ where
             >,
         >,
     FC: FCircuit<Field = <FS1::CM as CommitmentDef>::Scalar>,
-    T: Transcript<FC::Field>,
+    T: TranscriptGadget<FC::Field>,
 {
     fn generate_constraints(
         self,

@@ -61,7 +61,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemePro
         ws: &[impl Borrow<Self::IW>; 1],
         us: &[impl Borrow<Self::IU>; 1],
         rng: impl RngCore,
-    ) -> Result<(Self::RW, Self::RU, Self::Proof<1, 1>, Self::Challenge), Error> {
+    ) -> Result<(Self::RW, Self::RU, Self::Proof<1, 1>), Error> {
         let (W, U) = (Ws[0].borrow(), Us[0].borrow());
         let (w, u) = (ws[0].borrow(), us[0].borrow());
 
@@ -94,7 +94,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemePro
                 .map(|(a, b)| rho * b + a)
                 .collect(),
         };
-        Ok((WW, UU, cm_t, rho_bits.try_into().unwrap()))
+        Ok((WW, UU, cm_t))
     }
 }
 
@@ -110,7 +110,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemePro
         _: &[impl Borrow<Self::IW>; 0],
         _: &[impl Borrow<Self::IU>; 0],
         rng: impl RngCore,
-    ) -> Result<(Self::RW, Self::RU, Self::Proof<2, 0>, Self::Challenge), Error> {
+    ) -> Result<(Self::RW, Self::RU, Self::Proof<2, 0>), Error> {
         let (W1, U1) = (W1.borrow(), U1.borrow());
         let (W2, U2) = (W2.borrow(), U2.borrow());
 
@@ -146,6 +146,6 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemePro
                 .map(|(a, b)| rho * b + a)
                 .collect(),
         };
-        Ok((WW, UU, cm_t, rho_bits.try_into().unwrap()))
+        Ok((WW, UU, cm_t))
     }
 }
