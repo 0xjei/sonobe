@@ -380,14 +380,13 @@ impl<E: Pairing<G1: SonobeCurve, BaseField: SonobeField, ScalarField: SonobeFiel
         let assignment = [&[E::ScalarField::one()][..], x, w].concat();
 
         let witness_map_time = start_timer!(|| "R1CS to QAP witness map");
-        let h = {
-            QAP::witness_map_from_matrices::<_, GeneralEvaluationDomain<_>>(
-                pk.r1cs.matrices(),
-                num_inputs,
-                num_constraints,
-                &assignment,
-            )?
-        };
+        let h = QAP::witness_map_from_matrices::<_, GeneralEvaluationDomain<_>>(
+            pk.r1cs.matrices(),
+            num_inputs,
+            num_constraints,
+            &assignment,
+        )?;
+
         end_timer!(witness_map_time);
 
         let assignment_bigint = cfg_into_iter!(assignment)

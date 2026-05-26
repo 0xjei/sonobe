@@ -165,13 +165,7 @@ pub trait CCSGadget {
                     // `c_i · 〇_{j ∈ S_i} (M_j[row] · z)`
                     let mut prod = c.clone().into();
                     for i in s {
-                        // TODO: intermediate
-                        // let v = matrices[*i].0[row].mul(&z)?;
-                        let v = matrices[*i].0[row]
-                            .mul(&z)?
-                            .try_into()
-                            .map_err(|_| SynthesisError::Unsatisfiable)?;
-                        prod = prod * v;
+                        prod = prod * matrices[*i].0[row].mul(&z)?;
                     }
                     sum = match sum {
                         Some(sum) => Some(sum + prod),

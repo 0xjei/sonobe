@@ -94,8 +94,8 @@ impl<Base: SonobeField, Target: SonobeField> Inputize<Base> for EmulatedFieldVar
         value
             .into_bigint()
             .to_bits_le()
-            .into_iter()
-            .take(Target::MODULUS_BIT_SIZE as usize)
+            .chunks(Base::BITS_PER_LIMB)
+            .map(Base::BigInt::from_bits_le)
             .map(Base::from)
             .collect()
     }

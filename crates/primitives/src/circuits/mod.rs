@@ -230,10 +230,14 @@ impl<F: Field, const ARITH_ENABLED: bool, const ASSIGNMENTS_ENABLED: bool>
         circuit: impl FnOnce(ConstraintSystemRef<F>) -> Result<R, SynthesisError>,
     ) -> Result<R, SynthesisError> {
         let cs = std::mem::take(&mut self.0);
-        let cs_ref = ConstraintSystemRef::new(cs);
-        let result = circuit(cs_ref.clone())?;
-        self.0 = cs_ref.into_inner().unwrap();
+        let result = {
+            let cs_ref = ConstraintSystemRef::new(cs);
+            let result = circuit(cs_ref.clone())?;
+            self.0 = cs_ref.into_inner().unwrap();
+            result
+        };
         if ARITH_ENABLED {
+            println!("{}", self.0.num_constraints());
             self.0.finalize();
         }
         Ok(result)
