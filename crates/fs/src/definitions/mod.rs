@@ -13,9 +13,9 @@ pub mod witnesses;
 use ark_r1cs_std::{GR1CSVar, alloc::AllocVar};
 use sonobe_primitives::{
     arithmetizations::{Arith, ArithConfig},
-    circuits::{AssignmentsOwned, WitnessToCommitted},
+    circuits::AssignmentsOwned,
     commitments::{CommitmentDef, CommitmentDefGadget},
-    relations::{Relation, RelationGadget, WitnessInstanceSampler},
+    relations::{Relation, WitnessInstanceSampler},
     traits::{Dummy, SonobeField},
 };
 
