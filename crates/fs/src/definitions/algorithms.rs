@@ -56,7 +56,7 @@ pub trait FoldingSchemeProver<const M: usize, const N: usize>: FoldingSchemeDef 
         ws: &[impl Borrow<Self::IW>; N],
         us: &[impl Borrow<Self::IU>; N],
         rng: impl RngCore,
-    ) -> Result<(Self::RW, Self::RU, Self::Proof<M, N>, Self::Challenge), Error>;
+    ) -> Result<(Self::RW, Self::RU, Self::Proof<M, N>), Error>;
 }
 
 /// [`FoldingSchemeVerifier`] is the trait for folding scheme verifier.
