@@ -27,6 +27,18 @@ pub enum Error {
     /// assignments do not satisfy the constraint system.
     #[error("The provided assignments do not satisfy the constraint system: {0}")]
     UnsatisfiedAssignments(String),
+    /// [`Error::InvalidNumberOfConstraints`] indicates that the constraint
+    /// system's number of constraints does not match the provided config.
+    #[error(
+        "The number of constraints in the constraint system configuration is invalid. Provided: {0}, expected: {1}"
+    )]
+    InvalidNumberOfConstraints(usize, usize),
+    /// [`Error::InvalidNumberOfVariables`] indicates that the constraint
+    /// system's number of variables does not match the provided config.
+    #[error(
+        "The number of variables in the constraint system configuration is invalid. Provided: {0}, expected: {1}"
+    )]
+    InvalidNumberOfVariables(usize, usize),
     /// [`Error::SynthesisError`] indicates an error during constraint
     /// synthesis.
     #[error(transparent)]
