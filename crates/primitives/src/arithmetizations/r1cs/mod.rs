@@ -52,6 +52,37 @@ impl<F: Field> R1CS<F> {
         n_variables: usize,
         n_public_inputs: usize,
         matrices: [Matrix<F>; 3],
+    ) -> Result<Self, Error> {
+        for matrix in &matrices {
+            if matrix.len() != n_constraints {
+                return Err(Error::InvalidNumberOfConstraints(
+                    n_constraints,
+                    matrix.len(),
+                ));
+            }
+            for row in matrix {
+                if let Some(max) = row.iter().map(|(_, i)| *i).max()
+                    && max >= n_variables
+                {
+                    return Err(Error::InvalidNumberOfVariables(n_variables, max + 1));
+                }
+            }
+        }
+        Ok(Self::new_without_validity_check(
+            n_constraints,
+            n_variables,
+            n_public_inputs,
+            matrices,
+        ))
+    }
+
+    /// [`R1CS::new_without_validity_check`] creates a new R1CS structure from
+    /// the given configuration and matrices without checking their validity.
+    pub fn new_without_validity_check(
+        n_constraints: usize,
+        n_variables: usize,
+        n_public_inputs: usize,
+        matrices: [Matrix<F>; 3],
     ) -> Self {
         Self {
             m: n_constraints,
@@ -80,12 +111,13 @@ impl<F: Field> From<&ConstraintSystem<F>> for R1CS<F> {
         // Get the R1CS predicate matrices
         let r1cs_predicate = &cs.predicate_constraint_systems[R1CS_PREDICATE_LABEL];
         let matrices = r1cs_predicate.to_matrices(cs);
-        // `unwrap` is safe here because R1CS always has 3 matrices
-        R1CS::new(
+
+        // matrices are extracted from a circuit, which we assume is trusted
+        R1CS::new_without_validity_check(
             cs.num_constraints(),
             cs.num_instance_variables + cs.num_witness_variables,
             cs.num_instance_variables - 1, // -1 to subtract the first '1'
-            matrices.try_into().unwrap(),
+            matrices.try_into().unwrap(),  // safe as R1CS always has 3 matrices
         )
     }
 }

@@ -135,7 +135,7 @@ pub fn constraints_for_test<F: Field>() -> R1CS<F> {
         vec![(F::one(), 2)],
     ];
 
-    R1CS::<F>::new(4, 6, 1, [A, B, C])
+    R1CS::<F>::new_without_validity_check(4, 6, 1, [A, B, C])
 }
 
 /// [`satisfying_assignments_for_test`] returns a satisfying assignment for the
