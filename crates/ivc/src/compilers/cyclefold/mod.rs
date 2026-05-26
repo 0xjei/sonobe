@@ -32,7 +32,11 @@ use sonobe_primitives::{
     commitments::CommitmentDef,
     relations::WitnessInstanceSampler,
     traits::{CF1, CF2, Dummy, SonobeCurve},
-    transcripts::Transcript,
+    transcripts::{
+        Transcript, TranscriptGadget,
+        recording::RecordingTranscript,
+        replay::{ReplayTranscript, ReplayTranscriptVar},
+    },
 };
 
 use crate::{
@@ -63,7 +67,7 @@ pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
         Us: &[impl Borrow<Self::RU>; M],
         us: &[impl Borrow<Self::IU>; N],
         proof: &Self::Proof<M, N>,
-        rho: Self::Challenge,
+        transcript: ReplayTranscript<CF1<<Self::CM as CommitmentDef>::Commitment>>,
     ) -> Vec<Self::CFCircuit>;
 
     /// [`FoldingSchemeCycleFoldExt::to_cyclefold_inputs`] computes the inputs
@@ -76,7 +80,7 @@ pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
         us: [<Self::Gadget as FoldingSchemeDefGadget>::IU; N],
         UU: <Self::Gadget as FoldingSchemeDefGadget>::RU,
         proof: <Self::Gadget as FoldingSchemeDefGadget>::Proof<M, N>,
-        rho: <Self::Gadget as FoldingSchemeDefGadget>::Challenge,
+        transcript: ReplayTranscriptVar<CF1<<Self::CM as CommitmentDef>::Commitment>>,
     ) -> Result<
         Vec<
             Vec<
@@ -160,7 +164,8 @@ where
                 Commitment: SonobeCurve<BaseField = <FS1::CM as CommitmentDef>::Scalar>,
             >,
         >,
-    T: Transcript<CF1<<FS1::CM as CommitmentDef>::Commitment>>,
+    T: Transcript<CF1<<FS1::CM as CommitmentDef>::Commitment>, Config: CanonicalSerialize>,
+    T::Gadget: TranscriptGadget<CF1<<FS1::CM as CommitmentDef>::Commitment>, Config = T::Config>,
 {
     type Field = <FS1::CM as CommitmentDef>::Scalar;
 
@@ -215,7 +220,7 @@ where
         loop {
             let new_arith1 = {
                 let cs = ArithExtractor::new();
-                cs.execute_synthesizer(AugmentedCircuit::<FS1, FS2, FC, T>::new(
+                cs.execute_synthesizer(AugmentedCircuit::<FS1, FS2, FC, T::Gadget>::new(
                     &hash_config,
                     &arith1_config,
                     arith2_config,
@@ -274,8 +279,8 @@ where
         Proof(W, U, w, u, cf_W, cf_U): &Self::Proof<FC>,
         mut rng: impl RngCore,
     ) -> Result<(FC::State, FC::ExternalOutputs, Self::Proof<FC>), Error> {
-        let hash = T::new_with_pp_hash(hash_config, *pp_hash);
-        let mut transcript = hash.separate_domain("transcript".as_ref());
+        let hash = T::new_with_pp_hash(hash_config.clone(), *pp_hash);
+        let mut transcript = RecordingTranscript::new(hash.separate_domain("transcript".as_ref()));
 
         let arith1_config = &dk1.to_arith_config();
         let arith2_config = &dk2.to_arith_config();
@@ -287,8 +292,7 @@ where
         let (mut cf_UU, mut cf_WW) = (Dummy::dummy(arith2_config), Dummy::dummy(arith2_config));
 
         if i != 0 {
-            let challenge;
-            (WW, UU, proof, challenge) = FS1::prove(
+            (WW, UU, proof) = FS1::prove(
                 dk1.to_pk(),
                 &mut transcript,
                 &[W],
@@ -298,14 +302,15 @@ where
                 &mut rng,
             )?;
 
-            let cf_circuits = FS1::to_cyclefold_circuits(&[U], &[u], &proof, challenge);
+            let cf_circuits =
+                FS1::to_cyclefold_circuits(&[U], &[u], &proof, transcript.clone().into());
             for (i, cf_circuit) in cf_circuits.into_iter().enumerate() {
                 let cs = AssignmentsExtractor::new();
                 cs.execute_fn(|cs| cf_circuit.verify_point_rlc(cs))?;
 
                 let (cf_w, cf_u) = dk2.sample(cs.assignments()?, &mut rng)?;
 
-                (cf_WW, cf_UU, cf_proofs[i], _) = FS2::prove(
+                (cf_WW, cf_UU, cf_proofs[i]) = FS2::prove(
                     dk2.to_pk(),
                     &mut transcript,
                     &[if i == 0 { cf_W } else { &cf_WW }],
@@ -320,7 +325,7 @@ where
 
         let cs = AssignmentsExtractor::new();
         let (next_state, external_outputs) = cs.execute_fn(|cs| {
-            let augmented_circuit = AugmentedCircuit::<FS1, FS2, FC, T>::new(
+            let augmented_circuit = AugmentedCircuit::<FS1, FS2, FC, T::Gadget>::new(
                 hash_config,
                 arith1_config,
                 arith2_config,
@@ -369,7 +374,7 @@ where
             return Err(Error::IVCVerificationFail);
         }
 
-        let hash = T::new_with_pp_hash(hash_config, *pp_hash);
+        let hash = T::new_with_pp_hash(hash_config.clone(), *pp_hash);
         let mut sponge = hash.separate_domain("sponge".as_ref());
 
         let u_x = sponge

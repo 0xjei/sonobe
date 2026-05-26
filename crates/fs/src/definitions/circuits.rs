@@ -32,7 +32,7 @@ pub trait FoldingSchemePartialVerifierGadget<const M: usize, const N: usize>:
         Us: [&Self::RU; M],
         us: [&Self::IU; N],
         proof: &Self::Proof<M, N>,
-    ) -> Result<(Self::RU, Self::Challenge), SynthesisError>;
+    ) -> Result<Self::RU, SynthesisError>;
 }
 
 /// [`FoldingSchemeFullVerifierGadget`] is the full in-circuit verifier.

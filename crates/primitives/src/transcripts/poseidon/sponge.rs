@@ -1,12 +1,12 @@
 //! Implementation of transcript traits for arkworks' Poseidon sponge.
 
 use ark_crypto_primitives::sponge::{
-    Absorb, CryptographicSponge, FieldBasedCryptographicSponge,
+    Absorb, CryptographicSponge, DuplexSpongeMode, FieldBasedCryptographicSponge,
     constraints::CryptographicSpongeVar,
     poseidon::{PoseidonConfig, PoseidonSponge, constraints::PoseidonSpongeVar},
 };
 use ark_ff::PrimeField;
-use ark_r1cs_std::{boolean::Boolean, fields::fp::FpVar};
+use ark_r1cs_std::fields::{FieldVar, fp::FpVar};
 use ark_relations::gr1cs::{ConstraintSystemRef, SynthesisError};
 use ark_std::mem::transmute_copy;
 
@@ -16,8 +16,14 @@ impl<F: PrimeField> Transcript<F> for PoseidonSponge<F> {
     type Config = PoseidonConfig<F>;
     type Gadget = PoseidonSpongeVar<F>;
 
-    fn new(config: &Self::Config) -> Self {
-        CryptographicSponge::new(config)
+    fn new(config: Self::Config) -> Self {
+        Self {
+            state: vec![F::zero(); config.rate + config.capacity],
+            parameters: config,
+            mode: DuplexSpongeMode::Absorbing {
+                next_absorb_index: 0,
+            },
+        }
     }
 
     fn add_field_elements(&mut self, input: &[F]) -> &mut Self {
@@ -40,38 +46,35 @@ impl<F: PrimeField> Transcript<F> for PoseidonSponge<F> {
         self
     }
 
-    fn get_bits(&mut self, num_bits: usize) -> Vec<bool> {
-        CryptographicSponge::squeeze_bits(self, num_bits)
-    }
-
     fn get_field_elements(&mut self, num_elements: usize) -> Vec<F> {
         self.squeeze_native_field_elements(num_elements)
     }
 }
 
 impl<F: PrimeField> TranscriptGadget<F> for PoseidonSpongeVar<F> {
+    type Config = PoseidonConfig<F>;
     type Widget = PoseidonSponge<F>;
 
-    fn new(config: &PoseidonConfig<F>) -> Self
+    fn new(config: PoseidonConfig<F>) -> Self
     where
         Self: Sized,
     {
-        CryptographicSpongeVar::new(ConstraintSystemRef::None, config)
+        Self {
+            cs: ConstraintSystemRef::None,
+            state: vec![FpVar::<F>::zero(); config.rate + config.capacity],
+            parameters: config,
+            mode: DuplexSpongeMode::Absorbing {
+                next_absorb_index: 0,
+            },
+        }
     }
 
-    fn add<A: AbsorbableVar<F> + ?Sized>(
-        &mut self,
-        input: &A,
-    ) -> Result<&mut Self, SynthesisError> {
+    fn add<A: AbsorbableVar<F>>(&mut self, input: &A) -> Result<&mut Self, SynthesisError> {
         let mut result = Vec::new();
         input.absorb_into(&mut result)?;
 
         self.absorb(&result)?;
         Ok(self)
-    }
-
-    fn get_bits(&mut self, num_bits: usize) -> Result<Vec<Boolean<F>>, SynthesisError> {
-        self.squeeze_bits(num_bits)
     }
 
     fn get_field_elements(&mut self, num_elements: usize) -> Result<Vec<FpVar<F>>, SynthesisError> {
@@ -102,7 +105,7 @@ mod tests {
     #[test]
     fn check_against_circom_poseidon() -> Result<(), Box<dyn Error>> {
         let config = poseidon_circom_config::<Fr>();
-        let mut poseidon_sponge = PoseidonSponge::new(&config);
+        let mut poseidon_sponge = PoseidonSponge::new(config);
         let v = vec![1, 2, 3, 4]
             .into_iter()
             .map(Fr::from)
@@ -123,13 +126,13 @@ mod tests {
     fn test_challenge_field_element() -> Result<(), Box<dyn Error>> {
         // Create a transcript outside of the circuit
         let config = poseidon_circom_config::<Fr>();
-        let mut tr = PoseidonSponge::<Fr>::new(&config);
+        let mut tr = PoseidonSponge::<Fr>::new(config.clone());
         tr.add(&Fr::from(42_u32));
         let c = tr.challenge_field_element();
 
         // Create a transcript inside of the circuit
         let cs = ConstraintSystem::<Fr>::new_ref();
-        let mut tr_var = PoseidonSpongeVar::<Fr>::new(&config);
+        let mut tr_var = PoseidonSpongeVar::<Fr>::new(config);
         let v = FpVar::<Fr>::new_witness(cs.clone(), || Ok(Fr::from(42_u32)))?;
         tr_var.add(&v)?;
         let c_var = tr_var.challenge_field_element()?;
@@ -146,13 +149,13 @@ mod tests {
 
         // Create a transcript outside of the circuit
         let config = poseidon_circom_config::<Fq>();
-        let mut tr = PoseidonSponge::<Fq>::new(&config);
+        let mut tr = PoseidonSponge::<Fq>::new(config.clone());
         tr.add(&Fq::from(42_u32));
         let c = tr.challenge_bits(nbits);
 
         // Create a transcript inside of the circuit
         let cs = ConstraintSystem::<Fq>::new_ref();
-        let mut tr_var = PoseidonSpongeVar::<Fq>::new(&config);
+        let mut tr_var = PoseidonSpongeVar::<Fq>::new(config);
         let v = FpVar::<Fq>::new_witness(cs.clone(), || Ok(Fq::from(42_u32)))?;
         tr_var.add(&v)?;
         let c_var = tr_var.challenge_bits(nbits)?;
@@ -167,7 +170,7 @@ mod tests {
     fn test_absorb_canonical_point() -> Result<(), Box<dyn Error>> {
         // Create a transcript outside of the circuit
         let config = poseidon_circom_config::<Fq>();
-        let mut tr = PoseidonSponge::<Fq>::new(&config);
+        let mut tr = PoseidonSponge::<Fq>::new(config.clone());
         let rng = &mut thread_rng();
 
         let p = G1::rand(rng);
@@ -176,7 +179,7 @@ mod tests {
 
         // Create a transcript inside of the circuit
         let cs = ConstraintSystem::<Fq>::new_ref();
-        let mut tr_var = PoseidonSpongeVar::<Fq>::new(&config);
+        let mut tr_var = PoseidonSpongeVar::<Fq>::new(config);
         let p_var = ProjectiveVar::<Config, FpVar<Fq>>::new_witness(cs, || Ok(p))?;
         tr_var.add(&p_var)?;
         let c_var = tr_var.challenge_field_element()?;
@@ -191,7 +194,7 @@ mod tests {
     fn test_absorb_emulated_point() -> Result<(), Box<dyn Error>> {
         // Create a transcript outside of the circuit
         let config = poseidon_circom_config::<Fr>();
-        let mut tr = PoseidonSponge::<Fr>::new(&config);
+        let mut tr = PoseidonSponge::<Fr>::new(config.clone());
         let rng = &mut thread_rng();
 
         let p = G1::rand(rng);
@@ -200,7 +203,7 @@ mod tests {
 
         // Create a transcript inside of the circuit
         let cs = ConstraintSystem::<Fr>::new_ref();
-        let mut tr_var = PoseidonSpongeVar::<Fr>::new(&config);
+        let mut tr_var = PoseidonSpongeVar::<Fr>::new(config);
         let p_var = EmulatedAffineVar::new_witness(cs, || Ok(p))?;
         tr_var.add(&p_var)?;
         let c_var = tr_var.challenge_field_element()?;
