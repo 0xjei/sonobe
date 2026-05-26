@@ -17,10 +17,6 @@ use super::utils::TaggedVec;
 pub trait FoldingInstance<CM: CommitmentDef>:
     Clone + Debug + PartialEq + Eq + Absorbable + for<'a> Dummy<&'a ArithConfig>
 {
-    /// [`FoldingInstance::N_COMMITMENTS`] defines the number of commitments
-    /// contained in the instance.
-    const N_COMMITMENTS: usize;
-
     /// [`FoldingInstance::commitments`] returns the commitments contained in
     /// the instance.
     // TODO (@winderica): consider the scenario where the instance has multiple
@@ -30,10 +26,6 @@ pub trait FoldingInstance<CM: CommitmentDef>:
     /// [`FoldingInstance::public_inputs`] returns the reference to the public
     /// inputs contained in the instance.
     fn public_inputs(&self) -> &[CM::Scalar];
-
-    /// [`FoldingInstance::public_inputs_mut`] returns the mutable reference to
-    /// the public inputs contained in the instance.
-    fn public_inputs_mut(&mut self) -> &mut [CM::Scalar];
 }
 
 /// [`PlainInstance`] is a vector of field elements that are the statements /
@@ -53,17 +45,11 @@ impl<V: Default + Clone> Dummy<&ArithConfig> for PlainInstance<V> {
 }
 
 impl<CM: CommitmentDef> FoldingInstance<CM> for PlainInstance<CM::Scalar> {
-    const N_COMMITMENTS: usize = 0;
-
     fn commitments(&self) -> Vec<CM::Commitment> {
         vec![]
     }
 
     fn public_inputs(&self) -> &[CM::Scalar] {
-        self
-    }
-
-    fn public_inputs_mut(&mut self) -> &mut [CM::Scalar] {
         self
     }
 }
