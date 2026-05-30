@@ -359,7 +359,7 @@ pub trait IVCVerifierGadget: IVCTypesGadget {
 ///     // 2. Generate prover key and verifier key for the step circuit.
 ///     let (pk, vk) = I::generate_keys(pp, &step_circuit)?;
 ///
-///     let mut prover = IVCStatefulProver::<_, I>::new(pk, step_circuit, initial_state)?;
+///     let mut prover = IVCStatefulProver::<_, I>::new(&pk, &step_circuit, initial_state)?;
 ///
 ///     for external_inputs in external_inputs_vec {
 ///         // 3. Generate the new state and proof from the current state and
@@ -382,10 +382,10 @@ pub trait IVCVerifierGadget: IVCTypesGadget {
 pub struct IVCStatefulProver<'a, FC: FCircuit<Field = I::Field>, I: IVC> {
     pk: &'a I::ProverKey<FC>,
     step_circuit: &'a FC,
-    i: usize,
-    initial_state: FC::State,
-    current_state: FC::State,
-    current_proof: I::Proof<FC>,
+    pub i: usize,
+    pub initial_state: FC::State,
+    pub current_state: FC::State,
+    pub current_proof: I::Proof<FC>,
 }
 
 impl<'a, FC: FCircuit<Field = I::Field>, I: IVC> IVCStatefulProver<'a, FC, I> {
