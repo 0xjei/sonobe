@@ -105,10 +105,10 @@ pub trait Transcript<F: PrimeField>: Clone {
     }
 
     /// [`Transcript::challenge_field_element`] squeezes a challenge from the
-    /// transcript / sponge as a field element.
+    /// transcript as a field element.
     ///
     /// Internally, it first squeezes a field element and then absorbs it back
-    /// into the transcript / sponge to ensure security.
+    /// into the transcript to ensure security.
     fn challenge_field_element(&mut self) -> F {
         let c = self.get_field_elements(1);
         self.add_field_elements(&c);
@@ -116,28 +116,31 @@ pub trait Transcript<F: PrimeField>: Clone {
     }
 
     /// [`Transcript::challenge_bits`] squeezes a challenge from the transcript
-    /// / sponge as a bit vector.
+    /// as a bit vector.
     ///
-    /// Internally, it first squeezes the bits and then absorbs packed field
-    /// elements formed by the bits back into the transcript / sponge to ensure
-    /// security.
-    fn challenge_bits(&mut self, nbits: usize) -> Vec<bool> {
-        let bits = self.get_bits(nbits);
-        self.add_field_elements(
-            &bits
-                .chunks(F::MODULUS_BIT_SIZE as usize - 1)
-                .map(F::BigInt::from_bits_le)
-                .map(F::from)
-                .collect::<Vec<_>>(),
-        );
+    /// Internally, it squeezes several field elements, absorbs them back to the
+    /// transcript (for strong Fiat-Shamir), and decompose them into bits.
+    fn challenge_bits(&mut self, num_bits: usize) -> Vec<bool> {
+        let usable_bits = (F::MODULUS_BIT_SIZE - 1) as usize;
+
+        let num_elements = num_bits.div_ceil(usable_bits);
+        let src_elements = self.challenge_field_elements(num_elements);
+
+        let mut bits: Vec<bool> = Vec::with_capacity(usable_bits * num_elements);
+        for elem in &src_elements {
+            let elem_bits = elem.into_bigint().to_bits_le();
+            bits.extend_from_slice(&elem_bits[..usable_bits]);
+        }
+
+        bits.truncate(num_bits);
         bits
     }
 
     /// [`Transcript::challenge_field_elements`] squeezes `n` challenges from
-    /// the transcript / sponge as field elements.
+    /// the transcript as field elements.
     ///
     /// Internally, it first squeezes the field elements and then absorbs them
-    /// back into the transcript / sponge to ensure security.
+    /// back into the transcript to ensure security.
     fn challenge_field_elements(&mut self, n: usize) -> Vec<F> {
         let c = self.get_field_elements(n);
         self.add_field_elements(&c);
@@ -221,10 +224,10 @@ pub trait TranscriptGadget<F: PrimeField>: Clone {
     }
 
     /// [`TranscriptGadget::challenge_field_element`] squeezes a challenge from
-    /// the transcript / sponge variable as a field element variable.
+    /// the transcript variable as a field element variable.
     ///
     /// Internally, it first squeezes a field element variable and then absorbs
-    /// it back into the transcript / sponge variable to ensure security.
+    /// it back into the transcript variable to ensure security.
     fn challenge_field_element(&mut self) -> Result<FpVar<F>, SynthesisError> {
         let mut c = self.get_field_elements(1)?;
         self.add(&c[0])?;
@@ -232,27 +235,31 @@ pub trait TranscriptGadget<F: PrimeField>: Clone {
     }
 
     /// [`TranscriptGadget::challenge_bits`] squeezes a challenge from the
-    /// transcript / sponge variable as a vector of bit variables.
+    /// transcript variable as a vector of bit variables.
     ///
-    /// Internally, it first squeezes the bit variables and then absorbs packed
-    /// field element variables formed by the bit variables back into the
-    /// transcript / sponge variable to ensure security.
-    fn challenge_bits(&mut self, nbits: usize) -> Result<Vec<Boolean<F>>, SynthesisError> {
-        let bits = self.get_bits(nbits)?;
-        self.add(
-            &bits
-                .chunks(F::MODULUS_BIT_SIZE as usize - 1)
-                .map(Boolean::le_bits_to_fp)
-                .collect::<Result<Vec<_>, _>>()?,
-        )?;
+    /// Internally, it squeezes several field element variables, absorbs them
+    /// back to the transcript variable (for strong Fiat-Shamir), and decompose
+    /// them into bit variables.
+    fn challenge_bits(&mut self, num_bits: usize) -> Result<Vec<Boolean<F>>, SynthesisError> {
+        let usable_bits = (F::MODULUS_BIT_SIZE - 1) as usize;
+
+        let num_elements = num_bits.div_ceil(usable_bits);
+        let src_elements = self.challenge_field_elements(num_elements)?;
+
+        let mut bits: Vec<Boolean<F>> = Vec::with_capacity(usable_bits * num_elements);
+        for elem in &src_elements {
+            bits.extend_from_slice(&elem.to_bits_le()?[..usable_bits]);
+        }
+
+        bits.truncate(num_bits);
         Ok(bits)
     }
 
     /// [`TranscriptGadget::challenge_field_elements`] squeezes `n` challenges
-    /// from the transcript / sponge variable as field element variables.
+    /// from the transcript variable as field element variables.
     ///
     /// Internally, it first squeezes the field element variables and then
-    /// absorbs them back into the transcript / sponge variable to ensure
+    /// absorbs them back into the transcript variable to ensure
     /// security.
     fn challenge_field_elements(&mut self, n: usize) -> Result<Vec<FpVar<F>>, SynthesisError> {
         let c = self.get_field_elements(n)?;
