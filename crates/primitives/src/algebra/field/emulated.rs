@@ -33,7 +33,7 @@ use num_traits::Signed;
 
 use crate::{
     algebra::{
-        field::{SonobeField, TwoStageFieldVar},
+        field::{SonobePrimeField, TwoStageFieldVar},
         ops::{
             bits::{FromBitsGadget, ToBitsGadgetExt},
             eq::EquivalenceGadget,
@@ -145,7 +145,7 @@ impl Bounds {
     }
 }
 
-fn compose<F: SonobeField>(limbs: impl Borrow<[F]>) -> BigInt {
+fn compose<F: SonobePrimeField>(limbs: impl Borrow<[F]>) -> BigInt {
     let mut r = BigInt::zero();
 
     for &limb in limbs.borrow().iter().rev() {
@@ -195,7 +195,7 @@ pub type EmulatedIntVar<F> = LimbedVar<F, (), true>;
 /// appear as intermediate results during computations.
 pub type EmulatedFieldVar<Base, Target> = LimbedVar<Base, Target, true>;
 
-impl<F: SonobeField, const ALIGNED: bool> GR1CSVar<F> for LimbedVar<F, (), ALIGNED> {
+impl<F: SonobePrimeField, const ALIGNED: bool> GR1CSVar<F> for LimbedVar<F, (), ALIGNED> {
     type Value = BigInt; // For integers, their values are `BigInt`.
 
     fn cs(&self) -> ConstraintSystemRef<F> {
@@ -207,7 +207,7 @@ impl<F: SonobeField, const ALIGNED: bool> GR1CSVar<F> for LimbedVar<F, (), ALIGN
     }
 }
 
-impl<Base: SonobeField, Target: SonobeField, const ALIGNED: bool> GR1CSVar<Base>
+impl<Base: SonobePrimeField, Target: SonobePrimeField, const ALIGNED: bool> GR1CSVar<Base>
     for LimbedVar<Base, Target, ALIGNED>
 {
     type Value = Target; // For field elements, their values are in `Target`.
@@ -233,7 +233,7 @@ fn bigint_to_field_element<F: PrimeField>(v: BigInt) -> Option<F> {
     }
 }
 
-impl<F: SonobeField, Cfg, const ALIGNED: bool> LimbedVar<F, Cfg, ALIGNED> {
+impl<F: SonobePrimeField, Cfg, const ALIGNED: bool> LimbedVar<F, Cfg, ALIGNED> {
     /// [`LimbedVar::new`] creates a new [`LimbedVar`] from the pre-allocated
     /// limbs and their bounds.
     pub fn new(limbs: Vec<FpVar<F>>, bounds: Vec<Bounds>) -> Self {
@@ -277,7 +277,7 @@ pub enum RangeCheckMode {
     Tight,
 }
 
-impl<F: SonobeField, Cfg> LimbedVar<F, Cfg, true> {
+impl<F: SonobePrimeField, Cfg> LimbedVar<F, Cfg, true> {
     pub fn alloc<T: Borrow<(BigInt, Bounds)>>(
         cs: impl Into<Namespace<F>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
@@ -362,7 +362,7 @@ impl<F: SonobeField, Cfg> LimbedVar<F, Cfg, true> {
     }
 }
 
-impl<F: SonobeField, Cfg> LimbedVar<F, Cfg, true> {
+impl<F: SonobePrimeField, Cfg> LimbedVar<F, Cfg, true> {
     /// [`LimbedVar::enforce_lt`] enforces `self` to be less than `other`, where
     /// both should be aligned (as indicated by the const generic).
     /// Adapted from the xJsnark [paper] and its [implementation].
@@ -461,13 +461,13 @@ impl<F: SonobeField, Cfg> LimbedVar<F, Cfg, true> {
     }
 }
 
-impl<F: SonobeField, Cfg> From<LimbedVar<F, Cfg, true>> for LimbedVar<F, Cfg, false> {
+impl<F: SonobePrimeField, Cfg> From<LimbedVar<F, Cfg, true>> for LimbedVar<F, Cfg, false> {
     fn from(v: LimbedVar<F, Cfg, true>) -> Self {
         Self::new(v.limbs, v.bounds)
     }
 }
 
-impl<F: SonobeField, Cfg, const LHS_ALIGNED: bool> LimbedVar<F, Cfg, LHS_ALIGNED> {
+impl<F: SonobePrimeField, Cfg, const LHS_ALIGNED: bool> LimbedVar<F, Cfg, LHS_ALIGNED> {
     /// [`LimbedVar::add_unaligned`] computes `self + other`, without aligning
     /// the limbs.
     pub fn add_unaligned<const RHS_ALIGNED: bool>(
@@ -706,7 +706,7 @@ impl<F: SonobeField, Cfg, const LHS_ALIGNED: bool> LimbedVar<F, Cfg, LHS_ALIGNED
     }
 }
 
-impl<Base: SonobeField, Target: SonobeField, const LHS_ALIGNED: bool>
+impl<Base: SonobePrimeField, Target: SonobePrimeField, const LHS_ALIGNED: bool>
     LimbedVar<Base, Target, LHS_ALIGNED>
 {
     /// [`LimbedVar::modulo`] computes `self % Target::MODULUS` and returns the
@@ -803,7 +803,7 @@ impl<Base: SonobeField, Target: SonobeField, const LHS_ALIGNED: bool>
 
 // The following lines are quite repetitive, but we have to implement them all
 // to make the compiler happy.
-impl<Base: SonobeField, Target: SonobeField> EquivalenceGadget<LimbedVar<Base, Target, true>>
+impl<Base: SonobePrimeField, Target: SonobePrimeField> EquivalenceGadget<LimbedVar<Base, Target, true>>
     for LimbedVar<Base, Target, true>
 {
     fn enforce_equivalent(&self, other: &Self) -> Result<(), SynthesisError> {
@@ -811,7 +811,7 @@ impl<Base: SonobeField, Target: SonobeField> EquivalenceGadget<LimbedVar<Base, T
     }
 }
 
-impl<Base: SonobeField, Target: SonobeField> EquivalenceGadget<LimbedVar<Base, Target, true>>
+impl<Base: SonobePrimeField, Target: SonobePrimeField> EquivalenceGadget<LimbedVar<Base, Target, true>>
     for LimbedVar<Base, Target, false>
 {
     fn enforce_equivalent(
@@ -822,7 +822,7 @@ impl<Base: SonobeField, Target: SonobeField> EquivalenceGadget<LimbedVar<Base, T
     }
 }
 
-impl<Base: SonobeField, Target: SonobeField> EquivalenceGadget<LimbedVar<Base, Target, false>>
+impl<Base: SonobePrimeField, Target: SonobePrimeField> EquivalenceGadget<LimbedVar<Base, Target, false>>
     for LimbedVar<Base, Target, true>
 {
     fn enforce_equivalent(
@@ -833,7 +833,7 @@ impl<Base: SonobeField, Target: SonobeField> EquivalenceGadget<LimbedVar<Base, T
     }
 }
 
-impl<Base: SonobeField, Target: SonobeField> EquivalenceGadget<LimbedVar<Base, Target, false>>
+impl<Base: SonobePrimeField, Target: SonobePrimeField> EquivalenceGadget<LimbedVar<Base, Target, false>>
     for LimbedVar<Base, Target, false>
 {
     fn enforce_equivalent(
@@ -844,31 +844,31 @@ impl<Base: SonobeField, Target: SonobeField> EquivalenceGadget<LimbedVar<Base, T
     }
 }
 
-impl<F: SonobeField> EquivalenceGadget<LimbedVar<F, (), true>> for LimbedVar<F, (), true> {
+impl<F: SonobePrimeField> EquivalenceGadget<LimbedVar<F, (), true>> for LimbedVar<F, (), true> {
     fn enforce_equivalent(&self, other: &LimbedVar<F, (), true>) -> Result<(), SynthesisError> {
         self.enforce_equal(other)
     }
 }
 
-impl<F: SonobeField> EquivalenceGadget<LimbedVar<F, (), true>> for LimbedVar<F, (), false> {
+impl<F: SonobePrimeField> EquivalenceGadget<LimbedVar<F, (), true>> for LimbedVar<F, (), false> {
     fn enforce_equivalent(&self, other: &LimbedVar<F, (), true>) -> Result<(), SynthesisError> {
         self.enforce_equal_unaligned(other)
     }
 }
 
-impl<F: SonobeField> EquivalenceGadget<LimbedVar<F, (), false>> for LimbedVar<F, (), true> {
+impl<F: SonobePrimeField> EquivalenceGadget<LimbedVar<F, (), false>> for LimbedVar<F, (), true> {
     fn enforce_equivalent(&self, other: &LimbedVar<F, (), false>) -> Result<(), SynthesisError> {
         self.enforce_equal_unaligned(other)
     }
 }
 
-impl<F: SonobeField> EquivalenceGadget<LimbedVar<F, (), false>> for LimbedVar<F, (), false> {
+impl<F: SonobePrimeField> EquivalenceGadget<LimbedVar<F, (), false>> for LimbedVar<F, (), false> {
     fn enforce_equivalent(&self, other: &LimbedVar<F, (), false>) -> Result<(), SynthesisError> {
         self.enforce_equal_unaligned(other)
     }
 }
 
-impl<Base: SonobeField, Target: SonobeField> TryFrom<LimbedVar<Base, Target, false>>
+impl<Base: SonobePrimeField, Target: SonobePrimeField> TryFrom<LimbedVar<Base, Target, false>>
     for LimbedVar<Base, Target, true>
 {
     type Error = SynthesisError;
@@ -878,7 +878,7 @@ impl<Base: SonobeField, Target: SonobeField> TryFrom<LimbedVar<Base, Target, fal
     }
 }
 
-impl<Base: SonobeField, Target: SonobeField> TwoStageFieldVar for LimbedVar<Base, Target, true> {
+impl<Base: SonobePrimeField, Target: SonobePrimeField> TwoStageFieldVar for LimbedVar<Base, Target, true> {
     type ValueField = Target;
     type ConstraintField = Base;
     type Intermediate = LimbedVar<Base, Target, false>;
@@ -893,7 +893,7 @@ impl<Base: SonobeField, Target: SonobeField> TwoStageFieldVar for LimbedVar<Base
 }
 
 // Only implement `EqGadget` for aligned variables.
-impl<F: SonobeField, Cfg> EqGadget<F> for LimbedVar<F, Cfg, true> {
+impl<F: SonobePrimeField, Cfg> EqGadget<F> for LimbedVar<F, Cfg, true> {
     fn is_eq(&self, other: &Self) -> Result<Boolean<F>, SynthesisError> {
         if self.limbs.len() != other.limbs.len() {
             return Err(SynthesisError::Unsatisfiable);
@@ -948,7 +948,7 @@ impl<F: SonobeField, Cfg> EqGadget<F> for LimbedVar<F, Cfg, true> {
     }
 }
 
-impl<F: SonobeField, Cfg> FromBitsGadget<F> for LimbedVar<F, Cfg, true> {
+impl<F: SonobePrimeField, Cfg> FromBitsGadget<F> for LimbedVar<F, Cfg, true> {
     fn from_bits_le(bits: &[Boolean<F>]) -> Result<Self, SynthesisError> {
         Self::from_bounded_bits_le(
             bits,
@@ -1026,7 +1026,7 @@ impl<F: PrimeField, Cfg> AbsorbableVar<F> for LimbedVar<F, Cfg, true> {
 }
 
 impl<
-    CF: SonobeField,
+    CF: SonobePrimeField,
     Cfg,
     Other: Index<usize, Output = LimbedVar<CF, Cfg, RHS_ALIGNED>>,
     const LHS_ALIGNED: bool,
@@ -1078,7 +1078,7 @@ impl<
     }
 }
 
-impl<CF: SonobeField, Cfg> MatrixGadget<LimbedVar<CF, Cfg, false>>
+impl<CF: SonobePrimeField, Cfg> MatrixGadget<LimbedVar<CF, Cfg, false>>
     for SparseMatrixVar<LimbedVar<CF, Cfg, false>>
 {
     fn mul_vector(
@@ -1117,7 +1117,7 @@ fn compute_bounds(lb: &BigInt, ub: &BigInt, bits_per_limb: usize) -> Vec<Bounds>
     bounds
 }
 
-impl<F: SonobeField, Cfg> AllocVar<(BigInt, Bounds), F> for LimbedVar<F, Cfg, true> {
+impl<F: SonobePrimeField, Cfg> AllocVar<(BigInt, Bounds), F> for LimbedVar<F, Cfg, true> {
     fn new_variable<T: Borrow<(BigInt, Bounds)>>(
         cs: impl Into<Namespace<F>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
@@ -1163,7 +1163,7 @@ impl<F: SonobeField, Cfg> AllocVar<(BigInt, Bounds), F> for LimbedVar<F, Cfg, tr
     }
 }
 
-impl<F: SonobeField, G: SonobeField, Cfg> AllocVar<G, F> for LimbedVar<F, Cfg, true> {
+impl<F: SonobePrimeField, G: SonobePrimeField, Cfg> AllocVar<G, F> for LimbedVar<F, Cfg, true> {
     fn new_variable<T: Borrow<G>>(
         cs: impl Into<Namespace<F>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
@@ -1184,7 +1184,7 @@ impl<F: SonobeField, G: SonobeField, Cfg> AllocVar<G, F> for LimbedVar<F, Cfg, t
     }
 }
 
-impl<F: SonobeField, Cfg> LimbedVar<F, Cfg, true> {
+impl<F: SonobePrimeField, Cfg> LimbedVar<F, Cfg, true> {
     /// [`LimbedVar::constant`] allocates a constant [`LimbedVar`] with value
     /// `x`.
     pub fn constant(x: BigInt) -> Self {
@@ -1272,7 +1272,7 @@ impl_binary_op!(
     |a: &LimbedVar<F, Cfg, LHS_ALIGNED>, b: &LimbedVar<F, Cfg, RHS_ALIGNED>| -> LimbedVar<F, Cfg, false> {
         a.add_unaligned(b).unwrap()
     },
-    (F: SonobeField, Cfg, const LHS_ALIGNED: bool, const RHS_ALIGNED: bool),
+    (F: SonobePrimeField, Cfg, const LHS_ALIGNED: bool, const RHS_ALIGNED: bool),
 );
 
 impl_assignment_op!(
@@ -1281,7 +1281,7 @@ impl_assignment_op!(
     |a: &mut LimbedVar<F, Cfg, false>, b: &LimbedVar<F, Cfg, ALIGNED>| {
         *a = a.add_unaligned(b).unwrap()
     },
-    (F: SonobeField, Cfg, const ALIGNED: bool),
+    (F: SonobePrimeField, Cfg, const ALIGNED: bool),
 );
 
 impl_binary_op!(
@@ -1290,7 +1290,7 @@ impl_binary_op!(
     |a: &LimbedVar<F, Cfg, SELF_ALIGNED>, b: &LimbedVar<F, Cfg, OTHER_ALIGNED>| -> LimbedVar<F, Cfg, false> {
         a.sub_unaligned(b).unwrap()
     },
-    (F: SonobeField, Cfg, const SELF_ALIGNED: bool, const OTHER_ALIGNED: bool),
+    (F: SonobePrimeField, Cfg, const SELF_ALIGNED: bool, const OTHER_ALIGNED: bool),
 );
 
 impl_assignment_op!(
@@ -1299,7 +1299,7 @@ impl_assignment_op!(
     |a: &mut LimbedVar<F, Cfg, false>, b: &LimbedVar<F, Cfg, OTHER_ALIGNED>| {
         *a = a.sub_unaligned(b).unwrap()
     },
-    (F: SonobeField, Cfg, const OTHER_ALIGNED: bool),
+    (F: SonobePrimeField, Cfg, const OTHER_ALIGNED: bool),
 );
 
 impl_binary_op!(
@@ -1308,7 +1308,7 @@ impl_binary_op!(
     |a: &LimbedVar<F, Cfg, SELF_ALIGNED>, b: &LimbedVar<F, Cfg, OTHER_ALIGNED>| -> LimbedVar<F, Cfg, false> {
         a.mul_unaligned(b).unwrap()
     },
-    (F: SonobeField, Cfg, const SELF_ALIGNED: bool, const OTHER_ALIGNED: bool),
+    (F: SonobePrimeField, Cfg, const SELF_ALIGNED: bool, const OTHER_ALIGNED: bool),
 );
 
 impl_assignment_op!(
@@ -1317,7 +1317,7 @@ impl_assignment_op!(
     |a: &mut LimbedVar<F, Cfg, false>, b: &LimbedVar<F, Cfg, OTHER_ALIGNED>| {
         *a = a.mul_unaligned(b).unwrap()
     },
-    (F: SonobeField, Cfg, const OTHER_ALIGNED: bool),
+    (F: SonobePrimeField, Cfg, const OTHER_ALIGNED: bool),
 );
 
 #[cfg(test)]

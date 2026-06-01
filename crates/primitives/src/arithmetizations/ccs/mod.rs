@@ -40,12 +40,13 @@ use crate::{
 pub trait CCS:
     Arith + for<'a> From<&'a ConstraintSystem<Self::Field>> + From<ConstraintSystem<Self::Field>>
 {
-    /// [`CCS::Field`] specifies the underlying field of a CCS instance
-    type Field: Field;
-
     /// [`CCS::matrices`] returns the matrices contained in a concrete CCS
     /// instance `self`.
     fn matrices(&self) -> &[Matrix<Self::Field>];
+
+    fn multisets() -> Vec<Vec<usize>>;
+
+    fn coefficients() -> Vec<Self::Field>;
 
     /// [`CCS::evaluate_ccs`] evaluates the CCS relation at a given vector of
     /// assignments, multisets, and coefficients.

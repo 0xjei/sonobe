@@ -21,7 +21,7 @@ use ark_relations::gr1cs::SynthesisError;
 use crate::{
     algebra::{
         Val,
-        field::{SonobeField, emulated::EmulatedFieldVar},
+        field::{SonobePrimeField, emulated::EmulatedFieldVar},
         group::emulated::EmulatedAffineVar,
     },
     circuits::WitnessToPublic,
@@ -39,7 +39,7 @@ pub type CF2<C> = <<C as CurveGroup>::BaseField as Field>::BasePrimeField;
 /// [`SonobeCurve`] trait is a wrapper around [`CurveGroup`] that also includes
 /// necessary bounds for the curve to be used conveniently in folding schemes.
 pub trait SonobeCurve:
-    CurveGroup<ScalarField: SonobeField, BaseField: SonobeField, Config: SWCurveConfig>
+    CurveGroup<ScalarField: SonobePrimeField, BaseField: SonobePrimeField, Config: SWCurveConfig>
     + Absorbable
     + Val<
         Var: CurveVar<Self, Self::BaseField>
@@ -52,16 +52,16 @@ pub trait SonobeCurve:
 {
 }
 
-impl<P: SWCurveConfig<ScalarField: SonobeField, BaseField: SonobeField>> SonobeCurve
+impl<P: SWCurveConfig<ScalarField: SonobePrimeField, BaseField: SonobePrimeField>> SonobeCurve
     for Projective<P>
 {
 }
 
-impl<P: SWCurveConfig<ScalarField: SonobeField, BaseField: SonobeField>> Val for Projective<P> {
+impl<P: SWCurveConfig<ScalarField: SonobePrimeField, BaseField: SonobePrimeField>> Val for Projective<P> {
     type PreferredConstraintField = P::BaseField;
     type Var = ProjectiveVar<P, FpVar<P::BaseField>>;
 
-    type EmulatedVar<F: SonobeField> = EmulatedAffineVar<F, Self>;
+    type EmulatedVar<F: SonobePrimeField> = EmulatedAffineVar<F, Self>;
 }
 
 impl<T, C: SonobeCurve> Dummy<T> for C {
@@ -108,7 +108,7 @@ impl<P: SWCurveConfig<BaseField: PrimeField>> Inputize<P::BaseField>
     }
 }
 
-impl<Base: SonobeField, Target: SonobeCurve> Inputize<Base> for EmulatedAffineVar<Base, Target> {
+impl<Base: SonobePrimeField, Target: SonobeCurve> Inputize<Base> for EmulatedAffineVar<Base, Target> {
     fn inputize(value: &Self::Value) -> Vec<Base> {
         let affine = value.into_affine();
         let (x, y) = affine.xy().unwrap_or_default();
@@ -126,7 +126,7 @@ impl<P: SWCurveConfig<BaseField: PrimeField>> WitnessToPublic
     }
 }
 
-impl<Base: SonobeField, Target: SonobeCurve> WitnessToPublic for EmulatedAffineVar<Base, Target> {
+impl<Base: SonobePrimeField, Target: SonobeCurve> WitnessToPublic for EmulatedAffineVar<Base, Target> {
     fn mark_as_public(&self) -> Result<(), SynthesisError> {
         self.x.mark_as_public()?;
         self.y.mark_as_public()?;

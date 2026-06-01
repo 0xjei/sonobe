@@ -7,7 +7,7 @@ use sonobe_primitives::{
     transcripts::Absorbable,
 };
 
-use crate::FoldingInstance;
+use crate::{FoldingInstance, definitions::instances::FoldingIncomingInstance};
 
 pub mod circuits;
 
@@ -27,10 +27,6 @@ pub struct RunningInstance<CM: CommitmentDef> {
 impl<CM: CommitmentDef> FoldingInstance<CM> for RunningInstance<CM> {
     fn commitments(&self) -> Vec<CM::Commitment> {
         vec![self.cm_e.clone(), self.cm_w.clone()]
-    }
-
-    fn public_inputs(&self) -> &[CM::Scalar] {
-        &self.x
     }
 }
 
@@ -67,6 +63,10 @@ impl<CM: CommitmentDef> FoldingInstance<CM> for IncomingInstance<CM> {
     fn commitments(&self) -> Vec<CM::Commitment> {
         vec![self.cm_w.clone()]
     }
+}
+
+impl<CM: CommitmentDef> FoldingIncomingInstance<CM> for IncomingInstance<CM> {
+    type PublicInput = CM::Scalar;
 
     fn public_inputs(&self) -> &[CM::Scalar] {
         &self.x

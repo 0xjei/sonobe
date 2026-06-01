@@ -27,6 +27,7 @@
 
 pub mod definitions;
 pub mod nova;
+pub mod superneo;
 
 pub use self::definitions::{
     FoldingSchemeDef, FoldingSchemeDefGadget,
@@ -51,8 +52,8 @@ mod tests {
     use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystem};
     use ark_std::{error::Error, rand::Rng, sync::Arc};
     use sonobe_primitives::{
+        arithmetizations::Arith,
         circuits::{ArithExtractor, AssignmentsOwned},
-        commitments::CommitmentDef,
         relations::WitnessInstanceSampler,
         transcripts::{
             Transcript,
@@ -65,12 +66,12 @@ mod tests {
     #[allow(non_snake_case)]
     pub fn test_folding_scheme<FS: FoldingSchemeOps<M, N>, const M: usize, const N: usize>(
         config: FS::Config,
-        circuit: impl ConstraintSynthesizer<<FS::CM as CommitmentDef>::Scalar>,
-        assignments_vec: Vec<AssignmentsOwned<<FS::CM as CommitmentDef>::Scalar>>,
+        circuit: impl ConstraintSynthesizer<<FS::Arith as Arith>::Field>,
+        assignments_vec: Vec<AssignmentsOwned<<FS::Arith as Arith>::Field>>,
         mut rng: impl Rng,
     ) -> Result<(), Box<dyn Error>>
     where
-        FS::Arith: From<ConstraintSystem<<FS::CM as CommitmentDef>::Scalar>>,
+        FS::Arith: From<ConstraintSystem<<FS::Arith as Arith>::Field>>,
     {
         let pp = FS::preprocess(config, &mut rng)?;
 

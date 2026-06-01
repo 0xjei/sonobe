@@ -8,7 +8,7 @@ use ark_std::marker::PhantomData;
 use sonobe_primitives::{
     arithmetizations::r1cs::{R1CS, circuits::R1CSVar},
     commitments::{CommitmentDef, CommitmentDefGadget, GroupBasedCommitment},
-    traits::{CF2, SonobeField},
+    traits::{CF2, SonobePrimeField},
 };
 
 use self::{
@@ -52,7 +52,7 @@ pub type Nova<CM, const CHALLENGE_BITS: usize = 128> =
 pub type CycleFoldNova<CM, const CHALLENGE_BITS: usize = 128> =
     AbstractNova<CM, CF2<<CM as CommitmentDef>::Commitment>, CHALLENGE_BITS>;
 
-impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> FoldingSchemeDef
+impl<CM: GroupBasedCommitment, TF: SonobePrimeField, const CHALLENGE_BITS: usize> FoldingSchemeDef
     for AbstractNova<CM, TF, CHALLENGE_BITS>
 {
     type CM = CM;
@@ -125,7 +125,7 @@ mod tests {
     use super::*;
     use crate::tests::test_folding_scheme;
 
-    fn test_nova_opt<TF: SonobeField>(
+    fn test_nova_opt<TF: SonobePrimeField>(
         rounds: usize,
         mut rng: impl RngCore,
     ) -> Result<(), Box<dyn Error>> {

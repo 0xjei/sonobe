@@ -16,7 +16,7 @@ use sonobe_primitives::{
     circuits::AssignmentsOwned,
     commitments::{CommitmentDef, CommitmentDefGadget},
     relations::{Relation, WitnessInstanceSampler},
-    traits::{Dummy, SonobeField},
+    traits::{Dummy, SonobePrimeField},
 };
 
 use self::{
@@ -53,7 +53,7 @@ use crate::FoldingWitnessVar;
 pub trait FoldingSchemeDef {
     /// [`FoldingSchemeDef::CM`] is the commitment scheme used by the folding
     /// scheme.
-    type CM: CommitmentDef<Scalar: SonobeField>;
+    type CM: CommitmentDef;
     /// [`FoldingSchemeDef::RW`] is the type of running witness.
     type RW: FoldingWitness<Self::CM>;
     /// [`FoldingSchemeDef::RU`] is the type of running instance.
@@ -64,7 +64,7 @@ pub trait FoldingSchemeDef {
     type IU: FoldingInstance<Self::CM>;
     /// [`FoldingSchemeDef::TranscriptField`] is the field type used in the
     /// transcript of the folding scheme.
-    type TranscriptField: SonobeField;
+    type TranscriptField: SonobePrimeField;
     /// [`FoldingSchemeDef::Arith`] is the constraint system supported by the
     /// folding scheme.
     type Arith: Arith;
@@ -85,7 +85,7 @@ pub trait FoldingSchemeDef {
         + WitnessInstanceSampler<
             Self::IW,
             Self::IU,
-            Source = AssignmentsOwned<<Self::CM as CommitmentDef>::Scalar>,
+            Source = AssignmentsOwned<<Self::Arith as Arith>::Field>,
             Error = Error,
         >;
     /// [`FoldingSchemeDef::Challenge`] is the type of challenge generated

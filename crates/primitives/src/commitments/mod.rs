@@ -21,7 +21,7 @@ use crate::{
         group::emulated::EmulatedAffineVar,
         ops::bits::FromBitsGadget,
     },
-    traits::{CF1, CF2, Inputize, SonobeCurve, SonobeField},
+    traits::{CF1, CF2, Inputize, SonobeCurve, SonobePrimeField},
     transcripts::{Absorbable, AbsorbableVar},
 };
 
@@ -132,7 +132,7 @@ pub trait CommitmentOps: CommitmentDef {
 pub trait CommitmentDefGadget: Clone {
     /// [`CommitmentDefGadget::ConstraintField`] is the field over which the
     /// circuit running the commitment scheme is defined.
-    type ConstraintField: SonobeField;
+    type ConstraintField: SonobePrimeField;
 
     /// [`CommitmentDefGadget::KeyVar`] is the in-circuit variable type for the
     /// commitment key.

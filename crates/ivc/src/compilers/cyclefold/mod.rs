@@ -33,7 +33,7 @@ use sonobe_fs::{
     DeciderKey, FoldingInstance, FoldingInstanceVar, FoldingSchemeDef, FoldingSchemeDefGadget,
     FoldingSchemeFullVerifierGadget, FoldingSchemePartialVerifierGadget,
     GroupBasedFoldingSchemePrimary, GroupBasedFoldingSchemeSecondary,
-    definitions::circuits::FoldingSchemeDeciderGadget,
+    definitions::{circuits::FoldingSchemeDeciderGadget, instances::FoldingIncomingInstance},
 };
 use sonobe_primitives::{
     algebra::field::emulated::EmulatedFieldVar,
@@ -445,7 +445,7 @@ where
             .add(current_state)
             .add(U)
             .add(cf_U)
-            .get_field_element();
+            .get();
 
         if u.public_inputs() != [u_x] {
             return Err(Error::IVCVerificationFail);

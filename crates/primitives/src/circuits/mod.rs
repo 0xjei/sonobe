@@ -67,7 +67,7 @@ pub mod utils;
 /// external inputs, and returns the next state and some external outputs.
 pub trait FCircuit {
     /// [`FCircuit::Field`] is the field over which the circuit is defined.
-    type Field: PrimeField;
+    type Field: PrimeField + Absorbable;
     /// [`FCircuit::State`] is the type of the state.
     ///
     /// It is usually an array of field elements, but we make our design quite

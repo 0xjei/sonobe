@@ -68,6 +68,8 @@ pub struct ArithConfig {
     /// [`ArithConfig::n_witnesses`] specifies the number of witnesses in the
     /// constraint system.
     pub n_witnesses: usize,
+
+    pub n_matrices: usize,
 }
 
 impl ArithConfig {
@@ -76,6 +78,12 @@ impl ArithConfig {
     pub fn log_constraints(&self) -> usize {
         log2(self.n_constraints) as usize
     }
+
+    /// [`ArithConfig::log_variables`] returns the base-2 logarithm of the
+    /// number of variables in the constraint system.
+    pub fn log_variables(&self) -> usize {
+        log2(self.n_variables) as usize
+    }
 }
 
 /// [`Arith`] is a trait for constraint systems (R1CS, CCS, etc.), where we
@@ -83,6 +91,8 @@ impl ArithConfig {
 /// In addition to the configuration, the implementor of this trait may also
 /// store the actual constraints and other information.
 pub trait Arith: Clone + Default + Send + Sync + CanonicalSerialize + CanonicalDeserialize {
+    type Field: Field;
+
     /// [`Arith::config`] returns the configuration of the constraint system.
     fn config(&self) -> ArithConfig;
 }

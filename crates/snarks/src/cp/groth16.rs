@@ -23,7 +23,7 @@ use sonobe_primitives::{
     arithmetizations::{Arith, ccs::CCS, r1cs::R1CS},
     circuits::alloc::{IdentityHasher, UsizeSet},
     commitments::pedersen::PedersenKey,
-    traits::{SonobeCurve, SonobeField},
+    traits::{SonobeCurve, SonobePrimeField},
 };
 use thiserror::Error;
 
@@ -108,13 +108,13 @@ pub enum Error {
 }
 
 pub struct LegoGroth16<
-    E: Pairing<G1: SonobeCurve, BaseField: SonobeField, ScalarField: SonobeField>,
+    E: Pairing<G1: SonobeCurve, BaseField: SonobePrimeField, ScalarField: SonobePrimeField>,
     QAP: R1CSToQAP = LibsnarkReduction,
 > {
     _p: PhantomData<(E, QAP)>,
 }
 
-impl<E: Pairing<G1: SonobeCurve, BaseField: SonobeField, ScalarField: SonobeField>, QAP: R1CSToQAP>
+impl<E: Pairing<G1: SonobeCurve, BaseField: SonobePrimeField, ScalarField: SonobePrimeField>, QAP: R1CSToQAP>
     CPSNARK for LegoGroth16<E, QAP>
 {
     type Field = E::ScalarField;
@@ -553,7 +553,7 @@ mod tests {
     }
 
     fn test_prove_and_verify<
-        E: Pairing<G1: SonobeCurve, BaseField: SonobeField, ScalarField: SonobeField>,
+        E: Pairing<G1: SonobeCurve, BaseField: SonobePrimeField, ScalarField: SonobePrimeField>,
     >(
         n_iters: usize,
     ) {
@@ -624,7 +624,7 @@ mod tests {
     }
 
     fn test_prove_and_verify2<
-        E: Pairing<G1: SonobeCurve, BaseField: SonobeField, ScalarField: SonobeField>,
+        E: Pairing<G1: SonobeCurve, BaseField: SonobePrimeField, ScalarField: SonobePrimeField>,
     >(
         n_iters: usize,
     ) {
@@ -698,7 +698,7 @@ mod tests {
     }
 
     fn test_prove_and_verify3<
-        E: Pairing<G1: SonobeCurve, BaseField: SonobeField, ScalarField: SonobeField>,
+        E: Pairing<G1: SonobeCurve, BaseField: SonobePrimeField, ScalarField: SonobePrimeField>,
     >(
         n_iters: usize,
     ) {

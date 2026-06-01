@@ -1,7 +1,10 @@
 //! This module defines extension traits for field elements and their in-circuit
 //! counterparts, along with some common implementations.
 
-use ark_ff::{BigInteger, Field, Fp, FpConfig, PrimeField};
+use ark_ff::{
+    BigInteger, Field, Fp, Fp2, Fp2Config, Fp3, Fp3Config, Fp4, Fp4Config, Fp6, Fp6Config, Fp12,
+    Fp12Config, FpConfig, PrimeField,
+};
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::AllocVar,
@@ -19,16 +22,17 @@ use crate::{
     algebra::{Val, field::emulated::EmulatedFieldVar},
     circuits::WitnessToPublic,
     traits::Inputize,
-    transcripts::{Absorbable, AbsorbableVar},
+    transcripts::{Absorbable, AbsorbableVar, squeezable::Squeezable},
 };
 
 pub mod emulated;
 
 /// [`SonobeField`] trait is a wrapper around [`PrimeField`] that also includes
 /// necessary bounds for the field to be used conveniently in folding schemes.
-pub trait SonobeField:
-    PrimeField<BasePrimeField = Self>
+pub trait SonobePrimeField:
+    PrimeField
     + Absorbable
+    + Squeezable<Self>
     + Val<
         Var: FieldVar<Self, Self> + WitnessToPublic + Inputize<Self>,
         EmulatedVar<Self> = EmulatedFieldVar<Self, Self>,
@@ -41,15 +45,25 @@ pub trait SonobeField:
     const BITS_PER_LIMB: usize;
 }
 
-impl<P: FpConfig<N>, const N: usize> SonobeField for Fp<P, N> {
+pub trait SonobeField:
+    Field<BasePrimeField: SonobePrimeField> + Absorbable + Squeezable<Self::BasePrimeField>
+{
+}
+
+impl<P: FpConfig<N>, const N: usize> SonobePrimeField for Fp<P, N> {
     const BITS_PER_LIMB: usize = 32;
+}
+
+impl<T: Field<BasePrimeField: SonobePrimeField> + Absorbable + Squeezable<Self::BasePrimeField>>
+    SonobeField for T
+{
 }
 
 impl<P: FpConfig<N>, const N: usize> Val for Fp<P, N> {
     type PreferredConstraintField = Self;
     type Var = FpVar<Self>;
 
-    type EmulatedVar<F: SonobeField> = EmulatedFieldVar<F, Self>;
+    type EmulatedVar<F: SonobePrimeField> = EmulatedFieldVar<F, Self>;
 }
 
 impl<P: FpConfig<N>, const N: usize> Absorbable for Fp<P, N> {
@@ -75,6 +89,108 @@ impl<P: FpConfig<N>, const N: usize> Absorbable for Fp<P, N> {
     }
 }
 
+impl<P: Fp2Config<Fp: Absorbable>> Absorbable for Fp2<P> {
+    fn absorb_into<F: PrimeField>(&self, dest: &mut Vec<F>) {
+        for i in self.to_base_prime_field_elements() {
+            i.absorb_into(dest);
+        }
+    }
+}
+
+impl<P: Fp3Config<Fp: Absorbable>> Absorbable for Fp3<P> {
+    fn absorb_into<F: PrimeField>(&self, dest: &mut Vec<F>) {
+        for i in self.to_base_prime_field_elements() {
+            i.absorb_into(dest);
+        }
+    }
+}
+
+impl<P: Fp4Config<Fp2Config: Fp2Config<Fp: Absorbable>>> Absorbable for Fp4<P> {
+    fn absorb_into<F: PrimeField>(&self, dest: &mut Vec<F>) {
+        for i in self.to_base_prime_field_elements() {
+            i.absorb_into(dest);
+        }
+    }
+}
+
+impl<P: Fp6Config<Fp2Config: Fp2Config<Fp: Absorbable>>> Absorbable for Fp6<P> {
+    fn absorb_into<F: PrimeField>(&self, dest: &mut Vec<F>) {
+        for i in self.to_base_prime_field_elements() {
+            i.absorb_into(dest);
+        }
+    }
+}
+
+impl<P: Fp12Config<Fp6Config: Fp6Config<Fp2Config: Fp2Config<Fp: Absorbable>>>> Absorbable
+    for Fp12<P>
+{
+    fn absorb_into<F: PrimeField>(&self, dest: &mut Vec<F>) {
+        for i in self.to_base_prime_field_elements() {
+            i.absorb_into(dest);
+        }
+    }
+}
+
+impl<P: FpConfig<N>, const N: usize> Squeezable<Self> for Fp<P, N> {
+    fn size() -> usize {
+        Self::extension_degree() as usize
+    }
+
+    fn squeeze_from(v: Vec<Self>) -> Self {
+        Self::from_base_prime_field_elems(v).unwrap()
+    }
+}
+
+impl<P: Fp2Config> Squeezable<<Self as Field>::BasePrimeField> for Fp2<P> {
+    fn size() -> usize {
+        Self::extension_degree() as usize
+    }
+
+    fn squeeze_from(v: Vec<<Self as Field>::BasePrimeField>) -> Self {
+        Self::from_base_prime_field_elems(v).unwrap()
+    }
+}
+
+impl<P: Fp3Config> Squeezable<<Self as Field>::BasePrimeField> for Fp3<P> {
+    fn size() -> usize {
+        Self::extension_degree() as usize
+    }
+
+    fn squeeze_from(v: Vec<<Self as Field>::BasePrimeField>) -> Self {
+        Self::from_base_prime_field_elems(v).unwrap()
+    }
+}
+
+impl<P: Fp4Config> Squeezable<<Self as Field>::BasePrimeField> for Fp4<P> {
+    fn size() -> usize {
+        Self::extension_degree() as usize
+    }
+
+    fn squeeze_from(v: Vec<<Self as Field>::BasePrimeField>) -> Self {
+        Self::from_base_prime_field_elems(v).unwrap()
+    }
+}
+
+impl<P: Fp6Config> Squeezable<<Self as Field>::BasePrimeField> for Fp6<P> {
+    fn size() -> usize {
+        Self::extension_degree() as usize
+    }
+
+    fn squeeze_from(v: Vec<<Self as Field>::BasePrimeField>) -> Self {
+        Self::from_base_prime_field_elems(v).unwrap()
+    }
+}
+
+impl<P: Fp12Config> Squeezable<<Self as Field>::BasePrimeField> for Fp12<P> {
+    fn size() -> usize {
+        Self::extension_degree() as usize
+    }
+
+    fn squeeze_from(v: Vec<<Self as Field>::BasePrimeField>) -> Self {
+        Self::from_base_prime_field_elems(v).unwrap()
+    }
+}
+
 impl<F: PrimeField> AbsorbableVar<F> for FpVar<F> {
     fn absorb_into(&self, dest: &mut Vec<FpVar<F>>) -> Result<(), SynthesisError> {
         dest.push(self.clone());
@@ -88,7 +204,9 @@ impl<F: PrimeField> Inputize<F> for FpVar<F> {
     }
 }
 
-impl<Base: SonobeField, Target: SonobeField> Inputize<Base> for EmulatedFieldVar<Base, Target> {
+impl<Base: SonobePrimeField, Target: SonobePrimeField> Inputize<Base>
+    for EmulatedFieldVar<Base, Target>
+{
     fn inputize(value: &Self::Value) -> Vec<Base> {
         // TODO: pack bits
         value
@@ -119,7 +237,9 @@ impl<F: PrimeField> WitnessToPublic for FpVar<F> {
     }
 }
 
-impl<Base: SonobeField, Target: SonobeField> WitnessToPublic for EmulatedFieldVar<Base, Target> {
+impl<Base: SonobePrimeField, Target: SonobePrimeField> WitnessToPublic
+    for EmulatedFieldVar<Base, Target>
+{
     fn mark_as_public(&self) -> Result<(), SynthesisError> {
         self.enforce_equal(&Self::new_input(self.cs(), || {
             Ok(self.value().unwrap_or_default())

@@ -22,10 +22,16 @@ pub trait FoldingInstance<CM: CommitmentDef>:
     // TODO (@winderica): consider the scenario where the instance has multiple
     // commitments of different types.
     fn commitments(&self) -> Vec<CM::Commitment>;
+}
+
+pub trait FoldingIncomingInstance<CM: CommitmentDef>:
+    FoldingInstance<CM>
+{
+    type PublicInput;
 
     /// [`FoldingInstance::public_inputs`] returns the reference to the public
     /// inputs contained in the instance.
-    fn public_inputs(&self) -> &[CM::Scalar];
+    fn public_inputs(&self) -> &[Self::PublicInput];
 }
 
 /// [`PlainInstance`] is a vector of field elements that are the statements /
@@ -48,6 +54,10 @@ impl<CM: CommitmentDef> FoldingInstance<CM> for PlainInstance<CM::Scalar> {
     fn commitments(&self) -> Vec<CM::Commitment> {
         vec![]
     }
+}
+
+impl<CM: CommitmentDef> FoldingIncomingInstance<CM> for PlainInstance<CM::Scalar> {
+    type PublicInput = CM::Scalar;
 
     fn public_inputs(&self) -> &[CM::Scalar] {
         self

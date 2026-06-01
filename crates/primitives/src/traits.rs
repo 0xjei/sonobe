@@ -4,7 +4,7 @@ use ark_ff::Field;
 use ark_r1cs_std::GR1CSVar;
 
 pub use crate::algebra::{
-    field::SonobeField,
+    field::{SonobePrimeField, SonobeField},
     group::{CF1, CF2, SonobeCurve},
 };
 
@@ -18,6 +18,12 @@ pub trait Dummy<Cfg> {
     /// [`Dummy::dummy`] constructs a dummy value of `Self` based on the given
     /// configuration `cfg`.
     fn dummy(cfg: Cfg) -> Self;
+}
+
+impl<T> Dummy<T> for () {
+    fn dummy(_: T) -> Self {
+        ()
+    }
 }
 
 impl<T: Default + Clone> Dummy<usize> for Vec<T> {
