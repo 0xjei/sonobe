@@ -125,8 +125,8 @@ impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> Relation<RW<Cfg>, RU<Cfg>>
                         for i in 1..dim + 1 {
                             let r = u.r[i - 1];
                             for b in 0..(1 << (nv - i)) {
-                                let left = &poly[b << 1];
-                                let right = &poly[(b << 1) + 1];
+                                let left = &poly.get(b << 1).cloned().unwrap_or_default();
+                                let right = &poly.get((b << 1) + 1).cloned().unwrap_or_default();
                                 poly[b] = left.add(&right.sub(&left).scale(r));
                             }
                         }
@@ -313,8 +313,8 @@ impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> WitnessInstanceSampler<RW<Cfg>
                         for i in 1..dim + 1 {
                             let r = r[i - 1];
                             for b in 0..(1 << (nv - i)) {
-                                let left = &poly[b << 1];
-                                let right = &poly[(b << 1) + 1];
+                                let left = &poly.get(b << 1).cloned().unwrap_or_default();
+                                let right = &poly.get((b << 1) + 1).cloned().unwrap_or_default();
                                 poly[b] = left.add(&right.sub(&left).scale(r));
                             }
                         }

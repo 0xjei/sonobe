@@ -3,7 +3,7 @@
 
 use ark_ff::{
     BigInteger, Field, Fp, Fp2, Fp2Config, Fp3, Fp3Config, Fp4, Fp4Config, Fp6, Fp6Config, Fp12,
-    Fp12Config, FpConfig, PrimeField,
+    Fp12Config, FpConfig, PrimeField, SmallFp, SmallFpConfig,
 };
 use ark_r1cs_std::{
     GR1CSVar,
@@ -54,6 +54,10 @@ impl<P: FpConfig<N>, const N: usize> SonobePrimeField for Fp<P, N> {
     const BITS_PER_LIMB: usize = 32;
 }
 
+impl<P: SmallFpConfig> SonobePrimeField for SmallFp<P> {
+    const BITS_PER_LIMB: usize = 32;
+}
+
 impl<T: Field<BasePrimeField: SonobePrimeField> + Absorbable + Squeezable<Self::BasePrimeField>>
     SonobeField for T
 {
@@ -66,7 +70,37 @@ impl<P: FpConfig<N>, const N: usize> Val for Fp<P, N> {
     type EmulatedVar<F: SonobePrimeField> = EmulatedFieldVar<F, Self>;
 }
 
+impl<P: SmallFpConfig> Val for SmallFp<P> {
+    type PreferredConstraintField = Self;
+    type Var = FpVar<Self>;
+
+    type EmulatedVar<F: SonobePrimeField> = EmulatedFieldVar<F, Self>;
+}
+
 impl<P: FpConfig<N>, const N: usize> Absorbable for Fp<P, N> {
+    fn absorb_into<F: PrimeField>(&self, dest: &mut Vec<F>) {
+        if TypeId::of::<F>() == TypeId::of::<Self>() {
+            // Safe because `F` and `Self` have the same type
+            // TODO (@winderica): specialization when???
+            dest.push(unsafe { transmute_copy::<Self, F>(self) });
+        } else {
+            let bits_per_limb = F::MODULUS_BIT_SIZE - 1;
+            let num_limbs = Self::MODULUS_BIT_SIZE.div_ceil(bits_per_limb);
+
+            let mut limbs = self
+                .into_bigint()
+                .to_bits_le()
+                .chunks(bits_per_limb as usize)
+                .map(|chunk| F::from(F::BigInt::from_bits_le(chunk)))
+                .collect::<Vec<F>>();
+            limbs.resize(num_limbs as usize, F::zero());
+
+            dest.extend(&limbs)
+        }
+    }
+}
+
+impl<P: SmallFpConfig> Absorbable for SmallFp<P> {
     fn absorb_into<F: PrimeField>(&self, dest: &mut Vec<F>) {
         if TypeId::of::<F>() == TypeId::of::<Self>() {
             // Safe because `F` and `Self` have the same type
@@ -128,6 +162,16 @@ impl<P: Fp12Config<Fp6Config: Fp6Config<Fp2Config: Fp2Config<Fp: Absorbable>>>> 
         for i in self.to_base_prime_field_elements() {
             i.absorb_into(dest);
         }
+    }
+}
+
+impl<P: SmallFpConfig> Squeezable<Self> for SmallFp<P> {
+    fn size() -> usize {
+        Self::extension_degree() as usize
+    }
+
+    fn squeeze_from(v: Vec<Self>) -> Self {
+        Self::from_base_prime_field_elems(v).unwrap()
     }
 }
 

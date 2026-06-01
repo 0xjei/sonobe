@@ -49,7 +49,8 @@ pub use self::definitions::{
 
 #[cfg(test)]
 mod tests {
-    use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystem};
+    use ark_crypto_primitives::sponge::poseidon::PoseidonSponge;
+use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystem};
     use ark_std::{error::Error, rand::Rng, sync::Arc};
     use sonobe_primitives::{
         arithmetizations::Arith,
@@ -57,7 +58,7 @@ mod tests {
         relations::WitnessInstanceSampler,
         transcripts::{
             Transcript,
-            griffin::{GriffinParams, sponge::GriffinSponge},
+            griffin::{GriffinParams, sponge::GriffinSponge}, poseidon::poseidon_paper_config,
         },
     };
 
@@ -93,10 +94,10 @@ mod tests {
         let mut Ws = Ws.try_into().unwrap();
         let mut Us = Us.try_into().unwrap();
 
-        let config = Arc::new(GriffinParams::new(16, 5, 9));
+        let config = poseidon_paper_config::<_, 128>(7, 4);
 
-        let mut transcript_p = GriffinSponge::new(config.clone());
-        let mut transcript_v = GriffinSponge::new(config);
+        let mut transcript_p = PoseidonSponge::new(config.clone());
+        let mut transcript_v = PoseidonSponge::new(config);
 
         for assignments in assignments_vec {
             let mut ws = vec![];

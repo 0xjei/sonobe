@@ -1,14 +1,27 @@
-use std::{fmt::Debug, marker::PhantomData};
-
 use ark_ff::{Field, PrimeField};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Valid};
 use ark_std::{
     array,
+    fmt::Debug,
+    io::Read,
+    marker::PhantomData,
     ops::{Add, Mul, Sub},
 };
 
 use crate::{algebra::field::SonobeField, transcripts::Absorbable};
 
-pub trait PolynomialRingConfig: Clone + Debug + Default + Eq + PartialEq {
+pub trait PolynomialRingConfig:
+    'static
+    + Clone
+    + Debug
+    + Default
+    + Eq
+    + PartialEq
+    + Send
+    + Sync
+    + CanonicalDeserialize
+    + CanonicalSerialize
+{
     const DEGREE: usize;
 
     const CYCLOTOMIC_POLYNOMIAL: &'static [(usize, i64)];
@@ -46,11 +59,43 @@ pub trait PolynomialRingConfig: Clone + Debug + Default + Eq + PartialEq {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Config1 {}
+#[derive(Clone, Debug, Default, PartialEq, Eq, CanonicalSerialize)]
+pub struct Config1;
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Config2 {}
+impl Valid for Config1 {
+    fn check(&self) -> Result<(), ark_serialize::SerializationError> {
+        Ok(())
+    }
+}
+
+impl CanonicalDeserialize for Config1 {
+    fn deserialize_with_mode<R: Read>(
+        reader: R,
+        compress: ark_serialize::Compress,
+        validate: ark_serialize::Validate,
+    ) -> Result<Self, ark_serialize::SerializationError> {
+        Ok(Self)
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, CanonicalSerialize)]
+pub struct Config2;
+
+impl Valid for Config2 {
+    fn check(&self) -> Result<(), ark_serialize::SerializationError> {
+        Ok(())
+    }
+}
+
+impl CanonicalDeserialize for Config2 {
+    fn deserialize_with_mode<R: Read>(
+        reader: R,
+        compress: ark_serialize::Compress,
+        validate: ark_serialize::Validate,
+    ) -> Result<Self, ark_serialize::SerializationError> {
+        Ok(Self)
+    }
+}
 
 impl PolynomialRingConfig for Config1 {
     const DEGREE: usize = 54;
@@ -106,7 +151,7 @@ impl PolynomialRingConfig for Config2 {
 const PHI_81: [(usize, i64); 3] = [(0, 1), (27, 1), (54, 1)];
 const PHI_128: [(usize, i64); 2] = [(0, 1), (64, 1)];
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
 pub struct PolynomialRingOverField<Cfg: PolynomialRingConfig, F: Field> {
     pub _t: PhantomData<Cfg>,
     pub coeffs: Vec<F>,
@@ -205,11 +250,7 @@ impl<Cfg: PolynomialRingConfig, F: Field> PolynomialRingOverField<Cfg, F> {
     pub fn scale(&self, other: F) -> Self {
         Self {
             _t: PhantomData,
-            coeffs: self
-                .coeffs
-                .iter()
-                .map(|a| other * a)
-                .collect::<Vec<_>>(),
+            coeffs: self.coeffs.iter().map(|a| other * a).collect::<Vec<_>>(),
         }
     }
 

@@ -150,9 +150,8 @@ impl<
         // t * N..t * N + (M + N) * (2B - 1)
         let z_mles = decomposed_zs.iter().flat_map(|v| {
             (1 - Cfg::B as i8..Cfg::B as i8).map(move |j| {
-                MLE::from_evaluations_vec(
-                    s,
-                    v.iter().map(|i| Cfg::K::from(i - j)).collect::<Vec<_>>(),
+                MLE::from_evaluations(
+                    &v.iter().map(|i| Cfg::K::from(i - j)).collect::<Vec<_>>(),
                 )
             })
         });
@@ -160,11 +159,10 @@ impl<
         let running_mles = mz.iter().take(Cfg::M).flat_map(|i| {
             i.iter().flat_map(move |j| {
                 (0..Cfg::P::DEGREE).map(move |k| {
-                    MLE::from_evaluations_vec(
-                        s,
-                        j.iter()
+                    MLE::from_evaluations(
+                        &j.iter()
                             .map(|c| Cfg::K::from_base_prime_field(c.coeffs[k]))
-                            .collect(),
+                            .collect::<Vec<_>>(),
                     )
                 })
             })
@@ -261,8 +259,8 @@ impl<
                         for i in 1..dim + 1 {
                             let r = r_prime[i - 1];
                             for b in 0..(1 << (nv - i)) {
-                                let left = &poly[b << 1];
-                                let right = &poly[(b << 1) + 1];
+                                let left = &poly.get(b << 1).cloned().unwrap_or_default();
+                                let right = &poly.get((b << 1) + 1).cloned().unwrap_or_default();
                                 poly[b] = left.add(&right.sub(&left).scale(r));
                             }
                         }
@@ -401,8 +399,8 @@ impl<
                         for i in 1..dim + 1 {
                             let r = r_prime[i - 1];
                             for b in 0..(1 << (nv - i)) {
-                                let left = &poly[b << 1];
-                                let right = &poly[(b << 1) + 1];
+                                let left = &poly.get(b << 1).cloned().unwrap_or_default();
+                                let right = &poly.get((b << 1) + 1).cloned().unwrap_or_default();
                                 poly[b] = left.add(&right.sub(&left).scale(r));
                             }
                         }

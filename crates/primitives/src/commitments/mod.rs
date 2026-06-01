@@ -26,6 +26,7 @@ use crate::{
 };
 
 pub mod pedersen;
+pub mod ajtai;
 // TODO: add back other commitment schemes
 
 /// [`Error`] enumerates possible errors during commitment operations.
@@ -65,7 +66,7 @@ pub trait CommitmentDef: 'static + Clone + Debug + PartialEq + Eq {
     ///
     /// For generality, we do not restrict this to field elements and instead
     /// only bound it by necessary traits.
-    type Scalar: Clone + Copy + Default + Debug + PartialEq + Eq + Sync + Absorbable + UniformRand;
+    type Scalar: Clone + Default + Debug + PartialEq + Eq + Sync + Absorbable;
     /// [`CommitmentDef::Commitment`] is the type of the commitment.
     ///
     /// In the future we may introduce other commitment schemes such as those
@@ -210,7 +211,7 @@ mod tests {
 
     use super::*;
 
-    pub fn test_commitment_correctness<CM: CommitmentOps>(
+    pub fn test_commitment_correctness<CM: CommitmentOps<Scalar: UniformRand>>(
         mut rng: impl RngCore,
         len: usize,
     ) -> Result<(), Box<dyn Error>> {
@@ -224,7 +225,9 @@ mod tests {
         Ok(())
     }
 
-    pub fn test_commitment_gadget_correctness<CM: CommitmentOpsGadget>(
+    pub fn test_commitment_gadget_correctness<
+        CM: CommitmentOpsGadget<Widget: CommitmentDef<Scalar: UniformRand>>,
+    >(
         mut rng: impl RngCore,
         len: usize,
     ) -> Result<(), Box<dyn Error>> {
