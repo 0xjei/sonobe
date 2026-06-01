@@ -119,7 +119,7 @@ pub trait Transcript<F: PrimeField>: Clone {
     /// as a bit vector.
     ///
     /// Internally, it squeezes several field elements, absorbs them back to the
-    /// transcript (for strong Fiat-Shamir), and decompose them into bits.
+    /// transcript (for strong Fiat-Shamir), and decomposes them into bits.
     fn challenge_bits(&mut self, num_bits: usize) -> Vec<bool> {
         let usable_bits = (F::MODULUS_BIT_SIZE - 1) as usize;
 
@@ -238,7 +238,7 @@ pub trait TranscriptGadget<F: PrimeField>: Clone {
     /// transcript variable as a vector of bit variables.
     ///
     /// Internally, it squeezes several field element variables, absorbs them
-    /// back to the transcript variable (for strong Fiat-Shamir), and decompose
+    /// back to the transcript variable (for strong Fiat-Shamir), and decomposes
     /// them into bit variables.
     fn challenge_bits(&mut self, num_bits: usize) -> Result<Vec<Boolean<F>>, SynthesisError> {
         let usable_bits = (F::MODULUS_BIT_SIZE - 1) as usize;
