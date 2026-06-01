@@ -32,12 +32,12 @@ impl<A: Arith, CM: CommitmentDef> DeciderKey for NovaKey<A, CM> {
     type ProverKey = Self;
     type VerifierKey = ();
 
-    fn to_pk(&self) -> &Self::ProverKey {
-        self
+    fn to_pk(&self) -> Self::ProverKey {
+        self.clone()
     }
 
-    fn to_vk(&self) -> &Self::VerifierKey {
-        &()
+    fn to_vk(&self) -> Self::VerifierKey {
+        ()
     }
 
     fn to_arith_config(&self) -> ArithConfig {

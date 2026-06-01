@@ -347,7 +347,7 @@ where
 
         if i != 0 {
             (WW, UU, proof) = FS1::prove(
-                dk1.to_pk(),
+                &dk1.to_pk(),
                 &mut transcript,
                 &[W],
                 &[U],
@@ -365,7 +365,7 @@ where
                 let (cf_w, cf_u) = dk2.sample(cs.assignments()?, &mut rng)?;
 
                 (cf_WW, cf_UU, cf_proofs[i]) = FS2::prove(
-                    dk2.to_pk(),
+                    &dk2.to_pk(),
                     &mut transcript,
                     &[if i == 0 { cf_W } else { &cf_WW }],
                     &[if i == 0 { cf_U } else { &cf_UU }],
@@ -589,7 +589,7 @@ impl<
         let mut transcript = hash.separate_domain("transcript".as_ref());
 
         let (WW, _, folding_proof) = FS1::prove(
-            ivc_vk.0.to_pk(),
+            &ivc_vk.0.to_pk(),
             &mut transcript,
             &[W],
             &[U],

@@ -39,14 +39,14 @@ pub struct SuperNeoKey<A: Arith, CM: CommitmentDef> {
 
 impl<A: Arith, CM: CommitmentDef> DeciderKey for SuperNeoKey<A, CM> {
     type ProverKey = Self;
-    type VerifierKey = ();
+    type VerifierKey = ArithConfig;
 
-    fn to_pk(&self) -> &Self::ProverKey {
-        self
+    fn to_pk(&self) -> Self::ProverKey {
+        self.clone()
     }
 
-    fn to_vk(&self) -> &Self::VerifierKey {
-        &()
+    fn to_vk(&self) -> Self::VerifierKey {
+        self.arith.config()
     }
 
     fn to_arith_config(&self) -> ArithConfig {
@@ -54,7 +54,9 @@ impl<A: Arith, CM: CommitmentDef> DeciderKey for SuperNeoKey<A, CM> {
     }
 }
 
-impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> Relation<RW<Cfg>, RU<Cfg>> for SuperNeoKey<A, Cfg::CM> {
+impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> Relation<RW<Cfg>, RU<Cfg>>
+    for SuperNeoKey<A, Cfg::CM>
+{
     type Error = Error;
 
     fn check_relation(&self, w: &RW<Cfg>, u: &RU<Cfg>) -> Result<(), Self::Error> {
