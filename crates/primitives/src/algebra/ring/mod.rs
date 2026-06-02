@@ -102,15 +102,27 @@ impl PolynomialRingConfig for Config1 {
 
     const CYCLOTOMIC_POLYNOMIAL: &'static [(usize, i64)] = &PHI_81;
 
-    fn rot<F: Field>(a: &[F], col: usize, row: usize) -> F {
-        let d = Self::DEGREE;
-        let h = d / 2;
-        let n = h * 3;
+    fn rot<F: Field>(a: &[F], col: usize, mut row: usize) -> F {
+        let mut res = F::zero();
+        let h = Self::DEGREE / 2;
+        let m = row;
 
-        a.get((row + n - col) % n).copied().unwrap_or_default()
-            - a.get(((row + h).max(d) + n - col) % n)
-                .copied()
-                .unwrap_or_default()
+        if row >= col && row - col < Self::DEGREE {
+            res += a[row - col];
+        }
+        row += h;
+        if m >= h && row >= col && row - col < Self::DEGREE {
+            res -= a[row - col];
+        }
+        row += h;
+        if m < h && row >= col && row - col < Self::DEGREE {
+            res -= a[row - col];
+        }
+        row += h;
+        if row >= col && row - col < Self::DEGREE {
+            res += a[row - col];
+        }
+        res
     }
 
     fn inner_product_transform<F: Field>(v: &[F]) -> Vec<F> {
