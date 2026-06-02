@@ -37,7 +37,7 @@ use crate::{
     superneo::{
         SuperNeo, SuperNeoConfig,
         keys::SuperNeoKey,
-        utils::{decompose, decompose2, extend_mle_field, recompose},
+        utils::{decompose, decompose2},
     },
 };
 
@@ -104,66 +104,53 @@ impl<
             )
             .collect::<Vec<_>>();
 
-        let mz = ws
+        let mz = decomposed_zs
             .iter()
-            .zip(us)
-            .map(|(w, u)| {
-                PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_embedding(
-                    [&[One::one()][..], &u.x, &w.w].concat(),
-                )
-            })
-            .chain(W.w.iter().zip(&U.x).zip(&U.u).map(|((w, x), u)| {
-                PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_embedding(
-                        [&u[..], x, w]
-                            .concat()
-                            .chunks(l)
-                            .map(|c| recompose(c, Cfg::B))
-                            .collect(),
-                    )
-            }))
-            .zip(&decomposed_zs)
-            .map(|(z, decomposed_z)| {
+            .map(|decomposed_z| {
+                let m = decomposed_z.len();
+                let embedded_z = &PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_embedding(
+                    decomposed_z.iter().map(|i| Cfg::F::from(*i)).collect(),
+                );
                 ccs.matrices()
                     .iter()
                     .map(move |matrix| {
-                        let matrix = PolynomialRingOverField::matrix_transform(
-                            matrix
-                                .iter()
-                                .map(|row| {
-                                    let mut r = vec![Cfg::F::zero(); cfg.n_variables];
-                                    for (v, i) in row {
-                                        r[*i] = *v;
-                                    }
-                                    r
-                                })
-                                .collect(),
-                        );
                         matrix
                             .iter()
-                            .map(|row| {
-                                let mut res = PolynomialRingOverField::default();
-                                for (i, j) in z.iter().zip(row) {
-                                    res = res.add(&i.mul(j));
+                            .map(|i| {
+                                let mut r = PolynomialRingOverField::<Cfg::P, Cfg::F>::default();
+                                for (v, j) in i {
+                                    let start = j * l;
+                                    let end = start + l;
+
+                                    let min = start / Cfg::P::DEGREE * Cfg::P::DEGREE;
+                                    let max = end.div_ceil(Cfg::P::DEGREE) * Cfg::P::DEGREE;
+                                    let mut vec = vec![Cfg::F::zero(); max - min];
+                                    for i in 0..l {
+                                        vec[i + start % Cfg::P::DEGREE] =
+                                            *v * Cfg::F::from(Cfg::B as u64).pow([i as u64]);
+                                    }
+                                    PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_transform(
+                                        vec,
+                                    )
+                                    .into_iter()
+                                    .enumerate()
+                                    .for_each(|(i, v)| {
+                                        r = r.add(&v.mul(&embedded_z[start / Cfg::P::DEGREE + i]));
+                                    });
                                 }
-                                res
+
+                                r
                             })
                             .collect::<Vec<_>>()
                     })
                     .chain([{
-                        let l = decomposed_z.len();
-                        let z = PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_embedding(
-                            decomposed_z.iter().map(|i| Cfg::F::from(*i)).collect(),
-                        );
-                        (0..l)
+                        (0..m)
                             .map(|i| {
-                                let mut r = vec![Cfg::F::zero(); l];
-                                r[i] = Cfg::F::one();
-
                                 let mut chunk = vec![Cfg::F::zero(); Cfg::P::DEGREE];
                                 chunk[i % Cfg::P::DEGREE] = Cfg::F::one();
 
                                 PolynomialRingOverField::<Cfg::P, Cfg::F>::element_transform(chunk)
-                                    .mul(&z[i / Cfg::P::DEGREE])
+                                    .mul(&embedded_z[i / Cfg::P::DEGREE])
                             })
                             .collect::<Vec<_>>()
                     }])
@@ -320,65 +307,6 @@ impl<
             })
             .collect::<Vec<_>>();
 
-        println!(
-            "{}",
-            DensePolynomial::from_coefficients_slice(sumcheck_proof.last().unwrap())
-                .evaluate(&r_prime.last().unwrap())
-        );
-        println!(
-            "{}",
-            EqPoly::fix_xy_eval(&r_prime, &alpha)
-                * (0..N)
-                    .map(|i| {
-                        gamma_powers[i]
-                            * S.iter()
-                                .zip(c)
-                                .map(|(s, c)| {
-                                    Cfg::K::from_base_prime_field(*c)
-                                        * s.iter()
-                                            .map(|&j| y_prime[i][j].coeffs[0])
-                                            .product::<Cfg::K>()
-                                })
-                                .sum::<Cfg::K>()
-                    })
-                    .sum::<Cfg::K>()
-        );
-        println!(
-            "{}",
-            EqPoly::fix_xy_eval(&r_prime, &alpha)
-                * (0..N + Cfg::M)
-                    .map(|i| {
-                        gamma_powers[i + N]
-                            * (1 - Cfg::B as i8..Cfg::B as i8)
-                                .map(|j| y_prime[i][t - 1].coeffs[0] - Cfg::K::from(j))
-                                .product::<Cfg::K>()
-                    })
-                    .sum::<Cfg::K>()
-        );
-        println!(
-            "{}",
-            EqPoly::fix_xy_eval(&U.r, &r_prime)
-                * (0..Cfg::M)
-                    .map(|i| {
-                        (0..t)
-                            .map(|j| {
-                                (0..Cfg::P::DEGREE)
-                                    .map(|k| {
-                                        gamma_powers[i * t * Cfg::P::DEGREE
-                                            + j * Cfg::P::DEGREE
-                                            + k
-                                            + N
-                                            + Cfg::M
-                                            + N]
-                                            * y_prime[N + i][j].coeffs[k]
-                                    })
-                                    .sum::<Cfg::K>()
-                            })
-                            .sum::<Cfg::K>()
-                    })
-                    .sum::<Cfg::K>()
-        );
-
         let rhos = PolynomialRingOverField::<Cfg::P, _>::vector_embedding(
             transcript
                 .get_decomposed(
@@ -405,98 +333,6 @@ impl<
             }
         }
         let z = PolynomialRingOverField::vector_unembedding(z);
-
-        pub fn recompose2<F: PrimeField>(v: &[F], b: usize) -> F {
-            let base = F::from(b as u64);
-            let mut pow = F::one();
-
-            let mut result = F::zero();
-            for i in v {
-                result += *i * pow;
-                pow *= base;
-            }
-            result
-        }
-
-        let zzz = z
-            .chunks(l)
-            .map(|i| recompose2(i, Cfg::B))
-            .collect::<Vec<_>>();
-        let yyy = {
-            let decomposed_z = z.clone();
-            let z = PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_embedding(zzz.clone());
-            ccs.matrices()
-                .iter()
-                .map(move |matrix| {
-                    let matrix = PolynomialRingOverField::matrix_transform(
-                        matrix
-                            .iter()
-                            .map(|row| {
-                                let mut r = vec![Cfg::F::zero(); cfg.n_variables];
-                                for (v, i) in row {
-                                    r[*i] = *v;
-                                }
-                                r
-                            })
-                            .collect(),
-                    );
-                    matrix
-                        .iter()
-                        .map(|row| {
-                            let mut res = PolynomialRingOverField::default();
-                            for (i, j) in z.iter().zip(row) {
-                                res = res.add(&i.mul(j));
-                            }
-                            res
-                        })
-                        .collect::<Vec<_>>()
-                })
-                .chain([{
-                    let l = decomposed_z.len();
-                    let z = PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_embedding(
-                        decomposed_z,
-                    );
-                    (0..l)
-                        .map(|i| {
-                            let mut r = vec![Cfg::F::zero(); l];
-                            r[i] = Cfg::F::one();
-
-                            let mut chunk = vec![Cfg::F::zero(); Cfg::P::DEGREE];
-                            chunk[i % Cfg::P::DEGREE] = Cfg::F::one();
-
-                            PolynomialRingOverField::<Cfg::P, Cfg::F>::element_transform(chunk)
-                                .mul(&z[i / Cfg::P::DEGREE])
-                        })
-                        .collect::<Vec<_>>()
-                }])
-                .map(|j| {
-                    let mut poly = j
-                        .into_iter()
-                        .map(|k| PolynomialRingOverField::<Cfg::P, _> {
-                            _t: PhantomData,
-                            coeffs: k
-                                .coeffs
-                                .into_iter()
-                                .map(Cfg::K::from_base_prime_field)
-                                .collect(),
-                        })
-                        .collect::<Vec<_>>();
-                    poly.resize(1 << s, Default::default());
-                    let nv = s;
-                    let dim = r_prime.len();
-                    // evaluate single variable of partial point from left to right
-                    for i in 1..dim + 1 {
-                        let r = r_prime[i - 1];
-                        for b in 0..(1 << (nv - i)) {
-                            let left = &poly.get(b << 1).cloned().unwrap_or_default();
-                            let right = &poly.get((b << 1) + 1).cloned().unwrap_or_default();
-                            poly[b] = left.add(&right.sub(&left).scale(r));
-                        }
-                    }
-                    poly.remove(0)
-                })
-                .collect::<Vec<_>>()
-        };
 
         assert_eq!(z.len(), cfg.n_variables * l);
 
@@ -534,57 +370,52 @@ impl<
 
         let y = zs
             .into_iter()
-            .map(|v| {
-                (
-                    v.chunks(l)
-                        .map(|c| recompose::<Cfg::F>(c, Cfg::B))
-                        .collect::<Vec<_>>(),
-                    v,
-                )
-            })
-            .map(|(z, decomposed_z)| {
-                let z = PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_embedding(z.clone());
+            .map(|decomposed_z| {
+                let m = decomposed_z.len();
+                let decomposed_z = &PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_embedding(
+                    decomposed_z.iter().map(|i| Cfg::F::from(*i)).collect(),
+                );
                 ccs.matrices()
                     .iter()
                     .map(move |matrix| {
-                        let matrix = PolynomialRingOverField::matrix_transform(
-                            matrix
-                                .iter()
-                                .map(|row| {
-                                    let mut r = vec![Cfg::F::zero(); cfg.n_variables];
-                                    for (v, i) in row {
-                                        r[*i] = *v;
-                                    }
-                                    r
-                                })
-                                .collect(),
-                        );
                         matrix
                             .iter()
-                            .map(|row| {
-                                let mut res = PolynomialRingOverField::default();
-                                for (i, j) in z.iter().zip(row) {
-                                    res = res.add(&i.mul(j));
+                            .map(|i| {
+                                let mut r = PolynomialRingOverField::<Cfg::P, Cfg::F>::default();
+                                for (v, j) in i {
+                                    let start = j * l;
+                                    let end = start + l;
+
+                                    let min = start / Cfg::P::DEGREE * Cfg::P::DEGREE;
+                                    let max = end.div_ceil(Cfg::P::DEGREE) * Cfg::P::DEGREE;
+                                    let mut vec = vec![Cfg::F::zero(); max - min];
+                                    for i in 0..l {
+                                        vec[i + start % Cfg::P::DEGREE] =
+                                            *v * Cfg::F::from(Cfg::B as u64).pow([i as u64]);
+                                    }
+                                    PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_transform(
+                                        vec,
+                                    )
+                                    .into_iter()
+                                    .enumerate()
+                                    .for_each(|(i, v)| {
+                                        r = r
+                                            .add(&v.mul(&decomposed_z[start / Cfg::P::DEGREE + i]));
+                                    });
                                 }
-                                res
+
+                                r
                             })
                             .collect::<Vec<_>>()
                     })
                     .chain([{
-                        let l = decomposed_z.len();
-                        let z = PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_embedding(
-                            decomposed_z.iter().map(|i| Cfg::F::from(*i)).collect(),
-                        );
-                        (0..l)
+                        (0..m)
                             .map(|i| {
-                                let mut r = vec![Cfg::F::zero(); l];
-                                r[i] = Cfg::F::one();
-
                                 let mut chunk = vec![Cfg::F::zero(); Cfg::P::DEGREE];
                                 chunk[i % Cfg::P::DEGREE] = Cfg::F::one();
 
                                 PolynomialRingOverField::<Cfg::P, Cfg::F>::element_transform(chunk)
-                                    .mul(&z[i / Cfg::P::DEGREE])
+                                    .mul(&decomposed_z[i / Cfg::P::DEGREE])
                             })
                             .collect::<Vec<_>>()
                     }])
@@ -617,38 +448,6 @@ impl<
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
-
-        let mut yy = vec![PolynomialRingOverField::default(); t];
-        for i in 0..Cfg::M {
-            let b = Cfg::K::from((Cfg::B) as u64).pow([i as u64]);
-            for j in 0..t {
-                yy[j] = yy[j].add(&y[i][j].scale(b));
-            }
-        }
-
-        let mut yyyy = vec![PolynomialRingOverField::default(); t];
-        for j in 0..t {
-            for i in 0..Cfg::M + N {
-                yyyy[j] = yyyy[j].add(&y_prime[i][j].mul(&{
-                    PolynomialRingOverField {
-                        _t: PhantomData,
-                        coeffs: rhos[i]
-                            .coeffs
-                            .iter()
-                            .map(|i| Cfg::K::from_base_prime_field(*i))
-                            .collect(),
-                    }
-                }))
-            }
-        }
-        for i in 0..t {
-            for j in 0..Cfg::P::DEGREE {
-                println!(
-                    "{} {} {} {} {}",
-                    i, j, yy[i].coeffs[j], yyy[i].coeffs[j], yyyy[i].coeffs[j]
-                );
-            }
-        }
 
         Ok((
             Self::RW {

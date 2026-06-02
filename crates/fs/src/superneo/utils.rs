@@ -73,18 +73,6 @@ pub fn decompose<F: PrimeField>(v: F, b: usize) -> Vec<i8> {
     }
 }
 
-pub fn recompose<F: PrimeField>(v: &[i8], b: usize) -> F {
-    let base = F::from(b as u64);
-    let mut pow = F::one();
-
-    let mut result = F::zero();
-    for i in v {
-        result += F::from(*i) * pow;
-        pow *= base;
-    }
-    result
-}
-
 pub fn decompose2<F: PrimeField>(v: F, b: usize, l: usize) -> Vec<i8> {
     let base = b;
 

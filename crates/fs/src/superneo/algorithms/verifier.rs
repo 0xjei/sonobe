@@ -28,7 +28,7 @@ use crate::{
     nova::AbstractNova,
     superneo::{
         SuperNeo, SuperNeoConfig,
-        utils::{decompose, decompose2, recompose},
+        utils::{decompose, decompose2},
     },
 };
 
