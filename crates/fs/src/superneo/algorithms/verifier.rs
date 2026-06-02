@@ -3,7 +3,7 @@
 use std::marker::PhantomData;
 
 use ark_ff::{Field, One, PrimeField, Zero};
-use ark_std::{borrow::Borrow, cfg_iter, ops::Mul};
+use ark_std::{borrow::Borrow, cfg_iter, log2, ops::Mul};
 #[cfg(not(feature = "parallel"))]
 use itertools::Itertools;
 use num_bigint::BigUint;
@@ -48,17 +48,24 @@ impl<
         let U = Us[0].borrow();
         let us = &us.iter().map(|i| i.borrow()).collect::<Vec<_>>();
 
+        let base = Cfg::B;
+
+        let m = Cfg::F::MODULUS.into();
+        let mut l = m.to_radix_le(base as u32).len();
+        if BigUint::from(base).pow(l as u32 - 1) == m {
+            l -= 1;
+        }
+
         let cfg = vk;
-        let s = cfg.log_constraints();
-        assert_eq!(s, cfg.log_variables());
-        let t = cfg.n_matrices;
+        let s = log2(cfg.n_variables * l) as usize;
+        let t = cfg.n_matrices + 1;
         let S = &A::multisets();
         let c = &A::coefficients();
 
         transcript.add(U);
         transcript.add(&us[..]);
 
-        let alpha = transcript.challenge_many(s);
+        let alpha = transcript.challenge_many::<Cfg::K>(s);
         let gamma = transcript.challenge::<Cfg::K>();
 
         let gamma_powers = &gamma.powers(Cfg::M * t * Cfg::P::DEGREE + N + Cfg::M + N);
@@ -74,7 +81,12 @@ impl<
                     .map(|j| {
                         (0..Cfg::P::DEGREE)
                             .map(|k| {
-                                gamma_powers[i * t * Cfg::P::DEGREE + j * Cfg::P::DEGREE + k]
+                                gamma_powers[i * t * Cfg::P::DEGREE
+                                    + j * Cfg::P::DEGREE
+                                    + k
+                                    + N
+                                    + Cfg::M
+                                    + N]
                                     * U.y[i][j].coeffs[k]
                             })
                             .sum::<Cfg::K>()
@@ -102,9 +114,9 @@ impl<
             .sum::<Cfg::K>();
         let n = (0..N + Cfg::M)
             .map(|i| {
-                gamma_powers[i]
+                gamma_powers[i + N]
                     * (1 - Cfg::B as i8..Cfg::B as i8)
-                        .map(|j| proof.y_prime[i][0].coeffs[0] - Cfg::K::from(j))
+                        .map(|j| proof.y_prime[i][t - 1].coeffs[0] - Cfg::K::from(j))
                         .product::<Cfg::K>()
             })
             .sum::<Cfg::K>();
@@ -115,8 +127,13 @@ impl<
                         .map(|j| {
                             (0..Cfg::P::DEGREE)
                                 .map(|k| {
-                                    gamma_powers[i * t * Cfg::P::DEGREE + j * Cfg::P::DEGREE + k]
-                                        * proof.y_prime[i][j].coeffs[k]
+                                    gamma_powers[i * t * Cfg::P::DEGREE
+                                        + j * Cfg::P::DEGREE
+                                        + k
+                                        + N
+                                        + Cfg::M
+                                        + N]
+                                        * proof.y_prime[N + i][j].coeffs[k]
                                 })
                                 .sum::<Cfg::K>()
                         })
@@ -125,8 +142,7 @@ impl<
                 .sum::<Cfg::K>();
         assert_eq!(
             claimed_eval,
-            EqPoly::fix_xy_eval(&alpha, &r_prime) * (f + gamma_powers[N] * n)
-                + gamma_powers[N + Cfg::M + N] * e
+            EqPoly::fix_xy_eval(&r_prime, &alpha) * (f + n) + e
         );
 
         let rhos = PolynomialRingOverField::<Cfg::P, _>::vector_embedding(
@@ -148,7 +164,7 @@ impl<
         }
 
         for i in 0..Cfg::M {
-            let b = Cfg::F::from((Cfg::B << i) as u64);
+            let b = Cfg::F::from(BigUint::from(Cfg::B).pow(i as u32));
             for j in 0..Cfg::KAPPA {
                 c[j] = c[j].sub(&proof.c_prime[i][j].scale(b));
             }
@@ -175,7 +191,8 @@ impl<
             }
         }
         for i in 0..Cfg::M {
-            let b = Cfg::K::from((Cfg::B << i) as u64);
+            let b =
+                Cfg::K::from_base_prime_field(Cfg::F::from(BigUint::from(Cfg::B).pow(i as u32)));
             for j in 0..t {
                 y[j] = y[j].sub(&proof.y[i][j].scale(b));
             }
@@ -186,23 +203,17 @@ impl<
             }
         }
 
-        let decomposed_uxs =
-            &U.x.iter()
-                .zip(&U.u)
-                .map(|(x, u)| {
-                    [*u].iter()
-                        .chain(x)
-                        .flat_map(|i| decompose::<Cfg::F>(*i, Cfg::B))
-                        .collect::<Vec<_>>()
-                })
-                .chain(us.iter().map(|u| {
-                    [One::one()]
-                        .iter()
-                        .chain(&u.x)
-                        .flat_map(|i| decompose::<Cfg::F>(*i, Cfg::B))
-                        .collect()
-                }))
-                .collect::<Vec<_>>();
+        let decomposed_uxs = us
+            .iter()
+            .map(|u| {
+                [One::one()]
+                    .iter()
+                    .chain(&u.x)
+                    .flat_map(|i| decompose::<Cfg::F>(*i, Cfg::B))
+                    .collect()
+            })
+            .chain(U.x.iter().zip(&U.u).map(|(x, u)| [&u[..], x].concat()))
+            .collect::<Vec<_>>();
         let embedded_uxs = decomposed_uxs
             .into_iter()
             .map(|z| {
@@ -218,14 +229,6 @@ impl<
             }
         }
         let ux = PolynomialRingOverField::vector_unembedding(ux);
-
-        let base = Cfg::B;
-
-        let m = Cfg::F::MODULUS.into();
-        let mut l = m.to_radix_le(base as u32).len();
-        if BigUint::from(base).pow(l as u32 - 1) == m {
-            l -= 1;
-        }
 
         assert_eq!(ux.len(), (cfg.n_public_inputs + 1) * l);
 
@@ -243,11 +246,8 @@ impl<
         }
 
         Ok(Self::RU {
-            u: us.into_iter().map(|v| recompose(&v, Cfg::B)).collect(),
-            x: xs
-                .into_iter()
-                .map(|v| v.chunks(l).map(|c| recompose(c, Cfg::B)).collect())
-                .collect(),
+            u: us,
+            x: xs,
             c: proof.c_prime.clone(),
             r: r_prime,
             y: proof.y.to_vec(),

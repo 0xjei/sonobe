@@ -1,9 +1,10 @@
 //! Definitions of SuperNeo keys and trait implementations for relation checks and
 //! witness-instance sampling using SuperNeo keys.
 
-use ark_ff::{Field, Zero};
+use ark_ff::{Field, One, PrimeField, Zero};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::{UniformRand, array, marker::PhantomData, rand::RngCore, sync::Arc};
+use ark_std::{UniformRand, array, log2, marker::PhantomData, rand::RngCore, sync::Arc};
+use num_bigint::BigUint;
 use sonobe_primitives::{
     algebra::{
         field::SonobeField,
@@ -27,7 +28,10 @@ use super::{
 };
 use crate::{
     DeciderKey, Error, PlainInstance as PU, PlainWitness as PW,
-    superneo::{SuperNeoConfig, utils::decompose},
+    superneo::{
+        SuperNeoConfig,
+        utils::{decompose, recompose},
+    },
 };
 
 /// [`SuperNeoKey`] is SuperNeo's decider key.
@@ -61,15 +65,33 @@ impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> Relation<RW<Cfg>, RU<Cfg>>
 
     fn check_relation(&self, w: &RW<Cfg>, u: &RU<Cfg>) -> Result<(), Self::Error> {
         let cfg = self.arith.config();
-        let s = cfg.log_constraints();
+        let base = Cfg::B;
 
+        let m = Cfg::F::MODULUS.into();
+        let mut l = m.to_radix_le(base as u32).len();
+        if BigUint::from(base).pow(l as u32 - 1) == m {
+            l -= 1;
+        }
+
+        let s = log2(cfg.n_variables * l) as usize;
+
+        let decomposed_zs =
+            w.w.iter()
+                .zip(&u.x)
+                .zip(&u.u)
+                .map(|((w, x), u)| [&u[..], x, w].concat())
+                .collect::<Vec<_>>();
         let mz =
             w.w.iter()
                 .zip(&u.x)
                 .zip(&u.u)
                 .map(|((w, x), u)| {
                     PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_embedding(
-                        [&[*u][..], x, w].concat(),
+                        [&u[..], x, w]
+                            .concat()
+                            .chunks(l)
+                            .map(|c| recompose(c, Cfg::B))
+                            .collect(),
                     )
                 })
                 .map(|z| {
@@ -105,8 +127,27 @@ impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> Relation<RW<Cfg>, RU<Cfg>>
                 .collect::<Vec<_>>();
         let ys = mz
             .into_iter()
-            .map(|i| {
-                i.into_iter()
+            .zip(&decomposed_zs)
+            .map(|(mz, z)| {
+                mz.into_iter()
+                    .chain([{
+                        let l = z.len();
+                        let z = PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_embedding(
+                            z.iter().map(|i| Cfg::F::from(*i)).collect(),
+                        );
+                        (0..l)
+                            .map(|i| {
+                                let mut r = vec![Cfg::F::zero(); l];
+                                r[i] = Cfg::F::one();
+
+                                let mut chunk = vec![Cfg::F::zero(); Cfg::P::DEGREE];
+                                chunk[i % Cfg::P::DEGREE] = Cfg::F::one();
+
+                                PolynomialRingOverField::<Cfg::P, Cfg::F>::element_transform(chunk)
+                                    .mul(&z[i / Cfg::P::DEGREE])
+                            })
+                            .collect::<Vec<_>>()
+                    }])
                     .map(|j| {
                         let mut poly = j
                             .into_iter()
@@ -119,6 +160,7 @@ impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> Relation<RW<Cfg>, RU<Cfg>>
                                     .collect(),
                             })
                             .collect::<Vec<_>>();
+                        poly.resize(1 << s, Default::default());
                         let nv = s;
                         let dim = u.r.len();
                         // evaluate single variable of partial point from left to right
@@ -136,7 +178,12 @@ impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> Relation<RW<Cfg>, RU<Cfg>>
             })
             .collect::<Vec<_>>();
 
-        assert_eq!(u.y, ys);
+        for i in 0..Cfg::M {
+            for j in 0..cfg.n_matrices + 1 {
+                println!("{} {}", i, j);
+                assert_eq!(u.y[i][j], ys[i][j]);
+            }
+        }
 
         for i in 0..Cfg::M {
             Cfg::CM::open(
@@ -211,22 +258,30 @@ impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> WitnessInstanceSampler<RW<Cfg>
     #[allow(non_snake_case)]
     fn sample(&self, _: Self::Source, mut rng: impl RngCore) -> Result<(RW<Cfg>, RU<Cfg>), Error> {
         let cfg = self.arith.config();
-        let s = cfg.log_constraints();
+        let base = Cfg::B;
+
+        let m = Cfg::F::MODULUS.into();
+        let mut l = m.to_radix_le(base as u32).len();
+        if BigUint::from(base).pow(l as u32 - 1) == m {
+            l -= 1;
+        }
+
+        let s = log2(cfg.n_variables * l) as usize;
 
         let u = (0..Cfg::M)
-            .map(|_| Cfg::F::rand(&mut rng))
+            .map(|_| decompose(Cfg::F::rand(&mut rng), Cfg::B))
             .collect::<Vec<_>>();
         let x = (0..Cfg::M)
             .map(|_| {
                 (0..cfg.n_public_inputs)
-                    .map(|_| Cfg::F::rand(&mut rng))
+                    .flat_map(|_| decompose(Cfg::F::rand(&mut rng), Cfg::B))
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
         let w = (0..Cfg::M)
             .map(|_| {
                 (0..cfg.n_witnesses)
-                    .map(|_| Cfg::F::rand(&mut rng))
+                    .flat_map(|_| decompose(Cfg::F::rand(&mut rng), Cfg::B))
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
@@ -236,10 +291,7 @@ impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> WitnessInstanceSampler<RW<Cfg>
                 Cfg::CM::commit(
                     &self.ck,
                     &PolynomialRingOverField::vector_embedding(
-                        w.iter()
-                            .flat_map(|i| decompose(*i, Cfg::B))
-                            .map(Cfg::F::from)
-                            .collect::<Vec<_>>(),
+                        w.iter().map(|i| Cfg::F::from(*i)).collect::<Vec<_>>(),
                     ),
                     &mut rng,
                 )
@@ -247,17 +299,25 @@ impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> WitnessInstanceSampler<RW<Cfg>
             })
             .collect::<Result<Vec<_>, _>>()?;
 
-        let r = (0..cfg.log_constraints())
-            .map(|_| Cfg::K::rand(&mut rng))
-            .collect::<Vec<_>>();
+        let r = (0..s).map(|_| Cfg::K::rand(&mut rng)).collect::<Vec<_>>();
 
+        let decomposed_zs = w
+            .iter()
+            .zip(&x)
+            .zip(&u)
+            .map(|((w, x), u)| [&u[..], x, w].concat())
+            .collect::<Vec<_>>();
         let mz = w
             .iter()
             .zip(&x)
             .zip(&u)
             .map(|((w, x), u)| {
                 PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_embedding(
-                    [&[*u][..], x, w].concat(),
+                    [&u[..], x, w]
+                        .concat()
+                        .chunks(l)
+                        .map(|c| recompose(c, Cfg::B))
+                        .collect(),
                 )
             })
             .map(|z| {
@@ -293,8 +353,27 @@ impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> WitnessInstanceSampler<RW<Cfg>
             .collect::<Vec<_>>();
         let ys = mz
             .into_iter()
-            .map(|i| {
-                i.into_iter()
+            .zip(&decomposed_zs)
+            .map(|(mz, z)| {
+                mz.into_iter()
+                    .chain([{
+                        let l = z.len();
+                        let z = PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_embedding(
+                            z.iter().map(|i| Cfg::F::from(*i)).collect(),
+                        );
+                        (0..l)
+                            .map(|i| {
+                                let mut r = vec![Cfg::F::zero(); l];
+                                r[i] = Cfg::F::one();
+
+                                let mut chunk = vec![Cfg::F::zero(); Cfg::P::DEGREE];
+                                chunk[i % Cfg::P::DEGREE] = Cfg::F::one();
+
+                                PolynomialRingOverField::<Cfg::P, Cfg::F>::element_transform(chunk)
+                                    .mul(&z[i / Cfg::P::DEGREE])
+                            })
+                            .collect::<Vec<_>>()
+                    }])
                     .map(|j| {
                         let mut poly = j
                             .into_iter()
@@ -307,6 +386,7 @@ impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> WitnessInstanceSampler<RW<Cfg>
                                     .collect(),
                             })
                             .collect::<Vec<_>>();
+                        poly.resize(1 << s, Default::default());
                         let nv = s;
                         let dim = r.len();
                         // evaluate single variable of partial point from left to right
@@ -324,7 +404,7 @@ impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> WitnessInstanceSampler<RW<Cfg>
             })
             .collect::<Vec<_>>();
 
-        let W = RW { w };
+        let W = RW { _t: PhantomData, w };
         let U = RU {
             c: c.try_into().unwrap(),
             u,

@@ -62,12 +62,12 @@ pub fn decompose<F: PrimeField>(v: F, b: usize) -> Vec<i8> {
     if x > F::MODULUS_MINUS_ONE_DIV_TWO {
         y = m - y;
         let mut result = y.to_radix_le(base as u32);
-        assert!(result.len() < l);
+        assert!(result.len() <= l);
         result.resize(l, 0);
         result.into_iter().map(|i| -(i as i8)).collect()
     } else {
         let mut result = y.to_radix_le(base as u32);
-        assert!(result.len() < l);
+        assert!(result.len() <= l);
         result.resize(l, 0);
         result.into_iter().map(|i| i as i8).collect()
     }
@@ -93,12 +93,12 @@ pub fn decompose2<F: PrimeField>(v: F, b: usize, l: usize) -> Vec<i8> {
     if x > F::MODULUS_MINUS_ONE_DIV_TWO {
         y = F::MODULUS.into() - y;
         let mut result = y.to_radix_le(base as u32);
-        assert!(result.len() < l);
+        assert!(result.len() <= l);
         result.resize(l, 0);
         result.into_iter().map(|i| -(i as i8)).collect()
     } else {
         let mut result = y.to_radix_le(base as u32);
-        assert!(result.len() < l);
+        assert!(result.len() <= l);
         result.resize(l, 0);
         result.into_iter().map(|i| i as i8).collect()
     }

@@ -101,7 +101,7 @@ mod tests {
     };
     use sonobe_primitives::{
         algebra::ring::Config1,
-        arithmetizations::{Arith, Error as ArithError},
+        arithmetizations::{Arith, Error as ArithError, r1cs::R1CS},
         circuits::{ArithExtractor, Assignments},
         commitments::{ajtai::Ajtai, pedersen::Pedersen},
         relations::Relation,
@@ -193,148 +193,6 @@ mod tests {
         ))
     }
 
-    #[derive(Debug, Clone, Default, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
-    pub struct TestR1CS<F: Field> {
-        m: usize, // number of constraints
-        n: usize, // number of variables
-        l: usize, // io len
-        matrices: [Matrix<F>; 4],
-    }
-
-    impl<F: Field> Arith for TestR1CS<F> {
-        type Field = F;
-
-        #[inline]
-        fn config(&self) -> ArithConfig {
-            ArithConfig {
-                degree: 2,
-                n_constraints: self.m,
-                n_variables: self.n,
-                n_public_inputs: self.l,
-                n_witnesses: self.n - self.l - 1,
-                n_matrices: 4,
-            }
-        }
-    }
-
-    impl<F: Field> CCS for TestR1CS<F> {
-        fn matrices(&self) -> &[Matrix<Self::Field>] {
-            &self.matrices[..]
-        }
-
-        fn multisets() -> Vec<Vec<usize>> {
-            vec![vec![1, 2], vec![3]]
-        }
-
-        fn coefficients() -> Vec<Self::Field> {
-            vec![F::one(), -F::one()]
-        }
-    }
-
-    impl<F: Field> TestR1CS<F> {
-        /// [`R1CS::new`] creates a new R1CS structure from the given configuration
-        /// and matrices.
-        pub fn new(
-            n_constraints: usize,
-            n_variables: usize,
-            n_public_inputs: usize,
-            matrices: [Matrix<F>; 4],
-        ) -> Result<Self, ArithError> {
-            for matrix in &matrices {
-                if matrix.len() != n_constraints {
-                    return Err(ArithError::InvalidNumberOfConstraints(
-                        n_constraints,
-                        matrix.len(),
-                    ));
-                }
-                for row in matrix {
-                    if let Some(max) = row.iter().map(|(_, i)| *i).max()
-                        && max >= n_variables
-                    {
-                        return Err(ArithError::InvalidNumberOfVariables(n_variables, max + 1));
-                    }
-                }
-            }
-            Ok(Self::new_without_validity_check(
-                n_constraints,
-                n_variables,
-                n_public_inputs,
-                matrices,
-            ))
-        }
-
-        /// [`R1CS::new_without_validity_check`] creates a new R1CS structure from
-        /// the given configuration and matrices without checking their validity.
-        pub fn new_without_validity_check(
-            n_constraints: usize,
-            n_variables: usize,
-            n_public_inputs: usize,
-            matrices: [Matrix<F>; 4],
-        ) -> Self {
-            Self {
-                m: n_constraints,
-                l: n_public_inputs,
-                n: n_variables,
-                matrices,
-            }
-        }
-
-        /// [`R1CS::evaluate_r1cs`] evaluates the R1CS relation at a given vector of
-        /// assignments `z`.
-        ///
-        /// This method is simply a wrapper of [`CCS::evaluate_ccs`] with fixed
-        /// coefficients and multisets.
-        pub fn evaluate_r1cs(
-            &self,
-            z: Assignments<F, impl AsRef<[F]> + Sync>,
-        ) -> Result<Vec<F>, ArithError> {
-            let u = z[0];
-            self.evaluate_ccs(z, [vec![1, 2], vec![3]], [F::one(), -u])
-        }
-    }
-
-    impl<F: Field> From<&ConstraintSystem<F>> for TestR1CS<F> {
-        fn from(cs: &ConstraintSystem<F>) -> Self {
-            // Get the R1CS predicate matrices
-            let r1cs_predicate = &cs.predicate_constraint_systems[R1CS_PREDICATE_LABEL];
-            let mut matrices = r1cs_predicate.to_matrices(cs);
-            matrices.insert(
-                0,
-                (0..cs.num_constraints())
-                    .map(|i| vec![(F::one(), i)])
-                    .collect(),
-            );
-
-            // matrices are extracted from a circuit, which we assume is trusted
-            TestR1CS::new_without_validity_check(
-                cs.num_constraints(),
-                cs.num_instance_variables + cs.num_witness_variables,
-                cs.num_instance_variables - 1, // -1 to subtract the first '1'
-                matrices.try_into().unwrap(),  // safe as R1CS always has 3 matrices
-            )
-        }
-    }
-
-    impl<F: Field> From<ConstraintSystem<F>> for TestR1CS<F> {
-        fn from(cs: ConstraintSystem<F>) -> Self {
-            Self::from(&cs)
-        }
-    }
-
-    impl<F: Field, W: AsRef<[F]>, U: AsRef<[F]>> ArithRelation<W, U> for TestR1CS<F> {
-        type Evaluation = Vec<F>;
-
-        fn eval_relation(&self, w: &W, x: &U) -> Result<Self::Evaluation, ArithError> {
-            self.evaluate_r1cs((F::one(), x.as_ref(), w.as_ref()).into())
-        }
-
-        fn check_evaluation(_w: &W, _x: &U, e: Self::Evaluation) -> Result<(), ArithError> {
-            cfg_into_iter!(e).all(|i| i.is_zero()).then_some(()).ok_or(
-                ArithError::UnsatisfiedAssignments("Evaluation contains non-zero values".into()),
-            )
-        }
-    }
-
     #[test]
     fn test_circuit() -> Result<(), Box<dyn Error>> {
         let mut rng = thread_rng();
@@ -348,7 +206,7 @@ mod tests {
             n_public,
         })?;
         println!("{} {}", cs.num_constraints(), cs.num_variables());
-        let r1cs: TestR1CS<_> = cs.arith()?;
+        let r1cs: R1CS<_> = cs.arith()?;
 
         let assignments =
             satisfying_assignments_for_test(Goldilocks::rand(&mut rng), n_witness, n_public);
@@ -364,7 +222,7 @@ mod tests {
         let n_witness: usize = 54 * 10;
         let n_public = 54 * 1 - 1;
 
-        test_folding_scheme::<SuperNeo<Cfg, TestR1CS<Goldilocks>>, 1, 1>(
+        test_folding_scheme::<SuperNeo<Cfg, R1CS<Goldilocks>>, 1, 1>(
             n_witness.next_power_of_two(),
             CircuitForTest {
                 x: UniformRand::rand(&mut rng),

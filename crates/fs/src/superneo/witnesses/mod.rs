@@ -13,15 +13,25 @@ use crate::{FoldingWitness, superneo::SuperNeoConfig};
 /// [`RunningWitness`] defines SuperNeo's running witness.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RunningWitness<Cfg: SuperNeoConfig> {
-    pub w: Vec<Vec<Cfg::F>>,
+    pub _t: PhantomData<Cfg>,
+    pub w: Vec<Vec<i8>>,
 }
 
 impl<Cfg: SuperNeoConfig> FoldingWitness<Cfg::CM> for RunningWitness<Cfg> {}
 
 impl<Cfg: SuperNeoConfig> Dummy<&ArithConfig> for RunningWitness<Cfg> {
     fn dummy(cfg: &ArithConfig) -> Self {
+        let base = Cfg::B;
+
+        let m = Cfg::F::MODULUS.into();
+        let mut l = m.to_radix_le(base as u32).len();
+        if BigUint::from(base).pow(l as u32 - 1) == m {
+            l -= 1;
+        }
+
         Self {
-            w: vec![vec![Default::default(); cfg.n_witnesses]; Cfg::M],
+            _t: PhantomData,
+            w: vec![vec![Default::default(); cfg.n_witnesses * l]; Cfg::M],
         }
     }
 }
