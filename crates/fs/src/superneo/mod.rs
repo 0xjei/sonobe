@@ -80,7 +80,7 @@ impl<Cfg: SuperNeoConfig, A: CCS<Field = Cfg::F> + ArithRelation<Vec<Cfg::F>, Ve
 
     type Config = usize;
     type PublicParam = <Cfg::CM as CommitmentDef>::Key;
-    type DeciderKey = SuperNeoKey<Self::Arith, Cfg::CM>;
+    type DeciderKey = SuperNeoKey<Self::Arith, Cfg>;
     type Challenge = Vec<PolynomialRingOverField<Cfg::P, Cfg::F>>;
     type Proof<const M: usize, const N: usize> = SuperNeoProof<Cfg, N>;
 }

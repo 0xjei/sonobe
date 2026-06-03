@@ -1,6 +1,10 @@
 //! Key generation for SuperNeo.
 
-use ark_std::sync::Arc;
+use ark_ff::{Field, PrimeField, Zero};
+use ark_std::{cfg_iter, sync::Arc};
+use num_bigint::BigUint;
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
 use sonobe_primitives::{
     algebra::{
         field::SonobeField,
@@ -29,6 +33,46 @@ impl<Cfg: SuperNeoConfig, A: CCS<Field = Cfg::F> + ArithRelation<Vec<Cfg::F>, Ve
                 "The commitment key is too short for the CCS instance".into(),
             ));
         }
-        Ok(Self::DeciderKey { arith: ccs, ck })
+
+        let base = Cfg::B;
+
+        let m = Cfg::F::MODULUS.into();
+        let mut l = m.to_radix_le(base as u32).len();
+        if BigUint::from(base).pow(l as u32 - 1) == m {
+            l -= 1;
+        }
+
+        Ok(Self::DeciderKey {
+            transformed_matrices: Arc::new(
+                ccs.matrices()
+                    .iter()
+                    .map(move |matrix| {
+                        cfg_iter!(matrix)
+                            .map(|row| {
+                                row.iter()
+                                    .map(|(v, j)| {
+                                        let start = j * l;
+                                        let end = start + l;
+
+                                        let min = start / Cfg::P::DEGREE * Cfg::P::DEGREE;
+                                        let max = end.div_ceil(Cfg::P::DEGREE) * Cfg::P::DEGREE;
+                                        let mut vec = vec![Cfg::F::zero(); max - min];
+                                        for i in 0..l {
+                                            vec[i + start % Cfg::P::DEGREE] =
+                                                *v * Cfg::F::from(Cfg::B as u64).pow([i as u64]);
+                                        }
+                                        (PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_transform(
+                                            vec,
+                                        ), start / Cfg::P::DEGREE)
+                                    })
+                                    .collect()
+                            })
+                            .collect()
+                    })
+                    .collect(),
+            ),
+            arith: ccs,
+            ck,
+        })
     }
 }

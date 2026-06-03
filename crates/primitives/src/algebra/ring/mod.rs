@@ -57,6 +57,24 @@ pub trait PolynomialRingConfig:
         }
         result
     }
+
+    fn mul_small<F: Field>(a: &[F], b: &[i8]) -> Vec<F> {
+        let mut result = vec![F::zero(); Self::DEGREE];
+        for i in 0..Self::DEGREE {
+            if b[i] == 0 {
+                continue;
+            }
+            for j in 0..Self::DEGREE {
+                let rot = Self::rot(a, i, j);
+                match b[i] {
+                    1 => result[j] += rot,
+                    -1 => result[j] -= rot,
+                    v => result[j] += rot * F::from(v),
+                };
+            }
+        }
+        result
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, CanonicalSerialize)]
@@ -270,6 +288,13 @@ impl<Cfg: PolynomialRingConfig, F: Field> PolynomialRingOverField<Cfg, F> {
         Self {
             _t: PhantomData,
             coeffs: Cfg::mul(&self.coeffs, &other.coeffs),
+        }
+    }
+
+    pub fn mul_small(&self, other: &[i8]) -> Self {
+        Self {
+            _t: PhantomData,
+            coeffs: Cfg::mul_small(&self.coeffs, &other),
         }
     }
 }
