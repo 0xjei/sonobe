@@ -1,7 +1,7 @@
 //! Key generation for SuperNeo.
 
-use ark_ff::{Field, PrimeField, Zero};
-use ark_std::{cfg_iter, sync::Arc};
+use ark_ff::{Field, One, PrimeField, Zero};
+use ark_std::{cfg_into_iter, cfg_iter, sync::Arc};
 use num_bigint::BigUint;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -69,6 +69,15 @@ impl<Cfg: SuperNeoConfig, A: CCS<Field = Cfg::F> + ArithRelation<Vec<Cfg::F>, Ve
                             })
                             .collect()
                     })
+                    .chain([
+                        cfg_into_iter!(0..cfg.n_variables * l)
+                            .map(|i| {
+                                let mut chunk = vec![Cfg::F::zero(); Cfg::P::DEGREE];
+                                chunk[i % Cfg::P::DEGREE] = Cfg::F::one();
+
+                                vec![(vec![PolynomialRingOverField::<Cfg::P, Cfg::F>::element_transform(chunk)], i / Cfg::P::DEGREE)]
+                            }).collect::<_>()
+                    ])
                     .collect(),
             ),
             arith: ccs,

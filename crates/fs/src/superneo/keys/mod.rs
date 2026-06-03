@@ -80,7 +80,6 @@ impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> Relation<RW<Cfg>, RU<Cfg>>
             .zip(&U.x)
             .zip(&U.u)
             .map(|((w, x), u)| {
-                let m = w.len() + x.len() + u.len();
                 let embedded_z = &PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_embedding(
                     u.iter()
                         .chain(x)
@@ -104,17 +103,6 @@ impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> Relation<RW<Cfg>, RU<Cfg>>
                             })
                             .collect::<Vec<_>>()
                     })
-                    .chain([{
-                        (0..m)
-                            .map(|i| {
-                                let mut chunk = vec![Cfg::F::zero(); Cfg::P::DEGREE];
-                                chunk[i % Cfg::P::DEGREE] = Cfg::F::one();
-
-                                PolynomialRingOverField::<Cfg::P, Cfg::F>::element_transform(chunk)
-                                    .mul(&embedded_z[i / Cfg::P::DEGREE])
-                            })
-                            .collect::<Vec<_>>()
-                    }])
                     .map(|j| {
                         let mut poly = j
                             .into_iter()
@@ -273,7 +261,6 @@ impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> WitnessInstanceSampler<RW<Cfg>
             .zip(&x)
             .zip(&u)
             .map(|((w, x), u)| {
-                let m = w.len() + x.len() + u.len();
                 let embedded_z = &PolynomialRingOverField::<Cfg::P, Cfg::F>::vector_embedding(
                     u.iter()
                         .chain(x)
@@ -297,17 +284,6 @@ impl<A: CCS<Field = Cfg::F>, Cfg: SuperNeoConfig> WitnessInstanceSampler<RW<Cfg>
                             })
                             .collect::<Vec<_>>()
                     })
-                    .chain([{
-                        (0..m)
-                            .map(|i| {
-                                let mut chunk = vec![Cfg::F::zero(); Cfg::P::DEGREE];
-                                chunk[i % Cfg::P::DEGREE] = Cfg::F::one();
-
-                                PolynomialRingOverField::<Cfg::P, Cfg::F>::element_transform(chunk)
-                                    .mul(&embedded_z[i / Cfg::P::DEGREE])
-                            })
-                            .collect::<Vec<_>>()
-                    }])
                     .map(|j| {
                         let mut poly = j
                             .into_iter()
