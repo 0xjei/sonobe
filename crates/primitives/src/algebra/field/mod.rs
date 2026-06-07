@@ -1,7 +1,7 @@
 //! This module defines extension traits for field elements and their in-circuit
 //! counterparts, along with some common implementations.
 
-use ark_ff::{BigInteger, Field, Fp, FpConfig, PrimeField};
+use ark_ff::{BigInteger, Field, Fp, Fp2, Fp2Config, FpConfig, PrimeField};
 use ark_r1cs_std::{
     GR1CSVar,
     alloc::AllocVar,
@@ -17,9 +17,9 @@ use ark_std::{
 
 use crate::{
     algebra::{Val, field::emulated::EmulatedFieldVar},
-    circuits::WitnessToPublic,
-    traits::Inputize,
+    circuits::{WitnessToPublic, inputize::Inputize},
     transcripts::{Absorbable, AbsorbableVar},
+    utils::evm::EVMSerialize,
 };
 
 pub mod emulated;
@@ -124,6 +124,18 @@ impl<Base: SonobeField, Target: SonobeField> WitnessToPublic for EmulatedFieldVa
         self.enforce_equal(&Self::new_input(self.cs(), || {
             Ok(self.value().unwrap_or_default())
         })?)
+    }
+}
+
+impl<P: FpConfig<N>, const N: usize> EVMSerialize for Fp<P, N> {
+    fn to_calldata(&self) -> Vec<u8> {
+        self.into_bigint().to_bytes_be()
+    }
+}
+
+impl<P: Fp2Config<Fp: EVMSerialize>> EVMSerialize for Fp2<P> {
+    fn to_calldata(&self) -> Vec<u8> {
+        [self.c1.to_calldata(), self.c0.to_calldata()].concat()
     }
 }
 

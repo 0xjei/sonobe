@@ -20,10 +20,11 @@ use itertools::{Either, Itertools};
 #[cfg(feature = "parallel")]
 use rayon::{iter::Either, prelude::*};
 use sonobe_primitives::{
+    algebra::{field::SonobeField, group::SonobeCurve},
     arithmetizations::{Arith, ccs::CCS, r1cs::R1CS},
-    circuits::alloc::{IdentityHasher, UsizeSet},
+    circuits::cache::{IdentityHasher, UsizeSet},
     commitments::pedersen::PedersenKey,
-    traits::{SonobeCurve, SonobeField},
+    utils::evm::EVMSerialize,
 };
 use thiserror::Error;
 
@@ -92,6 +93,19 @@ pub struct Proof<E: Pairing> {
     pub d: E::G1Affine,
     /// proof of commitment opening equality between `cp_{link}` and `d`
     pub link_pi: E::G1Affine,
+}
+
+impl<E: Pairing<G1Affine: EVMSerialize, G2Affine: EVMSerialize>> EVMSerialize for Proof<E> {
+    fn to_calldata(&self) -> Vec<u8> {
+        [
+            self.groth16_proof.a.to_calldata(),
+            self.groth16_proof.b.to_calldata(),
+            self.groth16_proof.c.to_calldata(),
+            self.d.to_calldata(),
+            self.link_pi.to_calldata(),
+        ]
+        .concat()
+    }
 }
 
 /// [`Error`] enumerates possible errors during LegoGroth16 operations.
@@ -518,7 +532,10 @@ mod tests {
         lc,
     };
     use ark_std::rand::thread_rng;
-    use sonobe_primitives::circuits::{ArithExtractor, AssignmentsExtractor};
+    use sonobe_primitives::{
+        algebra::group::SonobeCurve,
+        circuits::{ArithExtractor, AssignmentsExtractor},
+    };
 
     use super::*;
 

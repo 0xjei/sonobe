@@ -9,7 +9,7 @@ use ark_r1cs_std::{
 use ark_relations::gr1cs::{ConstraintSynthesizer, ConstraintSystemRef, SynthesisError, Variable};
 
 use super::Assignments;
-use crate::{arithmetizations::r1cs::R1CS, circuits::FCircuit, traits::SonobeField};
+use crate::{algebra::field::SonobeField, arithmetizations::r1cs::R1CS, circuits::FCircuit};
 
 /// [`CircuitForTest`] implements a simple test circuit computing
 /// `y = x^3 + x + 5` with 4 R1CS constraints.

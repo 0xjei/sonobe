@@ -22,8 +22,10 @@ use ark_serialize::{CanonicalSerialize, CanonicalSerializeWithFlags};
 use ark_std::borrow::Borrow;
 
 use crate::{
-    algebra::{field::emulated::EmulatedFieldVar, group::SonobeCurve},
-    traits::SonobeField,
+    algebra::{
+        field::{SonobeField, emulated::EmulatedFieldVar},
+        group::SonobeCurve,
+    },
     transcripts::AbsorbableVar,
 };
 
@@ -155,7 +157,7 @@ mod tests {
     use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::*;
-    use crate::{traits::Inputize, transcripts::Absorbable};
+    use crate::{circuits::inputize::Inputize, transcripts::Absorbable};
 
     #[test]
     fn test_alloc_zero() {

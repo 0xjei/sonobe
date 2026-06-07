@@ -13,12 +13,11 @@ use sonobe_fs::{
 use sonobe_primitives::{
     algebra::{
         field::emulated::{Bounds, EmulatedFieldVar},
-        group::emulated::EmulatedAffineVar,
+        group::{CF1, CF2, SonobeCurve, emulated::EmulatedAffineVar},
         ops::bits::{FromBits, ToBitsGadgetExt},
     },
     circuits::WitnessToPublic,
     commitments::GroupBasedCommitment,
-    traits::{CF1, CF2, SonobeCurve},
     transcripts::{
         Transcript, TranscriptGadget,
         replay::{ReplayTranscript, ReplayTranscriptVar},
@@ -216,7 +215,7 @@ mod tests {
     use ark_grumpkin::Projective as C2;
     use ark_std::{error::Error, rand::thread_rng, sync::Arc};
     use sonobe_primitives::{
-        circuits::utils::CircuitForTest,
+        circuits::test_utils::CircuitForTest,
         commitments::pedersen::Pedersen,
         transcripts::griffin::{GriffinParams, sponge::GriffinSponge},
     };

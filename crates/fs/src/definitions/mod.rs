@@ -12,11 +12,11 @@ pub mod witnesses;
 
 use ark_r1cs_std::{GR1CSVar, alloc::AllocVar};
 use sonobe_primitives::{
+    algebra::field::SonobeField,
     arithmetizations::{Arith, ArithConfig},
     circuits::AssignmentsOwned,
     commitments::{CommitmentDef, CommitmentDefGadget},
-    relations::{Relation, WitnessInstanceSampler},
-    traits::{Dummy, SonobeField},
+    relations::{Relation, WitnessInstanceSampler}, utils::dummy::Dummy,
 };
 
 use self::{

@@ -6,9 +6,7 @@
 use ark_r1cs_std::boolean::Boolean;
 use ark_std::marker::PhantomData;
 use sonobe_primitives::{
-    arithmetizations::r1cs::{R1CS, circuits::R1CSVar},
-    commitments::{CommitmentDef, CommitmentDefGadget, GroupBasedCommitment},
-    traits::{CF2, SonobeField},
+    algebra::{field::SonobeField, group::CF2}, arithmetizations::r1cs::{R1CS, circuits::R1CSVar}, commitments::{CommitmentDef, CommitmentDefGadget, GroupBasedCommitment}
 };
 
 use self::{
@@ -116,7 +114,7 @@ mod tests {
         rand::{RngCore, thread_rng},
     };
     use sonobe_primitives::{
-        circuits::utils::{CircuitForTest, satisfying_assignments_for_test},
+        circuits::test_utils::{CircuitForTest, satisfying_assignments_for_test},
         commitments::pedersen::Pedersen,
     };
     #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]

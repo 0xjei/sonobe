@@ -23,13 +23,15 @@ use ark_std::{
 
 use super::{CommitmentDef, CommitmentDefGadget, CommitmentKey, CommitmentOps, Error};
 use crate::{
-    algebra::{field::emulated::EmulatedFieldVar, group::emulated::EmulatedAffineVar},
+    algebra::{
+        field::emulated::EmulatedFieldVar,
+        group::{CF1, CF2, SonobeCurve, emulated::EmulatedAffineVar},
+    },
     circuits::{
         WitnessToPublic,
-        alloc::{CommitmentKeyCache, CommittedCache, RandomnessCache, UsizeSet},
+        cache::{CommitmentKeyCache, CommittedCache, RandomnessCache, UsizeSet},
     },
     commitments::{CommitmentOpsGadget, GroupBasedCommitment},
-    traits::{CF1, CF2, SonobeCurve},
     utils::null::Null,
 };
 

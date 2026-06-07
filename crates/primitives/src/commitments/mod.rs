@@ -17,12 +17,10 @@ use thiserror::Error;
 use crate::{
     algebra::{
         Val,
-        field::{TwoStageFieldVar, emulated::EmulatedFieldVar},
-        group::emulated::EmulatedAffineVar,
+        field::{SonobeField, TwoStageFieldVar, emulated::EmulatedFieldVar},
+        group::{CF1, CF2, SonobeCurve, emulated::EmulatedAffineVar},
         ops::bits::FromBitsGadget,
-    },
-    traits::{CF1, CF2, Inputize, SonobeCurve, SonobeField},
-    transcripts::{Absorbable, AbsorbableVar},
+    }, circuits::inputize::Inputize, transcripts::{Absorbable, AbsorbableVar}
 };
 
 pub mod pedersen;

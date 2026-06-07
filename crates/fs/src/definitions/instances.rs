@@ -6,8 +6,7 @@ use ark_std::fmt::Debug;
 use sonobe_primitives::{
     arithmetizations::ArithConfig,
     commitments::{CommitmentDef, CommitmentDefGadget},
-    traits::Dummy,
-    transcripts::{Absorbable, AbsorbableVar},
+    transcripts::{Absorbable, AbsorbableVar}, utils::dummy::Dummy,
 };
 
 use super::utils::TaggedVec;

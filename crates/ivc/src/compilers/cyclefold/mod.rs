@@ -36,20 +36,23 @@ use sonobe_fs::{
     definitions::circuits::FoldingSchemeDeciderGadget,
 };
 use sonobe_primitives::{
-    algebra::field::emulated::EmulatedFieldVar,
+    algebra::{
+        field::emulated::EmulatedFieldVar,
+        group::{CF1, CF2, SonobeCurve},
+    },
     arithmetizations::{Arith, ArithConfig},
     circuits::{
         ArithExtractor, AssignmentsExtractor, FCircuit,
-        alloc::{CommitmentKeyCache, CommittedCache, RandomnessCache, UsizeSet},
+        cache::{CommitmentKeyCache, CommittedCache, RandomnessCache, UsizeSet},
+        inputize::Inputize,
     },
     commitments::{CommitmentDef, CommitmentDefGadget},
     relations::WitnessInstanceSampler,
-    traits::{CF1, CF2, Dummy, Inputize, SonobeCurve},
     transcripts::{
         Transcript, TranscriptGadget,
         recording::RecordingTranscript,
         replay::{ReplayTranscript, ReplayTranscriptVar},
-    },
+    }, utils::dummy::Dummy,
 };
 use sonobe_snarks::cp::CPSNARK;
 

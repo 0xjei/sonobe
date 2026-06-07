@@ -12,12 +12,13 @@ use ark_std::{
 };
 
 use crate::{
-    traits::Inputize,
+    circuits::inputize::Inputize,
     transcripts::{Absorbable, AbsorbableVar},
 };
 
-pub mod alloc;
-pub mod utils;
+pub mod cache;
+pub mod inputize;
+pub mod test_utils;
 
 /// [`FCircuit`] defines the trait of step circuits being proven by IVC schemes.
 ///
@@ -319,14 +320,6 @@ impl<T: WitnessToPublic> WitnessToPublic for [T] {
     }
 }
 
-/// [`WitnessToCommitted`] defines a helper trait for marking witness variables
-/// as committed witnesses in the constraint system.
-pub trait WitnessToCommitted {
-    /// [`WitnessToCommitted::mark_as_committed`] marks a witness variable as a
-    /// committed witness.
-    fn mark_as_committed(&self) -> Result<(), SynthesisError>;
-}
-
 #[cfg(test)]
 mod tests {
     use ark_bn254::Fr;
@@ -337,7 +330,7 @@ mod tests {
     use wasm_bindgen_test::wasm_bindgen_test as test;
 
     use super::{
-        utils::{CircuitForTest, constraints_for_test, satisfying_assignments_for_test},
+        test_utils::{CircuitForTest, constraints_for_test, satisfying_assignments_for_test},
         *,
     };
     use crate::arithmetizations::r1cs::R1CS;

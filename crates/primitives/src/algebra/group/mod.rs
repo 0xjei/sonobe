@@ -3,7 +3,7 @@
 
 use ark_ec::{
     AffineRepr, CurveGroup, PrimeGroup,
-    short_weierstrass::{Projective, SWCurveConfig},
+    short_weierstrass::{Affine, Projective, SWCurveConfig},
 };
 use ark_ff::{Field, One, PrimeField, Zero};
 use ark_r1cs_std::{
@@ -19,9 +19,9 @@ use crate::{
         field::{SonobeField, emulated::EmulatedFieldVar},
         group::emulated::EmulatedAffineVar,
     },
-    circuits::WitnessToPublic,
-    traits::{Dummy, Inputize},
+    circuits::{WitnessToPublic, inputize::Inputize},
     transcripts::{Absorbable, AbsorbableVar},
+    utils::{dummy::Dummy, evm::EVMSerialize},
 };
 
 pub mod emulated;
@@ -123,5 +123,20 @@ impl<Base: SonobeField, Target: SonobeCurve> WitnessToPublic for EmulatedAffineV
         self.x.mark_as_public()?;
         self.y.mark_as_public()?;
         Ok(())
+    }
+}
+
+impl<P: SWCurveConfig<BaseField: EVMSerialize>> EVMSerialize for Affine<P> {
+    fn to_calldata(&self) -> Vec<u8> {
+        // the encoding of the additive identity is [0, 0] on the EVM
+        let (x, y) = self.xy().unwrap_or_default();
+
+        [x.to_calldata(), y.to_calldata()].concat()
+    }
+}
+
+impl<P: SWCurveConfig<BaseField: EVMSerialize>> EVMSerialize for Projective<P> {
+    fn to_calldata(&self) -> Vec<u8> {
+        self.into_affine().to_calldata()
     }
 }

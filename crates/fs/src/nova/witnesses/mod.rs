@@ -1,7 +1,7 @@
 //! Definitions of out-of-circuit values and in-circuit variables for Nova
 //! witnesses.
 
-use sonobe_primitives::{arithmetizations::ArithConfig, commitments::CommitmentDef, traits::Dummy};
+use sonobe_primitives::{arithmetizations::ArithConfig, commitments::CommitmentDef, utils::dummy::Dummy};
 
 use crate::FoldingWitness;
 

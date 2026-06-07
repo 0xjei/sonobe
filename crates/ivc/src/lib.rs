@@ -12,7 +12,7 @@ use ark_relations::gr1cs::SynthesisError;
 use ark_serialize::SerializationError;
 use ark_std::{error::Error as ErrorTrait, rand::RngCore};
 use sonobe_fs::Error as FoldingError;
-use sonobe_primitives::{arithmetizations::Error as ArithError, circuits::FCircuit, traits::Dummy};
+use sonobe_primitives::{arithmetizations::Error as ArithError, circuits::FCircuit, utils::dummy::Dummy};
 use thiserror::Error;
 
 pub mod compilers;
@@ -264,7 +264,7 @@ impl<I: IVCPreprocessor + IVCKeyGenerator + IVCProver + IVCVerifier> IVCOps for 
 /// ```rust
 /// use ark_std::rand::Rng;
 /// use sonobe_ivc::{Error, IVC};
-/// use sonobe_primitives::{circuits::FCircuit, traits::Dummy};
+/// use sonobe_primitives::{circuits::FCircuit, utils::dummy::Dummy};
 ///
 /// fn ivc_usage<I: IVC, F: FCircuit<Field = I::Field>>(
 ///     config: I::Config,
@@ -342,7 +342,7 @@ pub trait IVCVerifierGadget: IVCTypesGadget {
 /// ```rust
 /// use ark_std::rand::Rng;
 /// use sonobe_ivc::{Error, IVC, IVCStatefulProver};
-/// use sonobe_primitives::{circuits::FCircuit, traits::Dummy};
+/// use sonobe_primitives::{circuits::FCircuit, utils::dummy::Dummy};
 ///
 /// fn ivc_usage<I: IVC, F: FCircuit<Field = I::Field>>(
 ///     config: I::Config,

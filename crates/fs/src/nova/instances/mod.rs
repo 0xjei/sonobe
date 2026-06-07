@@ -3,8 +3,8 @@
 
 use ark_ff::PrimeField;
 use sonobe_primitives::{
-    arithmetizations::ArithConfig, commitments::CommitmentDef, traits::Dummy,
-    transcripts::Absorbable,
+    arithmetizations::ArithConfig, commitments::CommitmentDef,
+    transcripts::Absorbable, utils::dummy::Dummy,
 };
 
 use crate::FoldingInstance;
