@@ -169,7 +169,16 @@ where
         self.arith.check_relation(&w.w, &u.x)?;
         Cfg::CM::open(
             &self.ck,
-            &PolynomialRingOverField::vector_embedding(w.w.to_vec()),
+            &PolynomialRingOverField::vector_embedding(
+                w.w.iter()
+                    .flat_map(|i| {
+                        decompose::<Cfg::F>(*i, Cfg::B)
+                            .into_iter()
+                            .map(Cfg::F::from)
+                            .collect::<Vec<_>>()
+                    })
+                    .collect(),
+            ),
             &Null,
             &u.c,
         )?;
@@ -198,7 +207,16 @@ impl<A: Arith, Cfg: SuperNeoConfig>
         let (w, x) = (z.private, z.public);
         let (c, _) = Cfg::CM::commit(
             &self.ck,
-            &PolynomialRingOverField::vector_embedding(w.clone()),
+            &PolynomialRingOverField::vector_embedding(
+                w.iter()
+                    .flat_map(|i| {
+                        decompose::<Cfg::F>(*i, Cfg::B)
+                            .into_iter()
+                            .map(Cfg::F::from)
+                            .collect::<Vec<_>>()
+                    })
+                    .collect(),
+            ),
             rng,
         )?;
         Ok((IW { w }, IU { c, x }))

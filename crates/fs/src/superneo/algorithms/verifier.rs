@@ -157,7 +157,7 @@ impl<
         );
 
         let mut c = vec![PolynomialRingOverField::default(); Cfg::KAPPA];
-        for (c_i, rho) in U.c.iter().chain(us.iter().map(|i| &i.c)).zip(&rhos) {
+        for (c_i, rho) in us.iter().map(|i| &i.c).chain(&U.c).zip(&rhos) {
             for i in 0..c.len() {
                 c[i] = c[i].add(&c_i[i].mul(rho));
             }
