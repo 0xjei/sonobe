@@ -20,9 +20,7 @@ pub struct ReplayTranscript<F> {
 
 impl<F: PrimeField, T: Transcript<F>> From<RecordingTranscript<F, T>> for ReplayTranscript<F> {
     fn from(value: RecordingTranscript<F, T>) -> Self {
-        Self {
-            cached_challenges: value.cached_challenges,
-        }
+        Self::new(value.cached_challenges)
     }
 }
 
@@ -58,9 +56,7 @@ impl<F: PrimeField, T: TranscriptGadget<F>> From<RecordingTranscriptVar<F, T>>
     for ReplayTranscriptVar<F>
 {
     fn from(value: RecordingTranscriptVar<F, T>) -> Self {
-        Self {
-            cached_challenges: value.cached_challenges,
-        }
+        Self::new(value.cached_challenges)
     }
 }
 
@@ -68,10 +64,7 @@ impl<F: PrimeField> TranscriptGadget<F> for ReplayTranscriptVar<F> {
     type Config = Vec<FpVar<F>>;
     type Widget = ReplayTranscript<F>;
 
-    fn new(mut cached_challenges: Vec<FpVar<F>>) -> Self
-    where
-        Self: Sized,
-    {
+    fn new(mut cached_challenges: Vec<FpVar<F>>) -> Self {
         cached_challenges.reverse();
         Self { cached_challenges }
     }
