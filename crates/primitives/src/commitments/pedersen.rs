@@ -22,7 +22,7 @@ use super::{CommitmentDef, CommitmentDefGadget, CommitmentKey, CommitmentOps, Er
 use crate::{
     algebra::{
         field::emulated::EmulatedFieldVar,
-        group::{JointScalarMul, emulated::EmulatedAffineVar},
+        group::emulated::EmulatedAffineVar,
     },
     commitments::{CommitmentOpsGadget, GroupBasedCommitment},
     traits::{CF1, CF2, SonobeCurve},
@@ -225,22 +225,8 @@ impl<C: SonobeCurve, const H: bool> PedersenGadget<C, H> {
     /// with the given generators `g` and scalar bits `v`.
     fn msm(g: &[C::Var], v: &[Vec<Boolean<CF2<C>>>]) -> Result<C::Var, SynthesisError> {
         let mut res = C::Var::zero();
-        let n = v.len();
-        if n % 2 == 1 {
-            res += g[n - 1].scalar_mul_le(v[n - 1].to_bits_le()?.iter())?;
-        } else {
-            res += g[n - 1].joint_scalar_mul_be(
-                &g[n - 2],
-                v[n - 1].to_bits_le()?.iter(),
-                v[n - 2].to_bits_le()?.iter(),
-            )?;
-        }
-        for i in (1..n - 1).step_by(2) {
-            res += g[i - 1].joint_scalar_mul_be(
-                &g[i],
-                v[i - 1].to_bits_le()?.iter(),
-                v[i].to_bits_le()?.iter(),
-            )?;
+        for (g_i, v_i) in g.iter().zip(v) {
+            res += g_i.scalar_mul_le(v_i.to_bits_le()?.iter())?;
         }
         Ok(res)
     }
