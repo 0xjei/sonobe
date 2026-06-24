@@ -617,8 +617,13 @@ impl<F: SonobeField, Cfg, const LHS_ALIGNED: bool> LimbedVar<F, Cfg, LHS_ALIGNED
 
                 carry = (carry + limb) * inv;
                 carry_bounds = carry_bounds.add(bounds).shr_narrower(F::BITS_PER_LIMB);
-                group_bounds = carry_bounds.clone();
-                offset = 0;
+                // The limb folded above starts the next group and consumes one
+                // division by `2^W`, exactly as the first limb does in the
+                // group-extension (`if`) branch. Therefore `offset` must be
+                // `F::BITS_PER_LIMB` (not `0`), and `group_bounds` must keep
+                // tracking the undivided value `carry * 2^offset`.
+                offset = F::BITS_PER_LIMB;
+                group_bounds = carry_bounds.shl(offset);
             }
         }
 
@@ -1361,6 +1366,47 @@ mod tests {
         };
         aligned.enforce_equal_unaligned(&unaligned_incorrect)?;
 
+        assert!(!cs.is_satisfied()?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_enforce_equal_unaligned_rejects_multiple_of_modulus() -> Result<(), Box<dyn Error>> {
+        let cs = ConstraintSystem::<Fr>::new_ref();
+
+        // Base-`2^BITS_PER_LIMB` digits of `p = Fr::MODULUS`.
+        let mask = (BigUint::one() << Fr::BITS_PER_LIMB) - BigUint::one();
+        let mut vals = vec![];
+
+        let mut t: BigUint = Fr::MODULUS.into();
+        t <<= Fr::BITS_PER_LIMB;
+        while !t.is_zero() {
+            vals.push(Fr::from(&t & &mask));
+            t >>= Fr::BITS_PER_LIMB;
+        }
+        assert_eq!(compose(&vals[..]) >> Fr::BITS_PER_LIMB, Fr::MODULUS.into());
+
+        let mut bounds = vec![Bounds(BigInt::zero(), BigInt::zero())];
+        // The huge bound on the first digit forces the first group to finalize
+        // immediately
+        bounds.push(Bounds(
+            BigInt::zero(),
+            BigInt::one() << (Fr::MODULUS_BIT_SIZE - 2),
+        ));
+        bounds.resize(
+            vals.len(),
+            Bounds(BigInt::zero(), BigInt::one() << (Fr::BITS_PER_LIMB + 1)),
+        );
+
+        let v = EmulatedIntVar::new(Vec::new_witness(cs.clone(), || Ok(vals))?, bounds);
+
+        assert_eq!(v.value()? >> Fr::BITS_PER_LIMB, Fr::MODULUS.into());
+        assert!(cs.is_satisfied()?);
+
+        v.enforce_equal_unaligned(&EmulatedIntVar::constant(Zero::zero()))?;
+
+        // A non-zero multiple of `p` must NOT be accepted as equal to zero.
         assert!(!cs.is_satisfied()?);
 
         Ok(())
