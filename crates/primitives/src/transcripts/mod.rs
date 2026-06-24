@@ -91,7 +91,9 @@ pub trait Transcript<F: PrimeField>: Clone {
     fn separate_domain(&self, domain: &[u8]) -> Self {
         let mut new_sponge = self.clone();
 
-        let mut input = domain.len().to_le_bytes().to_vec();
+        // Encode the domain length with a fixed-width `u64` so the derived
+        // challenges are identical across targets.
+        let mut input = (domain.len() as u64).to_le_bytes().to_vec();
         input.extend_from_slice(domain);
 
         let limbs = input
@@ -210,7 +212,9 @@ pub trait TranscriptGadget<F: PrimeField>: Clone {
     fn separate_domain(&self, domain: &[u8]) -> Result<Self, SynthesisError> {
         let mut new_sponge = self.clone();
 
-        let mut input = domain.len().to_le_bytes().to_vec();
+        // Encode the domain length with a fixed-width `u64` so the derived
+        // challenges are identical across targets.
+        let mut input = (domain.len() as u64).to_le_bytes().to_vec();
         input.extend_from_slice(domain);
 
         let limbs = input
