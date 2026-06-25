@@ -271,6 +271,20 @@ impl<F: SonobeField, Cfg, const ALIGNED: bool> LimbedVar<F, Cfg, ALIGNED> {
 }
 
 impl<F: SonobeField, Cfg> LimbedVar<F, Cfg, true> {
+    /// [`LimbedVar::from_bounded_bits_le`] computes a `LimbedVar` from its
+    /// little-endian bits with explicitly supplied [`Bounds`].
+    pub fn from_bounded_bits_le(
+        bits: &[Boolean<F>],
+        bounds: Bounds,
+    ) -> Result<Self, SynthesisError> {
+        Ok(Self::new(
+            bits.chunks(F::BITS_PER_LIMB)
+                .map(Boolean::le_bits_to_fp)
+                .collect::<Result<_, _>>()?,
+            compute_bounds(&bounds.0, &bounds.1, F::BITS_PER_LIMB),
+        ))
+    }
+
     /// [`LimbedVar::enforce_lt`] enforces `self` to be less than `other`, where
     /// both should be aligned (as indicated by the const generic).
     /// Adapted from the xJsnark [paper] and its [implementation].
@@ -833,15 +847,6 @@ impl<F: SonobeField, Cfg> FromBitsGadget<F> for LimbedVar<F, Cfg, true> {
                 (BigInt::one() << bits.len()) - BigInt::one(),
             ),
         )
-    }
-
-    fn from_bounded_bits_le(bits: &[Boolean<F>], bounds: Bounds) -> Result<Self, SynthesisError> {
-        Ok(Self::new(
-            bits.chunks(F::BITS_PER_LIMB)
-                .map(Boolean::le_bits_to_fp)
-                .collect::<Result<_, _>>()?,
-            compute_bounds(&bounds.0, &bounds.1, F::BITS_PER_LIMB),
-        ))
     }
 }
 
