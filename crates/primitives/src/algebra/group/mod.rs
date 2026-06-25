@@ -35,9 +35,7 @@ pub trait SonobeCurve:
     + Inputize<Self::BaseField>
     + InputizeEmulated<Self::ScalarField>
     + Val<
-        Var: CurveVar<Self, Self::BaseField>
-                 + AbsorbableVar<Self::BaseField>
-                 + WitnessToPublic,
+        Var: CurveVar<Self, Self::BaseField> + AbsorbableVar<Self::BaseField> + WitnessToPublic,
         EmulatedVar<Self::ScalarField> = EmulatedAffineVar<Self::ScalarField, Self>,
     >
 {
