@@ -94,8 +94,10 @@ pub trait Transcript<F: PrimeField>: Clone {
         let mut input = domain.len().to_le_bytes().to_vec();
         input.extend_from_slice(domain);
 
+        // Chunk into `(MODULUS_BIT_SIZE - 1) / 8` bytes so a full chunk is
+        // always `< 2^(MODULUS_BIT_SIZE - 1) <= MODULUS`
         let limbs = input
-            .chunks(F::MODULUS_BIT_SIZE as usize / 8)
+            .chunks((F::MODULUS_BIT_SIZE as usize - 1) / 8)
             .map(|chunk| F::from_le_bytes_mod_order(chunk))
             .collect::<Vec<_>>();
 
@@ -213,8 +215,10 @@ pub trait TranscriptGadget<F: PrimeField>: Clone {
         let mut input = domain.len().to_le_bytes().to_vec();
         input.extend_from_slice(domain);
 
+        // Chunk into `(MODULUS_BIT_SIZE - 1) / 8` bytes so a full chunk is
+        // always `< 2^(MODULUS_BIT_SIZE - 1) <= MODULUS`
         let limbs = input
-            .chunks(F::MODULUS_BIT_SIZE as usize / 8)
+            .chunks((F::MODULUS_BIT_SIZE as usize - 1) / 8)
             .map(|chunk| FpVar::Constant(F::from_le_bytes_mod_order(chunk)))
             .collect::<Vec<_>>();
 
