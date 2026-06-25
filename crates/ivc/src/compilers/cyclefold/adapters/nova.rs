@@ -14,7 +14,7 @@ use sonobe_primitives::{
     algebra::{
         field::emulated::{Bounds, EmulatedFieldVar},
         group::emulated::EmulatedAffineVar,
-        ops::bits::{FromBits, FromBitsGadget, ToBitsGadgetExt},
+        ops::bits::{FromBits, ToBitsGadgetExt},
     },
     circuits::WitnessToPublic,
     commitments::GroupBasedCommitment,
