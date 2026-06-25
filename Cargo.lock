@@ -1124,6 +1124,7 @@ dependencies = [
  "ark-crypto-primitives",
  "ark-ec",
  "ark-ff",
+ "ark-grumpkin",
  "ark-pallas",
  "ark-poly",
  "ark-r1cs-std",

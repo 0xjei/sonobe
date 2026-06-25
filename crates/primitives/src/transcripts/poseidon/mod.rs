@@ -95,6 +95,8 @@ fn find_fd_round_numbers<F: PrimeField>(
         }
     }
 
+    assert_ne!(min_cost, usize::MAX);
+
     (r_f, r_p)
 }
 
@@ -106,13 +108,14 @@ pub fn poseidon_paper_config<F: PrimeField, const SECURITY_BITS: usize>(
     alpha: u64,
     rate: usize,
 ) -> PoseidonConfig<F> {
+    assert_ne!(alpha, 1);
     assert_eq!(
         BigUint::from(alpha).gcd(&(-F::one()).into()),
         BigUint::one()
     );
     let (full_rounds, partial_rounds) =
-        find_fd_round_numbers::<F>(rate, alpha, SECURITY_BITS, get_sbox_cost, true);
-    let (ark, mds) = find_poseidon_ark_and_mds::<F>(
+        find_fd_round_numbers::<F>(rate + 1, alpha, SECURITY_BITS, get_sbox_cost, true);
+    let (ark, mds) = find_poseidon_ark_and_mds(
         F::MODULUS_BIT_SIZE as u64,
         rate,
         full_rounds,
@@ -131,9 +134,9 @@ pub fn poseidon_paper_config<F: PrimeField, const SECURITY_BITS: usize>(
     )
 }
 
-/// [`poseidon_circom_config`] produces a Poseidon configuration which agrees
-/// with Circom's Poseidon(4) when `F` is the scalar field of BN254.
-pub fn poseidon_circom_config<F: PrimeField>() -> PoseidonConfig<F> {
+/// [`poseidon_circom_config`] produces a Poseidon configuration for BN254's
+/// scalar field that agrees with Circom's Poseidon(4).
+pub fn poseidon_circom_config() -> PoseidonConfig<ark_bn254::Fr> {
     // 120 bit security target as in
     // https://eprint.iacr.org/2019/458.pdf
     // t = rate + 1
@@ -143,8 +146,8 @@ pub fn poseidon_circom_config<F: PrimeField>() -> PoseidonConfig<F> {
     let alpha = 5;
     let rate = 4;
 
-    let (ark, mds) = find_poseidon_ark_and_mds::<F>(
-        F::MODULUS_BIT_SIZE as u64,
+    let (ark, mds) = find_poseidon_ark_and_mds(
+        ark_bn254::Fr::MODULUS_BIT_SIZE as u64,
         rate,
         full_rounds as u64,
         partial_rounds as u64,

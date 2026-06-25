@@ -84,9 +84,10 @@ impl<F: PrimeField> TranscriptGadget<F> for PoseidonSpongeVar<F> {
 
 #[cfg(test)]
 mod tests {
-    use ark_bn254::{Fq, Fr, G1Projective as G1, g1::Config};
+    use ark_bn254::{Fr, G1Projective as G1};
     use ark_crypto_primitives::sponge::poseidon::{PoseidonSponge, constraints::PoseidonSpongeVar};
     use ark_ff::UniformRand;
+    use ark_grumpkin::Projective as G2;
     use ark_r1cs_std::{
         GR1CSVar, alloc::AllocVar, fields::fp::FpVar,
         groups::curves::short_weierstrass::ProjectiveVar,
@@ -104,7 +105,7 @@ mod tests {
     // Test with value taken from https://github.com/iden3/circomlibjs/blob/43cc582b100fc3459cf78d903a6f538e5d7f38ee/test/poseidon.js#L32
     #[test]
     fn check_against_circom_poseidon() -> Result<(), Box<dyn Error>> {
-        let config = poseidon_circom_config::<Fr>();
+        let config = poseidon_circom_config();
         let mut poseidon_sponge = PoseidonSponge::new(config);
         let v = vec![1, 2, 3, 4]
             .into_iter()
@@ -125,15 +126,15 @@ mod tests {
     #[test]
     fn test_challenge_field_element() -> Result<(), Box<dyn Error>> {
         // Create a transcript outside of the circuit
-        let config = poseidon_circom_config::<Fr>();
-        let mut tr = PoseidonSponge::<Fr>::new(config.clone());
+        let config = poseidon_circom_config();
+        let mut tr = PoseidonSponge::new(config.clone());
         tr.add(&Fr::from(42_u32));
         let c = tr.challenge_field_element();
 
         // Create a transcript inside of the circuit
-        let cs = ConstraintSystem::<Fr>::new_ref();
-        let mut tr_var = PoseidonSpongeVar::<Fr>::new(config);
-        let v = FpVar::<Fr>::new_witness(cs.clone(), || Ok(Fr::from(42_u32)))?;
+        let cs = ConstraintSystem::new_ref();
+        let mut tr_var = PoseidonSpongeVar::new(config);
+        let v = FpVar::new_witness(cs.clone(), || Ok(Fr::from(42_u32)))?;
         tr_var.add(&v)?;
         let c_var = tr_var.challenge_field_element()?;
 
@@ -148,15 +149,15 @@ mod tests {
         let nbits = 128;
 
         // Create a transcript outside of the circuit
-        let config = poseidon_circom_config::<Fq>();
-        let mut tr = PoseidonSponge::<Fq>::new(config.clone());
-        tr.add(&Fq::from(42_u32));
+        let config = poseidon_circom_config();
+        let mut tr = PoseidonSponge::new(config.clone());
+        tr.add(&Fr::from(42_u32));
         let c = tr.challenge_bits(nbits);
 
         // Create a transcript inside of the circuit
-        let cs = ConstraintSystem::<Fq>::new_ref();
-        let mut tr_var = PoseidonSpongeVar::<Fq>::new(config);
-        let v = FpVar::<Fq>::new_witness(cs.clone(), || Ok(Fq::from(42_u32)))?;
+        let cs = ConstraintSystem::new_ref();
+        let mut tr_var = PoseidonSpongeVar::new(config);
+        let v = FpVar::new_witness(cs.clone(), || Ok(Fr::from(42_u32)))?;
         tr_var.add(&v)?;
         let c_var = tr_var.challenge_bits(nbits)?;
 
@@ -169,18 +170,18 @@ mod tests {
     #[test]
     fn test_absorb_canonical_point() -> Result<(), Box<dyn Error>> {
         // Create a transcript outside of the circuit
-        let config = poseidon_circom_config::<Fq>();
-        let mut tr = PoseidonSponge::<Fq>::new(config.clone());
+        let config = poseidon_circom_config();
+        let mut tr = PoseidonSponge::new(config.clone());
         let rng = &mut thread_rng();
 
-        let p = G1::rand(rng);
+        let p = G2::rand(rng);
         tr.add(&p);
         let c = tr.challenge_field_element();
 
         // Create a transcript inside of the circuit
-        let cs = ConstraintSystem::<Fq>::new_ref();
-        let mut tr_var = PoseidonSpongeVar::<Fq>::new(config);
-        let p_var = ProjectiveVar::<Config, FpVar<Fq>>::new_witness(cs, || Ok(p))?;
+        let cs = ConstraintSystem::new_ref();
+        let mut tr_var = PoseidonSpongeVar::new(config);
+        let p_var = ProjectiveVar::new_witness(cs, || Ok(p))?;
         tr_var.add(&p_var)?;
         let c_var = tr_var.challenge_field_element()?;
 
@@ -193,8 +194,8 @@ mod tests {
     #[test]
     fn test_absorb_emulated_point() -> Result<(), Box<dyn Error>> {
         // Create a transcript outside of the circuit
-        let config = poseidon_circom_config::<Fr>();
-        let mut tr = PoseidonSponge::<Fr>::new(config.clone());
+        let config = poseidon_circom_config();
+        let mut tr = PoseidonSponge::new(config.clone());
         let rng = &mut thread_rng();
 
         let p = G1::rand(rng);
@@ -202,8 +203,8 @@ mod tests {
         let c = tr.challenge_field_element();
 
         // Create a transcript inside of the circuit
-        let cs = ConstraintSystem::<Fr>::new_ref();
-        let mut tr_var = PoseidonSpongeVar::<Fr>::new(config);
+        let cs = ConstraintSystem::new_ref();
+        let mut tr_var = PoseidonSpongeVar::new(config);
         let p_var = EmulatedAffineVar::new_witness(cs, || Ok(p))?;
         tr_var.add(&p_var)?;
         let c_var = tr_var.challenge_field_element()?;
