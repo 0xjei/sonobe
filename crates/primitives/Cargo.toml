@@ -6,6 +6,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+ark-bn254 = { workspace = true, features = ["curve", "r1cs"] }
 ark-crypto-primitives = { workspace = true, features = ["constraints", "sponge", "crh"] }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true, features = ["asm"] }
@@ -23,7 +24,7 @@ sha3 = { workspace = true }
 thiserror = { workspace = true }
 
 [dev-dependencies]
-ark-bn254 = { workspace = true, features = ["curve", "r1cs"] }
+ark-grumpkin = { workspace = true, features = ["r1cs"] }
 ark-pallas = { workspace = true, features = ["curve", "r1cs"] }
 
 [target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
