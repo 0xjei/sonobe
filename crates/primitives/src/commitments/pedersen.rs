@@ -20,10 +20,7 @@ use ark_std::{UniformRand, borrow::Borrow, iter::repeat_with, marker::PhantomDat
 
 use super::{CommitmentDef, CommitmentDefGadget, CommitmentKey, CommitmentOps, Error};
 use crate::{
-    algebra::{
-        field::emulated::EmulatedFieldVar,
-        group::emulated::EmulatedAffineVar,
-    },
+    algebra::{field::emulated::EmulatedFieldVar, group::emulated::EmulatedAffineVar},
     commitments::{CommitmentOpsGadget, GroupBasedCommitment},
     traits::{CF1, CF2, SonobeCurve},
     utils::null::Null,
