@@ -3,7 +3,9 @@
 
 use ark_ff::Field;
 use ark_relations::gr1cs::{ConstraintSystem, Matrix, R1CS_PREDICATE_LABEL};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::{
+    CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
+};
 use ark_std::{cfg_into_iter, cfg_iter};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -15,7 +17,7 @@ pub mod circuits;
 
 /// [`R1CS`] holds the three sparse matrices `A`, `B`, `C` together with the
 /// configuration.
-#[derive(Debug, Clone, Default, PartialEq, CanonicalSerialize, CanonicalDeserialize)]
+#[derive(Debug, Clone, Default, PartialEq, CanonicalSerialize)]
 pub struct R1CS<F: Field> {
     m: usize, // number of constraints
     n: usize, // number of variables
@@ -53,27 +55,29 @@ impl<F: Field> R1CS<F> {
         n_public_inputs: usize,
         matrices: [Matrix<F>; 3],
     ) -> Result<Self, Error> {
-        for matrix in &matrices {
-            if matrix.len() != n_constraints {
-                return Err(Error::InvalidNumberOfConstraints(
-                    n_constraints,
-                    matrix.len(),
-                ));
+        let r1cs =
+            Self::new_without_validity_check(n_constraints, n_variables, n_public_inputs, matrices);
+        r1cs.validate()?;
+        Ok(r1cs)
+    }
+
+    /// [`R1CS::validate`] checks that the structural invariant of the R1CS
+    /// holds, i.w., every matrix has exactly `m` rows (one per constraint), and
+    /// no column index reaches beyond the `n` variables.
+    pub fn validate(&self) -> Result<(), Error> {
+        for matrix in &self.matrices {
+            if matrix.len() != self.m {
+                return Err(Error::InvalidNumberOfConstraints(self.m, matrix.len()));
             }
             for row in matrix {
                 if let Some(max) = row.iter().map(|(_, i)| *i).max()
-                    && max >= n_variables
+                    && max >= self.n
                 {
-                    return Err(Error::InvalidNumberOfVariables(n_variables, max + 1));
+                    return Err(Error::InvalidNumberOfVariables(self.n, max + 1));
                 }
             }
         }
-        Ok(Self::new_without_validity_check(
-            n_constraints,
-            n_variables,
-            n_public_inputs,
-            matrices,
-        ))
+        Ok(())
     }
 
     /// [`R1CS::new_without_validity_check`] creates a new R1CS structure from
@@ -103,6 +107,33 @@ impl<F: Field> R1CS<F> {
     ) -> Result<Vec<F>, Error> {
         let u = z[0];
         self.evaluate_ccs(z, [vec![0, 1], vec![2]], [F::one(), -u])
+    }
+}
+
+impl<F: Field> Valid for R1CS<F> {
+    fn check(&self) -> Result<(), SerializationError> {
+        self.matrices.check()?;
+        self.validate().map_err(|_| SerializationError::InvalidData)
+    }
+}
+
+impl<F: Field> CanonicalDeserialize for R1CS<F> {
+    fn deserialize_with_mode<R: Read>(
+        mut reader: R,
+        compress: Compress,
+        validate: Validate,
+    ) -> Result<Self, SerializationError> {
+        let m = usize::deserialize_with_mode(&mut reader, compress, Validate::No)?;
+        let n = usize::deserialize_with_mode(&mut reader, compress, Validate::No)?;
+        let l = usize::deserialize_with_mode(&mut reader, compress, Validate::No)?;
+        let matrices =
+            <[Matrix<F>; 3]>::deserialize_with_mode(&mut reader, compress, Validate::No)?;
+
+        let r1cs = Self::new_without_validity_check(m, n, l, matrices);
+        if validate == Validate::Yes {
+            r1cs.check()?;
+        }
+        Ok(r1cs)
     }
 }
 
@@ -205,6 +236,7 @@ mod tests {
     use ark_ff::UniformRand;
     use ark_std::{error::Error, rand::thread_rng};
 
+    use super::*;
     use crate::{
         circuits::utils::{constraints_for_test, satisfying_assignments_for_test},
         relations::Relation,
@@ -233,6 +265,40 @@ mod tests {
             )
             .is_err()
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_deserialize_rejects_malformed() -> Result<(), Box<dyn Error>> {
+        let valid = R1CS::<Fr>::new(1, 1, 0, [vec![vec![]], vec![vec![]], vec![vec![]]]).unwrap();
+        let mut bytes = vec![];
+        valid.serialize_compressed(&mut bytes)?;
+        assert_eq!(valid, R1CS::<Fr>::deserialize_compressed(&bytes[..])?);
+
+        let mismatched_constraints = R1CS::<Fr>::new_without_validity_check(
+            2,
+            1,
+            0,
+            [vec![vec![]], vec![vec![]], vec![vec![]]],
+        );
+        let mut bytes = vec![];
+        mismatched_constraints
+            .serialize_compressed(&mut bytes)
+            .unwrap();
+        assert!(R1CS::<Fr>::deserialize_compressed_unchecked(&bytes[..]).is_ok());
+        assert!(R1CS::<Fr>::deserialize_compressed(&bytes[..]).is_err());
+
+        let out_of_range_variable = R1CS::<Fr>::new_without_validity_check(
+            1,
+            1,
+            0,
+            [vec![vec![(Fr::from(1u64), 5)]], vec![vec![]], vec![vec![]]],
+        );
+        let mut bytes = vec![];
+        out_of_range_variable.serialize_compressed(&mut bytes)?;
+        assert!(R1CS::<Fr>::deserialize_compressed_unchecked(&bytes[..]).is_ok());
+        assert!(R1CS::<Fr>::deserialize_compressed(&bytes[..]).is_err());
 
         Ok(())
     }
