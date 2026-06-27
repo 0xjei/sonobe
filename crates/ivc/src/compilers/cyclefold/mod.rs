@@ -364,12 +364,6 @@ where
         current_state: &FC::State,
         Proof(W, U, w, u, cf_W, cf_U): &Self::Proof<FC>,
     ) -> Result<(), Error> {
-        if i == 0 {
-            return (initial_state == current_state)
-                .then_some(())
-                .ok_or(Error::IVCVerificationFail);
-        }
-
         // Ensure the prover supplied `initial_state` and `current_state` have
         // the same shape as `reference_state`'s, which is exactly what the
         // augmented circuit was synthesized for.
@@ -381,6 +375,12 @@ where
             || !FC::same_state_shape(reference_state, current_state)
         {
             return Err(Error::IVCVerificationFail);
+        }
+
+        if i == 0 {
+            return (initial_state == current_state)
+                .then_some(())
+                .ok_or(Error::IVCVerificationFail);
         }
 
         let hash = T::new_with_pp_hash(hash_config.clone(), *pp_hash);
