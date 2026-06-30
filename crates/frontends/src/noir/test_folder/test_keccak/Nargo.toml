@@ -1,0 +1,6 @@
+[package]
+name = "test_keccak"
+type = "bin"
+authors = [""]
+
+[dependencies]

@@ -1,0 +1,6 @@
+[package]
+name = "test_poseidon2"
+type = "bin"
+authors = [""]
+
+[dependencies]

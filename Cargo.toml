@@ -3,6 +3,7 @@ members = [
     "crates/primitives",
     "crates/fs",
     "crates/ivc",
+    "crates/frontends",
 ]
 resolver = "2"
 
@@ -21,6 +22,14 @@ sha3 = { version = "0.10" }
 rayon = { version = "1" }
 thiserror = { version = "2.0.16" }
 wasm-bindgen-test = { version = "0.3" }
+serde = { version = "1", default-features = false, features = ["derive"] }
+serde_json = { version = "1" }
+hashbrown = { version = "0.17" }
+
+# Noir frontend: depend on upstream noir-lang/noir's `acvm` (now on arkworks 0.6,
+# exporting a generic `GenericFieldElement<F>`), pinned to a release tag. The 1.0
+# beta line is not published to crates.io, so this is a git dependency.
+acvm = { git = "https://github.com/noir-lang/noir", tag = "v1.0.0-beta.22", default-features = false }
 
 # Arkworks family
 ark-crypto-primitives = { version = "0.6.0", default-features = false }

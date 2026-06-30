@@ -4,8 +4,8 @@
 //! etc.) behind a common absorb / squeeze interface suitable for building
 //! non-interactive proofs.
 //!
-//! Concrete implementations live in the [`poseidon`] and [`griffin`]
-//! sub-modules.
+//! Concrete implementations live in the [`poseidon`], [`poseidon2`], and
+//! [`griffin`] sub-modules.
 
 use ark_ff::{BigInteger, PrimeField};
 use ark_r1cs_std::{boolean::Boolean, convert::ToBitsGadget, fields::fp::FpVar};
@@ -16,6 +16,7 @@ pub use self::absorbable::{Absorbable, AbsorbableVar};
 pub mod absorbable;
 pub mod griffin;
 pub mod poseidon;
+pub mod poseidon2;
 pub mod recording;
 pub mod replay;
 

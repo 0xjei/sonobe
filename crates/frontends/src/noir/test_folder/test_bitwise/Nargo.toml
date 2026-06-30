@@ -1,0 +1,6 @@
+[package]
+name = "test_bitwise"
+type = "bin"
+authors = [""]
+
+[dependencies]

@@ -1,0 +1,6 @@
+[package]
+name = "test_no_external_inputs"
+type = "bin"
+authors = [""]
+
+[dependencies]
