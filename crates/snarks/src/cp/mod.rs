@@ -1,7 +1,7 @@
 use ark_ff::Field;
 use ark_std::{borrow::Borrow, rand::RngCore};
 
-pub mod groth16;
+pub mod legogroth16;
 
 pub trait CPSNARK {
     type Field: Field;

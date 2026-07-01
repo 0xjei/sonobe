@@ -20,7 +20,9 @@ use crate::{
         field::{SonobeField, TwoStageFieldVar, emulated::EmulatedFieldVar},
         group::{CF1, CF2, SonobeCurve, emulated::EmulatedAffineVar},
         ops::bits::FromBitsGadget,
-    }, circuits::inputize::Inputize, transcripts::{Absorbable, AbsorbableVar}
+    },
+    circuits::inputize::Inputize,
+    transcripts::{Absorbable, AbsorbableVar},
 };
 
 pub mod pedersen;

@@ -12,7 +12,9 @@ use ark_relations::gr1cs::SynthesisError;
 use ark_serialize::SerializationError;
 use ark_std::{error::Error as ErrorTrait, rand::RngCore};
 use sonobe_fs::Error as FoldingError;
-use sonobe_primitives::{arithmetizations::Error as ArithError, circuits::FCircuit, utils::dummy::Dummy};
+use sonobe_primitives::{
+    arithmetizations::Error as ArithError, circuits::FCircuit, utils::dummy::Dummy,
+};
 use thiserror::Error;
 
 pub mod compilers;
@@ -468,11 +470,50 @@ pub trait IVCProofCompressor {
     ) -> Result<(), Self::Error>;
 }
 
+/// [`IVCProofCompressorEVMExt`] extends [`IVCProofCompressor`] with the ability
+/// to produce the calldata for the decider's EVM verifier contract.
+#[cfg(feature = "evm")]
+pub trait IVCProofCompressorEVMExt: IVCProofCompressor {
+    /// [`IVCProofCompressorEVMExt::verify_calldata`] builds the calldata for
+    /// the EVM verifier from the same inputs as [`IVCProofCompressor::verify`].
+    fn verify_calldata<FC: FCircuit<Field = <Self::IVC as IVCTypes>::Field>>(
+        vk: &Self::VerifierKey<FC>,
+        i: usize,
+        initial_state: &FC::State,
+        current_state: &FC::State,
+        compressed_proof: &Self::CompressedProof<FC>,
+    ) -> Result<Vec<u8>, Self::Error>;
+}
+
 #[cfg(test)]
 mod tests {
     use ark_std::{error::Error, rand::Rng};
+    #[cfg(feature = "evm")]
+    use sonobe_primitives::{
+        algebra::field::SonobeField,
+        circuits::test_utils::CircuitForTest,
+        utils::evm::{compiler::SolidityCompiler, harness::TestEVM},
+    };
 
     use super::*;
+    #[cfg(feature = "evm")]
+    use crate::compilers::cyclefold::evm_verifier::{DeciderStateFragment, FCircuitEVMExt};
+
+    #[cfg(feature = "evm")]
+    impl<F: SonobeField> FCircuitEVMExt for CircuitForTest<F> {
+        fn decider_state_fragment(_: &Self::State) -> DeciderStateFragment {
+            DeciderStateFragment {
+                // `[F; 1]` is represented onchain as a fixed-size `uint256[1]`
+                type_name: "uint256[1]".to_string(),
+                // No custom struct
+                type_def: String::new(),
+                // The array length already pins the shape
+                shape_check_body: String::new(),
+                // Already flat
+                flatten_body: "return z;".to_string(),
+            }
+        }
+    }
 
     fn test_manual_state_management<I: IVC, F: FCircuit<Field = I::Field>>(
         pk: &I::ProverKey<F>,
@@ -573,7 +614,7 @@ mod tests {
         Ok(())
     }
 
-    pub fn test_ivc_decider<
+    pub fn test_decider<
         D: IVCProofCompressor,
         F: FCircuit<Field = <D::IVC as IVCTypes>::Field, ExternalInputs: Clone>,
     >(
@@ -582,6 +623,8 @@ mod tests {
         external_inputs_vec: Vec<F::ExternalInputs>,
         mut rng: impl Rng,
     ) -> Result<(), Box<dyn Error>> {
+        let n = external_inputs_vec.len();
+
         let pp = D::IVC::preprocess(config, &mut rng)?;
 
         let (pk, vk) = D::IVC::generate_keys(pp, &step_circuit)?;
@@ -593,7 +636,7 @@ mod tests {
             &vk,
             &step_circuit,
             initial_state.clone(),
-            external_inputs_vec.clone(),
+            external_inputs_vec,
             &mut rng,
         )?;
 
@@ -601,20 +644,73 @@ mod tests {
 
         let proof = D::prove(
             &pk,
-            external_inputs_vec.len(),
+            n,
             &initial_state,
             &current_state,
             &current_proof,
             &mut rng,
         )?;
 
-        D::verify(
+        D::verify(&vk, n, &initial_state, &current_state, &proof)?;
+
+        Ok(())
+    }
+
+    #[cfg(feature = "evm")]
+    pub fn test_decider_evm<
+        D: IVCProofCompressorEVMExt,
+        F: FCircuit<Field = <D::IVC as IVCTypes>::Field, ExternalInputs: Clone>,
+    >(
+        config: <D::IVC as IVCTypes>::Config,
+        step_circuit: F,
+        external_inputs_vec: Vec<F::ExternalInputs>,
+        sources_generator: impl Fn(&D::VerifierKey<F>) -> Result<Vec<(String, String)>, Box<dyn Error>>,
+        mut rng: impl Rng,
+    ) -> Result<(), Box<dyn Error>> {
+        let n = external_inputs_vec.len();
+
+        let pp = D::IVC::preprocess(config, &mut rng)?;
+
+        let (pk, vk) = D::IVC::generate_keys(pp, &step_circuit)?;
+
+        let initial_state = step_circuit.dummy_state();
+
+        let (current_state, current_proof) = test_auto_state_management::<D::IVC, F>(
+            &pk,
             &vk,
-            external_inputs_vec.len(),
+            &step_circuit,
+            initial_state.clone(),
+            external_inputs_vec,
+            &mut rng,
+        )?;
+
+        let (pk, vk) = D::preprocess_and_generate_keys(&step_circuit, vk, &mut rng)?;
+
+        let proof = D::prove(
+            &pk,
+            n,
             &initial_state,
             &current_state,
-            &proof,
+            &current_proof,
+            &mut rng,
         )?;
+
+        let solc = SolidityCompiler::default();
+        assert!(solc.available());
+
+        let (bytecode, selectors) = solc.compile(sources_generator(&vk)?, "DeciderVerifier")?;
+        let mut evm = TestEVM::default();
+        let addr = evm.deploy(&bytecode, ())?.unwrap();
+        let sig = *selectors.get("verifyDeciderProof").unwrap();
+
+        assert!(
+            evm.view(
+                addr,
+                sig,
+                &D::verify_calldata::<F>(&vk, n, &initial_state, &current_state, &proof)?
+            )?
+            .is_success()
+        );
 
         Ok(())
     }

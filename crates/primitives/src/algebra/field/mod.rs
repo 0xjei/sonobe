@@ -15,11 +15,12 @@ use ark_std::{
     ops::{Add, Mul, Sub},
 };
 
+#[cfg(feature = "evm")]
+use crate::utils::evm::serialize::EVMSerialize;
 use crate::{
     algebra::{Val, field::emulated::EmulatedFieldVar},
     circuits::{WitnessToPublic, inputize::Inputize},
     transcripts::{Absorbable, AbsorbableVar},
-    utils::evm::EVMSerialize,
 };
 
 pub mod emulated;
@@ -127,12 +128,14 @@ impl<Base: SonobeField, Target: SonobeField> WitnessToPublic for EmulatedFieldVa
     }
 }
 
+#[cfg(feature = "evm")]
 impl<P: FpConfig<N>, const N: usize> EVMSerialize for Fp<P, N> {
     fn to_calldata(&self) -> Vec<u8> {
         self.into_bigint().to_bytes_be()
     }
 }
 
+#[cfg(feature = "evm")]
 impl<P: Fp2Config<Fp: EVMSerialize>> EVMSerialize for Fp2<P> {
     fn to_calldata(&self) -> Vec<u8> {
         [self.c1.to_calldata(), self.c0.to_calldata()].concat()

@@ -16,7 +16,8 @@ use sonobe_primitives::{
     arithmetizations::{Arith, ArithConfig},
     circuits::AssignmentsOwned,
     commitments::{CommitmentDef, CommitmentDefGadget},
-    relations::{Relation, WitnessInstanceSampler}, utils::dummy::Dummy,
+    relations::{Relation, WitnessInstanceSampler},
+    utils::dummy::Dummy,
 };
 
 use self::{

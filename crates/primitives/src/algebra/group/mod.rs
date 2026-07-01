@@ -13,6 +13,8 @@ use ark_r1cs_std::{
 };
 use ark_relations::gr1cs::SynthesisError;
 
+#[cfg(feature = "evm")]
+use crate::utils::evm::serialize::EVMSerialize;
 use crate::{
     algebra::{
         Val,
@@ -21,7 +23,7 @@ use crate::{
     },
     circuits::{WitnessToPublic, inputize::Inputize},
     transcripts::{Absorbable, AbsorbableVar},
-    utils::{dummy::Dummy, evm::EVMSerialize},
+    utils::dummy::Dummy,
 };
 
 pub mod emulated;
@@ -37,7 +39,9 @@ pub trait SonobeCurve:
     CurveGroup<ScalarField: SonobeField, BaseField: SonobeField, Config: SWCurveConfig>
     + Absorbable
     + Val<
-        Var: CurveVar<Self, Self::BaseField> + AbsorbableVar<Self::BaseField> + WitnessToPublic
+        Var: CurveVar<Self, Self::BaseField>
+                 + AbsorbableVar<Self::BaseField>
+                 + WitnessToPublic
                  + Inputize<Self::BaseField>,
         EmulatedVar<Self::ScalarField> = EmulatedAffineVar<Self::ScalarField, Self>,
     >
@@ -126,6 +130,7 @@ impl<Base: SonobeField, Target: SonobeCurve> WitnessToPublic for EmulatedAffineV
     }
 }
 
+#[cfg(feature = "evm")]
 impl<P: SWCurveConfig<BaseField: EVMSerialize>> EVMSerialize for Affine<P> {
     fn to_calldata(&self) -> Vec<u8> {
         // the encoding of the additive identity is [0, 0] on the EVM
@@ -135,6 +140,7 @@ impl<P: SWCurveConfig<BaseField: EVMSerialize>> EVMSerialize for Affine<P> {
     }
 }
 
+#[cfg(feature = "evm")]
 impl<P: SWCurveConfig<BaseField: EVMSerialize>> EVMSerialize for Projective<P> {
     fn to_calldata(&self) -> Vec<u8> {
         self.into_affine().to_calldata()

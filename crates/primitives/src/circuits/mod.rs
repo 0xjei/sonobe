@@ -8,6 +8,7 @@ use ark_relations::gr1cs::{
 };
 use ark_std::{
     fmt::Debug,
+    mem::take,
     ops::{Deref, Index, IndexMut},
 };
 
@@ -247,7 +248,7 @@ impl<F: Field, const ARITH_ENABLED: bool, const ASSIGNMENTS_ENABLED: bool>
         &mut self,
         circuit: impl FnOnce(ConstraintSystemRef<F>) -> Result<R, SynthesisError>,
     ) -> Result<R, SynthesisError> {
-        let cs = std::mem::take(&mut self.0);
+        let cs = take(&mut self.0);
         let result = {
             let cs_ref = ConstraintSystemRef::new(cs);
             let result = circuit(cs_ref.clone())?;
@@ -255,7 +256,6 @@ impl<F: Field, const ARITH_ENABLED: bool, const ASSIGNMENTS_ENABLED: bool>
             result
         };
         if ARITH_ENABLED {
-            println!("{}", self.0.num_constraints());
             self.0.finalize();
         }
         Ok(result)

@@ -14,7 +14,12 @@ use sonobe_fs::{
     GroupBasedFoldingSchemePrimary, GroupBasedFoldingSchemeSecondary,
 };
 use sonobe_primitives::{
-    algebra::group::SonobeCurve, arithmetizations::ArithConfig, circuits::{FCircuit, WitnessToPublic}, commitments::CommitmentDef, transcripts::{TranscriptGadget, recording::RecordingTranscriptVar}, utils::dummy::Dummy
+    algebra::group::SonobeCurve,
+    arithmetizations::ArithConfig,
+    circuits::{FCircuit, WitnessToPublic},
+    commitments::CommitmentDef,
+    transcripts::{TranscriptGadget, recording::RecordingTranscriptVar},
+    utils::dummy::Dummy,
 };
 
 use crate::compilers::cyclefold::FoldingSchemeCycleFoldExt;

@@ -48,7 +48,7 @@ impl LinearSubspaceSNARK {
     }
 
     pub fn verify<E: Pairing>(vk: &VerifierKey<E>, x: &[E::G1Affine], pi: &E::G1Affine) -> bool {
-        // `PE::multi_pairin` internally uses `zip_eq`
+        // `E::multi_pairing` internally uses `zip_eq`
         E::multi_pairing([x, &[*pi][..]].concat(), [&vk.c, &[vk.a_neg][..]].concat()).is_zero()
     }
 }

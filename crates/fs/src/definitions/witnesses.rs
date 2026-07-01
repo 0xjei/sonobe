@@ -4,7 +4,8 @@ use ark_r1cs_std::{GR1CSVar, alloc::AllocVar};
 use ark_std::fmt::Debug;
 use sonobe_primitives::{
     arithmetizations::ArithConfig,
-    commitments::{CommitmentDef, CommitmentDefGadget}, utils::dummy::Dummy,
+    commitments::{CommitmentDef, CommitmentDefGadget},
+    utils::dummy::Dummy,
 };
 
 use super::utils::TaggedVec;

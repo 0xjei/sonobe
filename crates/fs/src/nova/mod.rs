@@ -6,7 +6,9 @@
 use ark_r1cs_std::boolean::Boolean;
 use ark_std::marker::PhantomData;
 use sonobe_primitives::{
-    algebra::{field::SonobeField, group::CF2}, arithmetizations::r1cs::{R1CS, circuits::R1CSVar}, commitments::{CommitmentDef, CommitmentDefGadget, GroupBasedCommitment}
+    algebra::{field::SonobeField, group::CF2},
+    arithmetizations::r1cs::{R1CS, circuits::R1CSVar},
+    commitments::{CommitmentDef, CommitmentDefGadget, GroupBasedCommitment},
 };
 
 use self::{

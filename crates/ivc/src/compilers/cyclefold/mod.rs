@@ -35,6 +35,8 @@ use sonobe_fs::{
     GroupBasedFoldingSchemePrimary, GroupBasedFoldingSchemeSecondary,
     definitions::circuits::FoldingSchemeDeciderGadget,
 };
+#[cfg(feature = "evm")]
+use sonobe_primitives::utils::evm::serialize::EVMSerialize;
 use sonobe_primitives::{
     algebra::{
         field::emulated::EmulatedFieldVar,
@@ -42,7 +44,7 @@ use sonobe_primitives::{
     },
     arithmetizations::{Arith, ArithConfig},
     circuits::{
-        ArithExtractor, AssignmentsExtractor, FCircuit,
+        ArithExtractor, AssignmentsExtractor, FCircuit, WitnessToPublic,
         cache::{CommitmentKeyCache, CommittedCache, RandomnessCache, UsizeSet},
         inputize::Inputize,
     },
@@ -50,9 +52,10 @@ use sonobe_primitives::{
     relations::WitnessInstanceSampler,
     transcripts::{
         Transcript, TranscriptGadget,
-        recording::RecordingTranscript,
+        recording::{RecordingTranscript, RecordingTranscriptVar},
         replay::{ReplayTranscript, ReplayTranscriptVar},
-    }, utils::dummy::Dummy,
+    },
+    utils::dummy::Dummy,
 };
 use sonobe_snarks::cp::CPSNARK;
 
@@ -60,9 +63,13 @@ use crate::{
     Error, IVCKeyGenerator, IVCPreprocessor, IVCProofCompressor, IVCProver, IVCTypes, IVCVerifier,
     compilers::cyclefold::circuits::{AugmentedCircuit, CycleFoldCircuit},
 };
+#[cfg(feature = "evm")]
+use crate::{IVCProofCompressorEVMExt, compilers::cyclefold::evm_verifier::FoldingSchemeEVMExt};
 
 pub mod adapters;
 pub mod circuits;
+#[cfg(feature = "evm")]
+pub mod evm_verifier;
 
 /// [`FoldingSchemeCycleFoldExt`] is the extension trait that a folding scheme
 /// must implement to be used with the CycleFold compiler.
@@ -519,10 +526,7 @@ impl<
 {
     type IVC = CycleFoldBasedIVC<FS1, FS2, T>;
 
-    type ProverKey<FC: FCircuit> = (
-        S::ProverKey,
-        <Self::IVC as IVCTypes>::VerifierKey<FC>,
-    );
+    type ProverKey<FC: FCircuit> = (S::ProverKey, <Self::IVC as IVCTypes>::VerifierKey<FC>);
 
     type VerifierKey<FC: FCircuit> = (
         S::VerifierKey,
@@ -532,7 +536,13 @@ impl<
         FC::State,
     );
 
-    type CompressedProof<FC: FCircuit> = (S::Proof, FS1::RU, FS1::IU, FS1::Proof<1, 1>);
+    type CompressedProof<FC: FCircuit> = (
+        S::Proof,
+        FS1::RU,
+        FS1::IU,
+        FS1::Proof<1, 1>,
+        Vec<<Self::IVC as IVCTypes>::Field>,
+    );
 
     type Error = Error;
 
@@ -607,7 +617,9 @@ impl<
         mut rng: impl RngCore,
     ) -> Result<Self::CompressedProof<FC>, Self::Error> {
         let hash = T::new_with_pp_hash(ivc_vk.2.0.clone(), ivc_vk.2.1);
-        let mut transcript = hash.separate_domain("transcript".as_ref());
+        // Record the transcript so the cached challenges can be returned in the
+        // compressed proof.
+        let mut transcript = RecordingTranscript::new(hash.separate_domain("transcript".as_ref()));
 
         let (WW, _, folding_proof) = FS1::prove(
             ivc_vk.0.to_pk(),
@@ -655,7 +667,13 @@ impl<
 
         let compressed_proof = S::prove(pk, &x[1..], w, &o, &mut rng)?;
 
-        Ok((compressed_proof, U.clone(), u.clone(), folding_proof))
+        Ok((
+            compressed_proof,
+            U.clone(),
+            u.clone(),
+            folding_proof,
+            transcript.cached_challenges,
+        ))
     }
 
     fn verify<FC: FCircuit<Field = <Self::IVC as IVCTypes>::Field>>(
@@ -663,7 +681,7 @@ impl<
         i: usize,
         initial_state: &FC::State,
         current_state: &FC::State,
-        (compressed_proof, U, u, folding_proof): &Self::CompressedProof<FC>,
+        (compressed_proof, U, u, folding_proof, challenges): &Self::CompressedProof<FC>,
     ) -> Result<(), Self::Error> {
         if !FC::same_state_shape(reference_state, initial_state)
             || !FC::same_state_shape(reference_state, current_state)
@@ -687,6 +705,7 @@ impl<
             vec![<Self::IVC as IVCTypes>::Field::from(i as u64)],
             FC::StateVar::inputize(initial_state),
             FC::StateVar::inputize(current_state),
+            challenges.clone(),
             commitments.iter().flat_map(<<FS1::Gadget as FoldingSchemeDefGadget>::CM as CommitmentDefGadget>::CommitmentVar::inputize).collect::<Vec<_>>()
         ]
         .concat();
@@ -695,6 +714,67 @@ impl<
         S::verify(vk, x, &c, compressed_proof)?;
 
         Ok(())
+    }
+}
+
+#[cfg(feature = "evm")]
+impl<
+    FS1: FoldingSchemeCycleFoldExt<
+            1,
+            1,
+            Arith: From<ConstraintSystem<CF1<<FS1::CM as CommitmentDef>::Commitment>>>,
+            Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>
+                        + FoldingSchemeDeciderGadget,
+            CM: CommitmentDef<
+                Scalar: EVMSerialize,
+                Commitment: SonobeCurve<BaseField = <FS2::CM as CommitmentDef>::Scalar>,
+            >,
+        > + FoldingSchemeEVMExt<1, 1>,
+    FS2: GroupBasedFoldingSchemeSecondary<
+            1,
+            1,
+            Arith: From<ConstraintSystem<CF1<<FS2::CM as CommitmentDef>::Commitment>>>,
+            Gadget: FoldingSchemeFullVerifierGadget<1, 1, VerifierKey = ()>
+                        + FoldingSchemeDeciderGadget,
+            CM: CommitmentDef<
+                Commitment: SonobeCurve<BaseField = <FS1::CM as CommitmentDef>::Scalar>,
+            >,
+        >,
+    T: Transcript<
+            CF1<<FS1::CM as CommitmentDef>::Commitment>,
+            Config: CanonicalSerialize,
+            Gadget: TranscriptGadget<
+                CF1<<FS1::CM as CommitmentDef>::Commitment>,
+                Config = T::Config,
+            >,
+        >,
+    S: CPSNARK<
+            Field = <FS1::CM as CommitmentDef>::Scalar,
+            Relation = (FS1::Arith, UsizeSet),
+            CommitmentKey = <FS1::CM as CommitmentDef>::Key,
+            Commitment = <<FS1::CM as CommitmentDef>::Commitment as CurveGroup>::Affine,
+            CommitmentOpening = <FS1::CM as CommitmentDef>::Scalar,
+            Proof: EVMSerialize,
+            Error = SynthesisError,
+        >,
+> IVCProofCompressorEVMExt for CycleFoldBasedIVCDecider<FS1, FS2, T, S>
+{
+    fn verify_calldata<FC: FCircuit<Field = <Self::IVC as IVCTypes>::Field>>(
+        (_vk, _folding_vk, _hash_config, _pp_hash, _reference_state): &Self::VerifierKey<FC>,
+        i: usize,
+        initial_state: &FC::State,
+        current_state: &FC::State,
+        (compressed_proof, U, u, folding_proof, challenges): &Self::CompressedProof<FC>,
+    ) -> Result<Vec<u8>, Self::Error> {
+        Ok((
+            vec![<Self::IVC as IVCTypes>::Field::from(i as u64)],
+            FC::StateVar::inputize(initial_state),
+            FC::StateVar::inputize(current_state),
+            &challenges,
+            FS1::verify_calldata(&[U], &[u], folding_proof)?,
+            compressed_proof,
+        )
+            .to_calldata())
     }
 }
 
@@ -770,9 +850,12 @@ impl<
 
         let hash = T::Gadget::new_with_pp_hash(hash_config.clone(), &pp_hash)?;
         let mut sponge = hash.separate_domain("sponge".as_ref())?;
-        let mut transcript = hash.separate_domain("transcript".as_ref())?;
+        let mut transcript =
+            RecordingTranscriptVar::new(hash.separate_domain("transcript".as_ref())?);
 
         let UU = FS1::Gadget::verify_hinted(&(), &mut transcript, [&U], [&u], &proof)?;
+
+        transcript.cached_challenges.mark_as_public()?;
 
         FS1::Gadget::decide_running(&dk1, &WW, &UU)?;
         FS2::Gadget::decide_running(&dk2, &cf_W, &cf_U)?;

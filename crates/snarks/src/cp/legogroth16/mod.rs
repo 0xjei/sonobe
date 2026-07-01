@@ -19,12 +19,13 @@ use hashbrown::HashSet;
 use itertools::{Either, Itertools};
 #[cfg(feature = "parallel")]
 use rayon::{iter::Either, prelude::*};
+#[cfg(feature = "evm")]
+use sonobe_primitives::utils::evm::serialize::EVMSerialize;
 use sonobe_primitives::{
     algebra::{field::SonobeField, group::SonobeCurve},
     arithmetizations::{Arith, ccs::CCS, r1cs::R1CS},
     circuits::cache::{IdentityHasher, UsizeSet},
     commitments::pedersen::PedersenKey,
-    utils::evm::EVMSerialize,
 };
 use thiserror::Error;
 
@@ -34,6 +35,9 @@ use crate::{
         LinearSubspaceSNARK, ProverKey as LinearSubspacePK, VerifierKey as LinearSubspaceVK,
     },
 };
+
+#[cfg(feature = "evm")]
+pub mod evm_verifier;
 
 pub struct CCGroth16ProverKey<E: Pairing> {
     /// The element `beta * G` in `E::G1`.
@@ -63,6 +67,15 @@ pub struct CCGroth16ProverKey<E: Pairing> {
 }
 
 pub struct CCGroth16VerifierKey<E: Pairing> {
+    #[cfg(feature = "evm")]
+    pub alpha_g1: E::G1Affine,
+    #[cfg(feature = "evm")]
+    pub beta_g2_neg: E::G2Affine,
+    #[cfg(feature = "evm")]
+    pub gamma_g2_neg: E::G2Affine,
+    #[cfg(feature = "evm")]
+    pub delta_g2_neg: E::G2Affine,
+
     /// The element `e(alpha * G, beta * H)` in `E::GT`.
     pub alpha_g1_beta_g2: PairingOutput<E>,
     /// The element `- gamma * H` in `E::G2`, prepared for use in pairings.
@@ -95,6 +108,7 @@ pub struct Proof<E: Pairing> {
     pub link_pi: E::G1Affine,
 }
 
+#[cfg(feature = "evm")]
 impl<E: Pairing<G1Affine: EVMSerialize, G2Affine: EVMSerialize>> EVMSerialize for Proof<E> {
     fn to_calldata(&self) -> Vec<u8> {
         [
@@ -338,6 +352,7 @@ impl<E: Pairing<G1: SonobeCurve, BaseField: SonobeField, ScalarField: SonobeFiel
         let alpha_g1 = (g1_generator * alpha).into_affine();
         let beta_g1 = (g1_generator * beta).into_affine();
         let beta_g2 = (g2_generator * beta).into_affine();
+        let gamma_g2 = (g2_generator * gamma).into_affine();
         let delta_g1 = (g1_generator * delta).into_affine();
         let delta_g2 = (g2_generator * delta).into_affine();
 
@@ -364,8 +379,16 @@ impl<E: Pairing<G1: SonobeCurve, BaseField: SonobeField, ScalarField: SonobeFiel
             },
             VerifierKey {
                 cc_vk: CCGroth16VerifierKey {
+                    #[cfg(feature = "evm")]
+                    alpha_g1,
+                    #[cfg(feature = "evm")]
+                    beta_g2_neg: -beta_g2,
+                    #[cfg(feature = "evm")]
+                    gamma_g2_neg: -gamma_g2,
+                    #[cfg(feature = "evm")]
+                    delta_g2_neg: -delta_g2,
                     alpha_g1_beta_g2: E::pairing(alpha_g1, beta_g2),
-                    gamma_g2_neg_pc: (g2_generator * -gamma).into_affine().into(),
+                    gamma_g2_neg_pc: (-gamma_g2).into(),
                     delta_g2_neg_pc: (-delta_g2).into(),
                     gamma_abc_g1_pub: gamma_abc_g1,
                 },
@@ -539,16 +562,17 @@ mod tests {
 
     use super::*;
 
-    struct MySillyCircuit<F: Field> {
-        a: F,
-        b: F,
-        c: F,
-        d: F,
-        e: F,
-        f: F,
+    /// A toy circuit enforcing `(a + b + c) * (d + e + f) = g`.
+    pub(crate) struct ToyCircuit<F: Field> {
+        pub a: F,
+        pub b: F,
+        pub c: F,
+        pub d: F,
+        pub e: F,
+        pub f: F,
     }
 
-    impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for MySillyCircuit<ConstraintF> {
+    impl<ConstraintF: Field> ConstraintSynthesizer<ConstraintF> for ToyCircuit<ConstraintF> {
         fn generate_constraints(
             self,
             cs: ConstraintSystemRef<ConstraintF>,
@@ -569,20 +593,26 @@ mod tests {
         }
     }
 
-    fn test_prove_and_verify<
+    pub(crate) fn toy_keygen<
         E: Pairing<G1: SonobeCurve, BaseField: SonobeField, ScalarField: SonobeField>,
     >(
-        n_iters: usize,
-    ) {
-        let mut rng = thread_rng();
-
-        let g = vec![E::G1Affine::rand(&mut rng)];
-        let h = E::G1Affine::rand(&mut rng);
-        let generators = [&g[..], &[h]].concat();
-        let ck = PedersenKey { g, h };
+        ck_sizes: &[usize],
+        mut rng: impl RngCore,
+    ) -> (ProverKey<E>, VerifierKey<E>, Vec<Vec<E::G1Affine>>) {
+        let cks: Vec<_> = ck_sizes
+            .iter()
+            .map(|&n| {
+                let g: Vec<_> = (0..n).map(|_| E::G1Affine::rand(&mut rng)).collect();
+                PedersenKey {
+                    g,
+                    h: E::G1Affine::rand(&mut rng),
+                }
+            })
+            .collect();
+        let generators = cks.iter().map(|ck| [&ck.g[..], &[ck.h]].concat()).collect();
 
         let mut cs = ArithExtractor::new();
-        cs.execute_synthesizer(MySillyCircuit {
+        cs.execute_synthesizer(ToyCircuit::<E::ScalarField> {
             a: Default::default(),
             b: Default::default(),
             c: Default::default(),
@@ -591,200 +621,74 @@ mod tests {
             f: Default::default(),
         })
         .unwrap();
-
         let (pk, vk) = LegoGroth16::<E>::generate_keys(
             (cs.arith().unwrap(), UsizeSet::from_iter(vec![0, 3, 5])),
-            &[&ck, &ck, &ck],
-            &mut rng,
+            &cks,
+            rng,
         )
         .unwrap();
-
-        for _ in 0..n_iters {
-            let a = E::ScalarField::rand(&mut rng);
-            let b = E::ScalarField::rand(&mut rng);
-            let c = E::ScalarField::rand(&mut rng);
-            let d = E::ScalarField::rand(&mut rng);
-            let e = E::ScalarField::rand(&mut rng);
-            let f = E::ScalarField::rand(&mut rng);
-
-            let mut cs = AssignmentsExtractor::new();
-            cs.execute_synthesizer(MySillyCircuit { a, b, c, d, e, f })
-                .unwrap();
-            let assignments = cs.assignments().unwrap();
-
-            let o = [
-                E::ScalarField::rand(&mut rng),
-                E::ScalarField::rand(&mut rng),
-                E::ScalarField::rand(&mut rng),
-            ];
-
-            let cm = vec![
-                E::G1::msm_unchecked(&generators, &[d, o[0]]).into_affine(),
-                E::G1::msm_unchecked(&generators, &[e, o[1]]).into_affine(),
-                E::G1::msm_unchecked(&generators, &[f, o[2]]).into_affine(),
-            ];
-
-            let proof = LegoGroth16::<E>::prove(
-                &pk,
-                &assignments.public,
-                &assignments.private,
-                &o,
-                &mut rng,
-            )
-            .unwrap();
-
-            assert!(
-                LegoGroth16::<E>::verify(&vk, &[(a + b + c) * (d + e + f)], &cm, &proof).is_ok()
-            );
-            assert!(LegoGroth16::<E>::verify(&vk, &[a], &cm, &proof).is_err());
-        }
+        (pk, vk, generators)
     }
 
-    fn test_prove_and_verify2<
+    pub(crate) fn toy_prove<
         E: Pairing<G1: SonobeCurve, BaseField: SonobeField, ScalarField: SonobeField>,
     >(
-        n_iters: usize,
-    ) {
-        let mut rng = thread_rng();
+        pk: &ProverKey<E>,
+        generators: &[Vec<E::G1Affine>],
+        ck_sizes: &[usize],
+        mut rng: impl RngCore,
+    ) -> (E::ScalarField, Vec<E::G1Affine>, Proof<E>) {
+        let [a, b, c, d, e, f] = [(); 6].map(|_| E::ScalarField::rand(&mut rng));
 
-        let g = vec![E::G1Affine::rand(&mut rng), E::G1Affine::rand(&mut rng)];
-        let h = E::G1Affine::rand(&mut rng);
-        let generators1 = [&g[..], &[h]].concat();
-        let ck1 = PedersenKey { g, h };
+        let mut cs = AssignmentsExtractor::new();
+        cs.execute_synthesizer(ToyCircuit { a, b, c, d, e, f })
+            .unwrap();
+        let assignments = cs.assignments().unwrap();
 
-        let g = vec![E::G1Affine::rand(&mut rng)];
-        let h = E::G1Affine::rand(&mut rng);
-        let generators2 = [&g[..], &[h]].concat();
-        let ck2 = PedersenKey { g, h };
+        let committed = [d, e, f];
+        let mut next = 0;
+        let mut o = vec![];
+        let commitments = ck_sizes
+            .iter()
+            .zip(generators)
+            .map(|(&n, gens)| {
+                let opening = E::ScalarField::rand(&mut rng);
+                o.push(opening);
+                let scalars: Vec<_> = committed[next..next + n]
+                    .iter()
+                    .copied()
+                    .chain([opening])
+                    .collect();
+                next += n;
+                E::G1::msm_unchecked(gens, &scalars).into_affine()
+            })
+            .collect();
 
-        let mut cs = ArithExtractor::new();
-        cs.execute_synthesizer(MySillyCircuit {
-            a: Default::default(),
-            b: Default::default(),
-            c: Default::default(),
-            d: Default::default(),
-            e: Default::default(),
-            f: Default::default(),
-        })
-        .unwrap();
-
-        let (pk, vk) = LegoGroth16::<E>::generate_keys(
-            (cs.arith().unwrap(), UsizeSet::from_iter(vec![0, 3, 5])),
-            &[&ck1, &ck2],
-            &mut rng,
-        )
-        .unwrap();
-
-        for _ in 0..n_iters {
-            let a = E::ScalarField::rand(&mut rng);
-            let b = E::ScalarField::rand(&mut rng);
-            let c = E::ScalarField::rand(&mut rng);
-            let d = E::ScalarField::rand(&mut rng);
-            let e = E::ScalarField::rand(&mut rng);
-            let f = E::ScalarField::rand(&mut rng);
-
-            let mut cs = AssignmentsExtractor::new();
-            cs.execute_synthesizer(MySillyCircuit { a, b, c, d, e, f })
-                .unwrap();
-            let assignments = cs.assignments().unwrap();
-
-            let o = [
-                E::ScalarField::rand(&mut rng),
-                E::ScalarField::rand(&mut rng),
-            ];
-
-            let cm = vec![
-                E::G1::msm_unchecked(&generators1, &[d, e, o[0]]).into_affine(),
-                E::G1::msm_unchecked(&generators2, &[f, o[1]]).into_affine(),
-            ];
-
-            let proof = LegoGroth16::<E>::prove(
-                &pk,
-                &assignments.public,
-                &assignments.private,
-                &o,
-                &mut rng,
-            )
+        let proof = LegoGroth16::<E>::prove(pk, &assignments.public, &assignments.private, &o, rng)
             .unwrap();
 
-            assert!(
-                LegoGroth16::<E>::verify(&vk, &[(a + b + c) * (d + e + f)], &cm, &proof).is_ok()
-            );
-            assert!(LegoGroth16::<E>::verify(&vk, &[a], &cm, &proof).is_err());
-        }
+        ((a + b + c) * (d + e + f), commitments, proof)
     }
 
-    fn test_prove_and_verify3<
+    fn test_legogroth16_opt<
         E: Pairing<G1: SonobeCurve, BaseField: SonobeField, ScalarField: SonobeField>,
     >(
-        n_iters: usize,
+        ck_sizes: &[usize],
+        mut rng: impl RngCore,
     ) {
-        let mut rng = thread_rng();
+        let (pk, vk, generators) = toy_keygen::<E>(ck_sizes, &mut rng);
 
-        let g = vec![
-            E::G1Affine::rand(&mut rng),
-            E::G1Affine::rand(&mut rng),
-            E::G1Affine::rand(&mut rng),
-        ];
-        let h = E::G1Affine::rand(&mut rng);
-        let generators = [&g[..], &[h]].concat();
-        let ck = PedersenKey { g, h };
-
-        let mut cs = ArithExtractor::new();
-        cs.execute_synthesizer(MySillyCircuit {
-            a: Default::default(),
-            b: Default::default(),
-            c: Default::default(),
-            d: Default::default(),
-            e: Default::default(),
-            f: Default::default(),
-        })
-        .unwrap();
-
-        let (pk, vk) = LegoGroth16::<E>::generate_keys(
-            (cs.arith().unwrap(), UsizeSet::from_iter(vec![0, 3, 5])),
-            &[&ck],
-            &mut rng,
-        )
-        .unwrap();
-
-        for _ in 0..n_iters {
-            let a = E::ScalarField::rand(&mut rng);
-            let b = E::ScalarField::rand(&mut rng);
-            let c = E::ScalarField::rand(&mut rng);
-            let d = E::ScalarField::rand(&mut rng);
-            let e = E::ScalarField::rand(&mut rng);
-            let f = E::ScalarField::rand(&mut rng);
-
-            let mut cs = AssignmentsExtractor::new();
-            cs.execute_synthesizer(MySillyCircuit { a, b, c, d, e, f })
-                .unwrap();
-            let assignments = cs.assignments().unwrap();
-
-            let o = [E::ScalarField::rand(&mut rng)];
-
-            let cm = vec![E::G1::msm_unchecked(&generators, &[d, e, f, o[0]]).into_affine()];
-
-            let proof = LegoGroth16::<E>::prove(
-                &pk,
-                &assignments.public,
-                &assignments.private,
-                &o,
-                &mut rng,
-            )
-            .unwrap();
-
-            assert!(
-                LegoGroth16::<E>::verify(&vk, &[(a + b + c) * (d + e + f)], &cm, &proof).is_ok()
-            );
-            assert!(LegoGroth16::<E>::verify(&vk, &[a], &cm, &proof).is_err());
-        }
+        let (g, cm, proof) = toy_prove::<E>(&pk, &generators, ck_sizes, &mut rng);
+        assert!(LegoGroth16::<E>::verify(&vk, &[g], &cm, &proof).is_ok());
+        assert!(LegoGroth16::<E>::verify(&vk, &[g + E::ScalarField::ONE], &cm, &proof).is_err());
     }
 
     #[test]
-    fn prove_and_verify() {
-        test_prove_and_verify::<Bn254>(5);
-        test_prove_and_verify2::<Bn254>(5);
-        test_prove_and_verify3::<Bn254>(5);
+    fn test_legogroth16() {
+        let mut rng = thread_rng();
+        // Three commitment layouts for the committed witnesses `d, e, f`.
+        test_legogroth16_opt::<Bn254>(&[1, 1, 1], &mut rng);
+        test_legogroth16_opt::<Bn254>(&[2, 1], &mut rng);
+        test_legogroth16_opt::<Bn254>(&[3], &mut rng);
     }
 }

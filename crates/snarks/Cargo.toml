@@ -6,6 +6,7 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+ark-bn254 = { workspace = true, features = ["curve", "r1cs"], optional = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true, features = ["asm"] }
 ark-groth16 = { workspace = true }
@@ -14,6 +15,7 @@ ark-relations = { workspace = true }
 ark-serialize = { workspace = true }
 ark-snark = { workspace = true }
 ark-std = { workspace = true, features = ["getrandom"] }
+askama = { workspace = true, optional = true }
 hashbrown = { workspace = true }
 itertools = { workspace = true }
 thiserror = { workspace = true }
@@ -33,6 +35,7 @@ wasm-bindgen-test = { workspace = true }
 
 [features]
 default = []
+evm = ["dep:askama", "sonobe-primitives/evm", "dep:ark-bn254"]
 parallel = [
     "sonobe-primitives/parallel",
     "ark-groth16/parallel",
