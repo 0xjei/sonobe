@@ -61,7 +61,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const CHALLENGE_BITS: usize> Fol
     type IU = IU<CM>;
 
     type TranscriptField = TF;
-    type Arith = R1CS<CM::Scalar>;
+    type Arith = R1CS<CM::Unit>;
 
     type Config = usize;
     type PublicParam = CM::Key;

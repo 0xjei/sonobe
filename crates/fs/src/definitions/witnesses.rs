@@ -21,7 +21,7 @@ pub trait FoldingWitness<CM: CommitmentDef>: Debug + for<'a> Dummy<&'a ArithConf
     /// [`FoldingWitness::openings`] returns the reference to all openings
     /// contained in the witness, where each opening a tuple of the values being
     /// committed to and the randomness used in the commitment.
-    fn openings(&self) -> Vec<(&[CM::Scalar], &CM::Randomness)>;
+    fn openings(&self) -> Vec<(&[CM::Unit], &CM::Randomness)>;
 }
 
 /// [`PlainWitness`] is a vector of field elements that are the witnesses to a
@@ -40,10 +40,10 @@ impl<V: Default + Clone> Dummy<&ArithConfig> for PlainWitness<V> {
     }
 }
 
-impl<CM: CommitmentDef> FoldingWitness<CM> for PlainWitness<CM::Scalar> {
+impl<CM: CommitmentDef> FoldingWitness<CM> for PlainWitness<CM::Unit> {
     const N_OPENINGS: usize = 0;
 
-    fn openings(&self) -> Vec<(&[CM::Scalar], &CM::Randomness)> {
+    fn openings(&self) -> Vec<(&[CM::Unit], &CM::Randomness)> {
         vec![]
     }
 }

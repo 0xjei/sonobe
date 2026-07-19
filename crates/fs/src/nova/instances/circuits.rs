@@ -22,12 +22,12 @@ pub struct RunningInstanceVar<CM: CommitmentDefGadget> {
     /// [`RunningInstanceVar::cm_e`] is the error term commitment.
     pub cm_e: CM::CommitmentVar,
     /// [`RunningInstanceVar::u`] is the constant term.
-    pub u: CM::ScalarVar,
+    pub u: CM::UnitVar,
     /// [`RunningInstanceVar::cm_w`] is the witness commitment.
     pub cm_w: CM::CommitmentVar,
     /// [`RunningInstanceVar::x`] is the vector of public inputs (to the
     /// circuit).
-    pub x: Vec<CM::ScalarVar>,
+    pub x: Vec<CM::UnitVar>,
 }
 
 impl<CM: CommitmentDefGadget> AllocVar<RunningInstance<CM::Widget>, CF<CM>>
@@ -108,14 +108,14 @@ impl<CM: CommitmentDefGadget> FoldingInstanceVar<CM> for RunningInstanceVar<CM> 
         vec![&self.cm_w, &self.cm_e]
     }
 
-    fn public_inputs(&self) -> &Vec<CM::ScalarVar> {
+    fn public_inputs(&self) -> &Vec<CM::UnitVar> {
         &self.x
     }
 
     fn new_witness_with_public_inputs(
         cs: impl Into<Namespace<CF<CM>>>,
         u: &Self::Value,
-        x: Vec<CM::ScalarVar>,
+        x: Vec<CM::UnitVar>,
     ) -> Result<Self, SynthesisError> {
         let cs = cs.into().cs();
         Ok(Self {
@@ -134,7 +134,7 @@ pub struct IncomingInstanceVar<CM: CommitmentDefGadget> {
     pub cm_w: CM::CommitmentVar,
     /// [`IncomingInstanceVar::x`] is the vector of public inputs (to the
     /// circuit).
-    pub x: Vec<CM::ScalarVar>,
+    pub x: Vec<CM::UnitVar>,
 }
 
 impl<CM: CommitmentDefGadget> AllocVar<IncomingInstance<CM::Widget>, CF<CM>>
@@ -203,14 +203,14 @@ impl<CM: CommitmentDefGadget> FoldingInstanceVar<CM> for IncomingInstanceVar<CM>
         vec![&self.cm_w]
     }
 
-    fn public_inputs(&self) -> &Vec<CM::ScalarVar> {
+    fn public_inputs(&self) -> &Vec<CM::UnitVar> {
         &self.x
     }
 
     fn new_witness_with_public_inputs(
         cs: impl Into<Namespace<CF<CM>>>,
         u: &Self::Value,
-        x: Vec<CM::ScalarVar>,
+        x: Vec<CM::UnitVar>,
     ) -> Result<Self, SynthesisError> {
         let cs = cs.into().cs();
         Ok(Self {

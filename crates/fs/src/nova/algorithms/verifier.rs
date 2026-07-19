@@ -26,7 +26,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemeVer
         let (U, u) = (Us[0].borrow(), us[0].borrow());
 
         let rho_bits = transcript.add(&U).add(&u).add(cm_t).challenge_bits(B);
-        let rho = CM::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Unit::from_bits_le(&rho_bits);
 
         Ok(Self::RU {
             cm_e: U.cm_e + cm_t.mul(rho),
@@ -54,7 +54,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemeVer
         let (U1, U2) = (U1.borrow(), U2.borrow());
 
         let rho_bits = transcript.add(&(U1, U2)).add(cm_t).challenge_bits(B);
-        let rho = CM::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Unit::from_bits_le(&rho_bits);
         let rho_squared = rho * rho;
 
         Ok(Self::RU {

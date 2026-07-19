@@ -14,12 +14,12 @@ use super::{IncomingWitness, RunningWitness};
 #[derive(Debug, PartialEq)]
 pub struct RunningWitnessVar<CM: CommitmentDefGadget> {
     /// [`RunningWitnessVar::e`] is the error term.
-    pub e: Vec<CM::ScalarVar>,
+    pub e: Vec<CM::UnitVar>,
     /// [`RunningWitnessVar::r_e`] is the randomness for the error term
     /// commitment.
     pub r_e: CM::RandomnessVar,
     /// [`RunningWitnessVar::w`] is the vector of witnesses (to the circuit).
-    pub w: Vec<CM::ScalarVar>,
+    pub w: Vec<CM::UnitVar>,
     /// [`RunningWitnessVar::r_w`] is the randomness for the witness commitment.
     pub r_w: CM::RandomnessVar,
 }
@@ -69,7 +69,7 @@ impl<CM: CommitmentDefGadget> GR1CSVar<CF<CM>> for RunningWitnessVar<CM> {
 #[derive(Debug, PartialEq)]
 pub struct IncomingWitnessVar<CM: CommitmentDefGadget> {
     /// [`IncomingWitnessVar::w`] is the vector of witnesses (to the circuit).
-    pub w: Vec<CM::ScalarVar>,
+    pub w: Vec<CM::UnitVar>,
     /// [`IncomingWitnessVar::r_w`] is the randomness for the witness
     /// commitment.
     pub r_w: CM::RandomnessVar,

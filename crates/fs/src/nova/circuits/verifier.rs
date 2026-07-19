@@ -26,7 +26,7 @@ where
         proof: &Self::Proof<1, 1>,
     ) -> Result<Self::RU, SynthesisError> {
         let rho_bits = transcript.add(&U)?.add(&u)?.add(proof)?.challenge_bits(B)?;
-        let rho = CM::ScalarVar::from_bits_le(&rho_bits)?;
+        let rho = CM::UnitVar::from_bits_le(&rho_bits)?;
 
         if U.x.len() != u.x.len() {
             return Err(SynthesisError::Unsatisfiable);
@@ -67,7 +67,7 @@ where
         proof: &Self::Proof<2, 0>,
     ) -> Result<Self::RU, SynthesisError> {
         let rho_bits = transcript.add(&(U1, U2))?.add(proof)?.challenge_bits(B)?;
-        let rho = CM::ScalarVar::from_bits_le(&rho_bits)?;
+        let rho = CM::UnitVar::from_bits_le(&rho_bits)?;
 
         if U1.x.len() != U2.x.len() {
             return Err(SynthesisError::Unsatisfiable);
@@ -118,7 +118,7 @@ where
         proof: &Self::Proof<1, 1>,
     ) -> Result<Self::RU, SynthesisError> {
         let rho_bits = transcript.add(&U)?.add(&u)?.add(proof)?.challenge_bits(B)?;
-        let rho = CM::ScalarVar::from_bits_le(&rho_bits)?;
+        let rho = CM::UnitVar::from_bits_le(&rho_bits)?;
 
         if U.x.len() != u.x.len() {
             return Err(SynthesisError::Unsatisfiable);

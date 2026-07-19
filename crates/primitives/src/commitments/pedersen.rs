@@ -148,7 +148,7 @@ impl<C: SonobeCurve> CommitmentDef for Pedersen<C, false> {
     const IS_HIDING: bool = false;
 
     type Key = PedersenKey<C, false>;
-    type Scalar = SF<C>;
+    type Unit = SF<C>;
     type Commitment = C;
     type Randomness = Null;
 }
@@ -157,7 +157,7 @@ impl<C: SonobeCurve> CommitmentDef for Pedersen<C, true> {
     const IS_HIDING: bool = true;
 
     type Key = PedersenKey<C, true>;
-    type Scalar = SF<C>;
+    type Unit = SF<C>;
     type Commitment = C;
     type Randomness = SF<C>;
 }
@@ -302,7 +302,7 @@ impl<C: SonobeCurve> HasWidget for PedersenGadget<C, false> {
 impl<C: SonobeCurve> CommitmentDefGadget for PedersenGadget<C, false> {
     type KeyVar = PedersenKeyVar<C, false>;
 
-    type ScalarVar = EmulatedFieldVar<BF<C>, SF<C>>;
+    type UnitVar = EmulatedFieldVar<BF<C>, SF<C>>;
 
     type CommitmentVar = Var<C, Canonical>;
 
@@ -320,7 +320,7 @@ impl<C: SonobeCurve> HasWidget for PedersenGadget<C, true> {
 impl<C: SonobeCurve> CommitmentDefGadget for PedersenGadget<C, true> {
     type KeyVar = PedersenKeyVar<C, true>;
 
-    type ScalarVar = EmulatedFieldVar<BF<C>, SF<C>>;
+    type UnitVar = EmulatedFieldVar<BF<C>, SF<C>>;
 
     type CommitmentVar = Var<C, Canonical>;
 
@@ -338,7 +338,7 @@ impl<C: SonobeCurve> HasWidget for PedersenEmulatedGadget<C, false> {
 impl<C: SonobeCurve> CommitmentDefGadget for PedersenEmulatedGadget<C, false> {
     type KeyVar = PedersenEmulatedKeyVar<C, false>;
 
-    type ScalarVar = FpVar<SF<C>>;
+    type UnitVar = FpVar<SF<C>>;
 
     type CommitmentVar = EmulatedAffineVar<SF<C>, C>;
 
@@ -356,7 +356,7 @@ impl<C: SonobeCurve> HasWidget for PedersenEmulatedGadget<C, true> {
 impl<C: SonobeCurve> CommitmentDefGadget for PedersenEmulatedGadget<C, true> {
     type KeyVar = PedersenEmulatedKeyVar<C, true>;
 
-    type ScalarVar = FpVar<SF<C>>;
+    type UnitVar = FpVar<SF<C>>;
 
     type CommitmentVar = EmulatedAffineVar<SF<C>, C>;
 

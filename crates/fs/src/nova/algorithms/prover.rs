@@ -71,7 +71,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemePro
         let (cm_t, r_t) = CM::commit(&pk.ck, &t, rng)?;
 
         let rho_bits = transcript.add(&U).add(&u).add(&cm_t).challenge_bits(B);
-        let rho = CM::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Unit::from_bits_le(&rho_bits);
 
         let WW = Self::RW {
             e: cfg_iter!(W.e)
@@ -121,7 +121,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemePro
         let (cm_t, r_t) = CM::commit(&pk.ck, &t, rng)?;
 
         let rho_bits = transcript.add(&(U1, U2)).add(&cm_t).challenge_bits(B);
-        let rho = CM::Scalar::from_bits_le(&rho_bits);
+        let rho = CM::Unit::from_bits_le(&rho_bits);
         let rho_squared = rho * rho;
 
         let WW = Self::RW {

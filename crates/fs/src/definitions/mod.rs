@@ -55,7 +55,7 @@ use self::{
 pub trait FoldingSchemeDef {
     /// [`FoldingSchemeDef::CM`] is the commitment scheme used by the folding
     /// scheme.
-    type CM: CommitmentDef<Scalar: SonobeField>;
+    type CM: CommitmentDef<Unit: SonobeField>;
     /// [`FoldingSchemeDef::RW`] is the type of running witness.
     type RW: FoldingWitness<Self::CM>;
     /// [`FoldingSchemeDef::RU`] is the type of running instance.
@@ -87,7 +87,7 @@ pub trait FoldingSchemeDef {
         + WitnessInstanceSampler<
             Self::IW,
             Self::IU,
-            Source = AssignmentsOwned<<Self::CM as CommitmentDef>::Scalar>,
+            Source = AssignmentsOwned<<Self::CM as CommitmentDef>::Unit>,
             Error = Error,
         >;
     /// [`FoldingSchemeDef::Challenge`] is the type of challenge generated
