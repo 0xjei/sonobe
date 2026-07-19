@@ -1,12 +1,19 @@
+use ark_ff::PrimeField;
 use ark_std::marker::PhantomData;
 
 pub trait CircuitRepr {}
 
-pub trait HasValue {
+pub trait HasConstraintField {
+    type ConstraintField: PrimeField;
+}
+
+pub type CF<X> = <X as HasConstraintField>::ConstraintField;
+
+pub trait HasValue: HasConstraintField {
     type Value;
 }
 
-pub trait HasWidget {
+pub trait HasWidget: HasConstraintField {
     type Widget;
 }
 

@@ -19,7 +19,7 @@ use crate::{
     algebra::field::emulated::EmulatedFieldVar,
     circuits::{
         WitnessToPublic,
-        linkage::{Canonical, Emulated, HasValue, HasVar},
+        linkage::{Canonical, Emulated, HasConstraintField, HasValue, HasVar},
     },
     traits::{Inputize, InputizeEmulated},
     transcripts::{Absorbable, AbsorbableVar},
@@ -45,6 +45,10 @@ pub trait SonobeField:
 
 impl<P: FpConfig<N>, const N: usize> SonobeField for Fp<P, N> {
     const BITS_PER_LIMB: usize = 32;
+}
+
+impl<F: PrimeField> HasConstraintField for FpVar<F> {
+    type ConstraintField = F;
 }
 
 impl<F: PrimeField> HasValue for FpVar<F> {

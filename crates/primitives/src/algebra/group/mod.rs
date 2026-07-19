@@ -5,7 +5,7 @@ use ark_ec::{
     AffineRepr, CurveGroup, PrimeGroup,
     short_weierstrass::{Projective, SWCurveConfig},
 };
-use ark_ff::{Field, One, PrimeField, Zero};
+use ark_ff::{One, PrimeField, Zero};
 use ark_r1cs_std::{
     convert::ToConstraintFieldGadget,
     fields::fp::FpVar,
@@ -17,18 +17,13 @@ use crate::{
     algebra::{field::SonobeField, group::emulated::EmulatedAffineVar},
     circuits::{
         WitnessToPublic,
-        linkage::{Canonical, Emulated, HasValue, HasVar},
+        linkage::{Canonical, Emulated, HasConstraintField, HasValue, HasVar},
     },
     traits::{Dummy, Inputize, InputizeEmulated},
     transcripts::{Absorbable, AbsorbableVar},
 };
 
 pub mod emulated;
-
-/// [`CF1`] is a type alias for the scalar field of a curve `C`.
-pub type CF1<C> = <C as PrimeGroup>::ScalarField;
-/// [`CF2`] is a type alias for the base field of a curve `C`.
-pub type CF2<C> = <<C as CurveGroup>::BaseField as Field>::BasePrimeField;
 
 /// [`SonobeCurve`] trait is a wrapper around [`CurveGroup`] that also includes
 /// necessary bounds for the curve to be used conveniently in folding schemes.
@@ -37,6 +32,7 @@ pub trait SonobeCurve:
     + Absorbable
     + Inputize<Self::BaseField>
     + InputizeEmulated<Self::ScalarField>
+    + HasGroup<Group = Self>
     + HasVar<
         Canonical,
         Var: CurveVar<Self, Self::BaseField> + AbsorbableVar<Self::BaseField> + WitnessToPublic,
@@ -47,6 +43,12 @@ pub trait SonobeCurve:
 impl<P: SWCurveConfig<ScalarField: SonobeField, BaseField: SonobeField>> SonobeCurve
     for Projective<P>
 {
+}
+
+impl<P: SWCurveConfig<BaseField: PrimeField>> HasConstraintField
+    for ProjectiveVar<P, FpVar<P::BaseField>>
+{
+    type ConstraintField = P::BaseField;
 }
 
 impl<P: SWCurveConfig<BaseField: PrimeField>> HasValue for ProjectiveVar<P, FpVar<P::BaseField>> {
@@ -127,3 +129,16 @@ impl<P: SWCurveConfig<BaseField: PrimeField>> WitnessToPublic
         self.to_constraint_field()?[..2].mark_as_public()
     }
 }
+
+pub trait HasGroup {
+    type Group: SonobeCurve;
+}
+
+impl<P: SWCurveConfig<ScalarField: SonobeField, BaseField: SonobeField>> HasGroup
+    for Projective<P>
+{
+    type Group = Self;
+}
+
+pub type BF<T> = <<T as HasGroup>::Group as CurveGroup>::BaseField;
+pub type SF<T> = <<T as HasGroup>::Group as PrimeGroup>::ScalarField;

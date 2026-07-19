@@ -11,7 +11,7 @@ use ark_relations::gr1cs::{ConstraintSystemRef, SynthesisError};
 use ark_std::mem::transmute_copy;
 
 use crate::{
-    circuits::linkage::{Canonical, HasValue, HasVar},
+    circuits::linkage::{Canonical, HasConstraintField, HasValue, HasVar},
     transcripts::{AbsorbableVar, Transcript, TranscriptTypes, TranscriptVar, TranscriptVarTypes},
 };
 
@@ -60,12 +60,15 @@ impl<F: PrimeField> Transcript for PoseidonSponge<F> {
     }
 }
 
+impl<F: PrimeField> HasConstraintField for PoseidonSpongeVar<F> {
+    type ConstraintField = F;
+}
+
 impl<F: PrimeField> HasValue for PoseidonSpongeVar<F> {
     type Value = PoseidonSponge<F>;
 }
 
 impl<F: PrimeField> TranscriptVarTypes for PoseidonSpongeVar<F> {
-    type ConstraintField = F;
     type Config = PoseidonConfig<F>;
 }
 

@@ -26,12 +26,14 @@ use sonobe_fs::{
     GroupBasedFoldingSchemePrimary, GroupBasedFoldingSchemeSecondary,
 };
 use sonobe_primitives::{
-    algebra::field::emulated::EmulatedFieldVar,
+    algebra::{
+        field::emulated::EmulatedFieldVar,
+        group::{BF, HasGroup, SF},
+    },
     arithmetizations::{Arith, ArithConfig},
     circuits::{ArithExtractor, AssignmentsExtractor, FCircuit},
-    commitments::CommitmentDef,
     relations::WitnessInstanceSampler,
-    traits::{CF1, CF2, Dummy, SonobeCurve},
+    traits::{Dummy, SonobeCurve},
     transcripts::{
         Transcript, TranscriptVar,
         recording::RecordingTranscript,
@@ -54,7 +56,7 @@ pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
 {
     /// [`FoldingSchemeCycleFoldExt::CFCircuit`] is the CycleFold circuit type
     /// associated with the folding scheme.
-    type CFCircuit: CycleFoldCircuit<CF2<<Self::CM as CommitmentDef>::Commitment>>;
+    type CFCircuit: CycleFoldCircuit<BF<Self::CM>>;
 
     /// [`FoldingSchemeCycleFoldExt::N_CYCLEFOLDS`] specifies how many CycleFold
     /// operations are needed to verify the primary folding scheme's proof.
@@ -67,7 +69,7 @@ pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
         Us: &[impl Borrow<Self::RU>; M],
         us: &[impl Borrow<Self::IU>; N],
         proof: &Self::Proof<M, N>,
-        transcript: ReplayTranscript<CF1<<Self::CM as CommitmentDef>::Commitment>>,
+        transcript: ReplayTranscript<Self::TranscriptField>,
     ) -> Vec<Self::CFCircuit>;
 
     /// [`FoldingSchemeCycleFoldExt::to_cyclefold_inputs`] computes the inputs
@@ -80,18 +82,8 @@ pub trait FoldingSchemeCycleFoldExt<const M: usize, const N: usize>:
         us: [<Self::Gadget as FoldingSchemeDefGadget>::IU; N],
         UU: <Self::Gadget as FoldingSchemeDefGadget>::RU,
         proof: <Self::Gadget as FoldingSchemeDefGadget>::Proof<M, N>,
-        transcript: ReplayTranscriptVar<CF1<<Self::CM as CommitmentDef>::Commitment>>,
-    ) -> Result<
-        Vec<
-            Vec<
-                EmulatedFieldVar<
-                    <Self::CM as CommitmentDef>::Scalar,
-                    CF2<<Self::CM as CommitmentDef>::Commitment>,
-                >,
-            >,
-        >,
-        SynthesisError,
-    >;
+        transcript: ReplayTranscriptVar<Self::TranscriptField>,
+    ) -> Result<Vec<Vec<EmulatedFieldVar<SF<Self::CM>, BF<Self::CM>>>>, SynthesisError>;
 }
 
 /// [`Key`] is the prover / verifier key for the CycleFold-based IVC scheme.
@@ -144,32 +136,28 @@ where
     FS1: FoldingSchemeCycleFoldExt<
             1,
             1,
-            Arith: From<ConstraintSystem<CF1<<FS1::CM as CommitmentDef>::Commitment>>>,
+            Arith: From<ConstraintSystem<SF<FS1::CM>>>,
             // TODO (@winderica):
             // All folding schemes we currently support have an empty verifier
             // key, so I used `()` here, but this should be generalized in the
             // future.
             Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
-            CM: CommitmentDef<
-                Commitment: SonobeCurve<BaseField = <FS2::CM as CommitmentDef>::Scalar>,
-            >,
+            CM: HasGroup<Group: SonobeCurve<BaseField = SF<FS2::CM>>>,
         >,
     FS2: GroupBasedFoldingSchemeSecondary<
             1,
             1,
-            Arith: From<ConstraintSystem<CF1<<FS2::CM as CommitmentDef>::Commitment>>>,
+            Arith: From<ConstraintSystem<SF<FS2::CM>>>,
             Gadget: FoldingSchemeFullVerifierGadget<1, 1, VerifierKey = ()>,
-            CM: CommitmentDef<
-                Commitment: SonobeCurve<BaseField = <FS1::CM as CommitmentDef>::Scalar>,
-            >,
+            CM: HasGroup<Group: SonobeCurve<BaseField = SF<FS1::CM>>>,
         >,
     T: Transcript<
-            Field = CF1<<FS1::CM as CommitmentDef>::Commitment>,
+            Field = FS1::TranscriptField,
             Config: CanonicalSerialize,
             Var: TranscriptVar<Config = T::Config>,
         >,
 {
-    type Field = <FS1::CM as CommitmentDef>::Scalar;
+    type Field = FS1::TranscriptField;
 
     type Config = (FS1::Config, FS2::Config, T::Config);
 

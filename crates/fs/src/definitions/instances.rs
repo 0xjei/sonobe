@@ -5,6 +5,7 @@ use ark_relations::gr1cs::{Namespace, SynthesisError};
 use ark_std::fmt::Debug;
 use sonobe_primitives::{
     arithmetizations::ArithConfig,
+    circuits::linkage::CF,
     commitments::{CommitmentDef, CommitmentDefGadget},
     traits::Dummy,
     transcripts::{Absorbable, AbsorbableVar},
@@ -70,10 +71,10 @@ impl<CM: CommitmentDef> FoldingInstance<CM> for PlainInstance<CM::Scalar> {
 
 /// [`FoldingInstanceVar`] is the in-circuit variable of [`FoldingInstance`].
 pub trait FoldingInstanceVar<CM: CommitmentDefGadget>:
-    AllocVar<Self::Value, CM::ConstraintField>
-    + GR1CSVar<CM::ConstraintField, Value: FoldingInstance<CM::Widget>>
-    + AbsorbableVar<CM::ConstraintField>
-    + CondSelectGadget<CM::ConstraintField>
+    AllocVar<Self::Value, CF<CM>>
+    + GR1CSVar<CF<CM>, Value: FoldingInstance<CM::Widget>>
+    + AbsorbableVar<CF<CM>>
+    + CondSelectGadget<CF<CM>>
 {
     /// [`FoldingInstanceVar::commitments`] returns the commitments contained in
     /// the instance variable.
@@ -87,7 +88,7 @@ pub trait FoldingInstanceVar<CM: CommitmentDefGadget>:
     /// folding instance in the circuit as a witness variable, with the given
     /// pre-allocated public inputs.
     fn new_witness_with_public_inputs(
-        cs: impl Into<Namespace<CM::ConstraintField>>,
+        cs: impl Into<Namespace<CF<CM>>>,
         u: &Self::Value,
         x: Vec<CM::ScalarVar>,
     ) -> Result<Self, SynthesisError>;
@@ -103,7 +104,7 @@ impl<CM: CommitmentDefGadget> FoldingInstanceVar<CM> for PlainInstanceVar<CM::Sc
     }
 
     fn new_witness_with_public_inputs(
-        _cs: impl Into<Namespace<CM::ConstraintField>>,
+        _cs: impl Into<Namespace<CF<CM>>>,
         _u: &Self::Value,
         x: Vec<CM::ScalarVar>,
     ) -> Result<Self, SynthesisError> {

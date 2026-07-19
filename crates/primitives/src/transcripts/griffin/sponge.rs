@@ -8,7 +8,8 @@ use ark_std::sync::Arc;
 
 use super::{Griffin, GriffinGadget, GriffinParams};
 use crate::{
-    circuits::linkage::{Canonical, HasValue, HasVar}, transcripts::{AbsorbableVar, Transcript, TranscriptTypes, TranscriptVar, TranscriptVarTypes},
+    circuits::linkage::{Canonical, HasConstraintField, HasValue, HasVar},
+    transcripts::{AbsorbableVar, Transcript, TranscriptTypes, TranscriptVar, TranscriptVarTypes},
 };
 
 /// [`GriffinSponge`] is a duplex sponge built on the Griffin permutation.
@@ -249,12 +250,15 @@ impl<F: PrimeField> Transcript for GriffinSponge<F> {
     }
 }
 
+impl<F: PrimeField> HasConstraintField for GriffinSpongeVar<F> {
+    type ConstraintField = F;
+}
+
 impl<F: PrimeField> HasValue for GriffinSpongeVar<F> {
     type Value = GriffinSponge<F>;
 }
 
 impl<F: PrimeField> TranscriptVarTypes for GriffinSpongeVar<F> {
-    type ConstraintField = F;
     type Config = Arc<GriffinParams<F>>;
 }
 

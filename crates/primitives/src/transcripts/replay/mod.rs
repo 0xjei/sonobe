@@ -10,7 +10,7 @@ use super::{
     recording::{RecordingTranscript, RecordingTranscriptVar},
 };
 use crate::{
-    circuits::linkage::{Canonical, HasValue, HasVar},
+    circuits::linkage::{CF, Canonical, HasConstraintField, HasValue, HasVar},
     transcripts::{TranscriptTypes, TranscriptVarTypes},
 };
 
@@ -64,10 +64,14 @@ pub struct ReplayTranscriptVar<F: PrimeField> {
     cached_challenges: Vec<FpVar<F>>,
 }
 
-impl<T: TranscriptVar> From<RecordingTranscriptVar<T>> for ReplayTranscriptVar<T::ConstraintField> {
+impl<T: TranscriptVar> From<RecordingTranscriptVar<T>> for ReplayTranscriptVar<CF<T>> {
     fn from(value: RecordingTranscriptVar<T>) -> Self {
         Self::new(value.cached_challenges)
     }
+}
+
+impl<F: PrimeField> HasConstraintField for ReplayTranscriptVar<F> {
+    type ConstraintField = F;
 }
 
 impl<F: PrimeField> HasValue for ReplayTranscriptVar<F> {
@@ -75,7 +79,6 @@ impl<F: PrimeField> HasValue for ReplayTranscriptVar<F> {
 }
 
 impl<F: PrimeField> TranscriptVarTypes for ReplayTranscriptVar<F> {
-    type ConstraintField = F;
     type Config = Vec<FpVar<F>>;
 }
 

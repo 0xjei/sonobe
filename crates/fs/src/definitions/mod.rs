@@ -13,7 +13,10 @@ pub mod witnesses;
 use ark_r1cs_std::{GR1CSVar, alloc::AllocVar};
 use sonobe_primitives::{
     arithmetizations::{Arith, ArithConfig},
-    circuits::{AssignmentsOwned, linkage::HasWidget},
+    circuits::{
+        AssignmentsOwned,
+        linkage::{CF, HasWidget},
+    },
     commitments::{CommitmentDef, CommitmentDefGadget},
     relations::{Relation, WitnessInstanceSampler},
     traits::{Dummy, SonobeField},
@@ -113,20 +116,10 @@ pub trait FoldingSchemeDefGadget: HasWidget<Widget: FoldingSchemeDef> {
 
     /// [`FoldingSchemeDefGadget::Challenge`] is the type of in-circuit
     /// challenge variable.
-    type Challenge: AllocVar<
-            <Self::Widget as FoldingSchemeDef>::Challenge,
-            <Self::CM as CommitmentDefGadget>::ConstraintField,
-        > + GR1CSVar<
-            <Self::CM as CommitmentDefGadget>::ConstraintField,
-            Value = <Self::Widget as FoldingSchemeDef>::Challenge,
-        >;
+    type Challenge: AllocVar<<Self::Widget as FoldingSchemeDef>::Challenge, CF<Self::CM>>
+        + GR1CSVar<CF<Self::CM>, Value = <Self::Widget as FoldingSchemeDef>::Challenge>;
     /// [`FoldingSchemeDefGadget::Proof`] is the type of in-circuit proof
     /// variable.
-    type Proof<const M: usize, const N: usize>: AllocVar<
-            <Self::Widget as FoldingSchemeDef>::Proof<M, N>,
-            <Self::CM as CommitmentDefGadget>::ConstraintField,
-        > + GR1CSVar<
-            <Self::CM as CommitmentDefGadget>::ConstraintField,
-            Value = <Self::Widget as FoldingSchemeDef>::Proof<M, N>,
-        >;
+    type Proof<const M: usize, const N: usize>: AllocVar<<Self::Widget as FoldingSchemeDef>::Proof<M, N>, CF<Self::CM>>
+        + GR1CSVar<CF<Self::CM>, Value = <Self::Widget as FoldingSchemeDef>::Proof<M, N>>;
 }

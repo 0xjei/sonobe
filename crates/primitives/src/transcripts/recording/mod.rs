@@ -6,7 +6,8 @@ use ark_relations::gr1cs::SynthesisError;
 
 use super::{AbsorbableVar, Transcript, TranscriptVar};
 use crate::{
-    circuits::linkage::{Canonical, HasValue, HasVar}, transcripts::{TranscriptTypes, TranscriptVarTypes},
+    circuits::linkage::{CF, Canonical, HasConstraintField, HasValue, HasVar},
+    transcripts::{TranscriptTypes, TranscriptVarTypes},
 };
 
 /// [`RecordingTranscript`] wraps a regular transcript to record all challenges
@@ -50,7 +51,11 @@ impl<T: Transcript> Transcript for RecordingTranscript<T> {
 #[derive(Clone)]
 pub struct RecordingTranscriptVar<T: TranscriptVar> {
     inner: T,
-    pub(super) cached_challenges: Vec<FpVar<T::ConstraintField>>,
+    pub(super) cached_challenges: Vec<FpVar<CF<T>>>,
+}
+
+impl<T: TranscriptVar> HasConstraintField for RecordingTranscriptVar<T> {
+    type ConstraintField = CF<T>;
 }
 
 impl<T: TranscriptVar> HasValue for RecordingTranscriptVar<T> {
@@ -58,7 +63,6 @@ impl<T: TranscriptVar> HasValue for RecordingTranscriptVar<T> {
 }
 
 impl<T: TranscriptVar> TranscriptVarTypes for RecordingTranscriptVar<T> {
-    type ConstraintField = T::ConstraintField;
     type Config = T;
 }
 
@@ -70,10 +74,7 @@ impl<T: TranscriptVar> TranscriptVar for RecordingTranscriptVar<T> {
         }
     }
 
-    fn add<A: AbsorbableVar<T::ConstraintField>>(
-        &mut self,
-        input: &A,
-    ) -> Result<&mut Self, SynthesisError> {
+    fn add<A: AbsorbableVar<CF<T>>>(&mut self, input: &A) -> Result<&mut Self, SynthesisError> {
         self.inner.add(input)?;
         Ok(self)
     }
@@ -81,7 +82,7 @@ impl<T: TranscriptVar> TranscriptVar for RecordingTranscriptVar<T> {
     fn get_field_elements(
         &mut self,
         num_elements: usize,
-    ) -> Result<Vec<FpVar<T::ConstraintField>>, SynthesisError> {
+    ) -> Result<Vec<FpVar<CF<T>>>, SynthesisError> {
         let v = self.inner.get_field_elements(num_elements)?;
         self.cached_challenges.extend_from_slice(&v);
         Ok(v)

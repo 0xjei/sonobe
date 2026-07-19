@@ -2,9 +2,9 @@
 //! mathematical structures.
 
 use sonobe_primitives::{
+    algebra::group::{BF, SF},
     circuits::linkage::{CircuitRepr, Gadget, HasGadget},
-    commitments::{CommitmentDef, FieldFriendly, GroupBasedCommitment, GroupFriendly},
-    traits::CF2,
+    commitments::{FieldFriendly, GroupBasedCommitment, GroupFriendly},
 };
 
 use crate::{
@@ -23,10 +23,8 @@ impl CircuitRepr for Secondary {}
 /// groups (elliptic curves), whose transcript field is the scalar field of its
 /// group-based commitment scheme.
 pub trait GroupBasedFoldingSchemePrimaryDef:
-    FoldingSchemeDef<
-        CM: GroupBasedCommitment,
-        TranscriptField = <<Self as FoldingSchemeDef>::CM as CommitmentDef>::Scalar,
-    > + HasGadget<Primary, Gadget: FoldingSchemeDefGadget<CM = Gadget<Self::CM, FieldFriendly>>>
+    FoldingSchemeDef<CM: GroupBasedCommitment, TranscriptField = SF<<Self as FoldingSchemeDef>::CM>>
+    + HasGadget<Primary, Gadget: FoldingSchemeDefGadget<CM = Gadget<Self::CM, FieldFriendly>>>
 {
 }
 
@@ -48,10 +46,8 @@ impl<FS, const M: usize, const N: usize> GroupBasedFoldingSchemePrimary<M, N> fo
 /// groups (elliptic curves), whose transcript field is the base field of its
 /// group-based commitment scheme.
 pub trait GroupBasedFoldingSchemeSecondaryDef:
-    FoldingSchemeDef<
-        CM: GroupBasedCommitment,
-        TranscriptField = CF2<<<Self as FoldingSchemeDef>::CM as CommitmentDef>::Commitment>,
-    > + HasGadget<Secondary, Gadget: FoldingSchemeDefGadget<CM = Gadget<Self::CM, GroupFriendly>>>
+    FoldingSchemeDef<CM: GroupBasedCommitment, TranscriptField = BF<<Self as FoldingSchemeDef>::CM>>
+    + HasGadget<Secondary, Gadget: FoldingSchemeDefGadget<CM = Gadget<Self::CM, GroupFriendly>>>
 {
 }
 

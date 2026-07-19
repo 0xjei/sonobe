@@ -4,6 +4,7 @@ use ark_r1cs_std::{GR1CSVar, alloc::AllocVar};
 use ark_std::fmt::Debug;
 use sonobe_primitives::{
     arithmetizations::ArithConfig,
+    circuits::linkage::CF,
     commitments::{CommitmentDef, CommitmentDefGadget},
     traits::Dummy,
 };
@@ -49,14 +50,12 @@ impl<CM: CommitmentDef> FoldingWitness<CM> for PlainWitness<CM::Scalar> {
 
 /// [`FoldingWitnessVar`] is the in-circuit variable of [`FoldingWitness`].
 pub trait FoldingWitnessVar<CM: CommitmentDefGadget>:
-    AllocVar<Self::Value, CM::ConstraintField>
-    + GR1CSVar<CM::ConstraintField, Value: FoldingWitness<CM::Widget>>
+    AllocVar<Self::Value, CF<CM>> + GR1CSVar<CF<CM>, Value: FoldingWitness<CM::Widget>>
 {
 }
 
 impl<CM: CommitmentDefGadget, T> FoldingWitnessVar<CM> for T where
-    T: AllocVar<Self::Value, CM::ConstraintField>
-        + GR1CSVar<CM::ConstraintField, Value: FoldingWitness<CM::Widget>>
+    T: AllocVar<Self::Value, CF<CM>> + GR1CSVar<CF<CM>, Value: FoldingWitness<CM::Widget>>
 {
 }
 

@@ -153,7 +153,6 @@ pub trait Transcript:
 }
 
 pub trait TranscriptVarTypes: Clone + HasValue<Value: TranscriptTypes> {
-    type ConstraintField: PrimeField;
     type Config: Clone;
 }
 

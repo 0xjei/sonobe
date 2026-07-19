@@ -6,7 +6,7 @@ use ark_r1cs_std::{
 };
 use ark_relations::gr1cs::{ConstraintSystemRef, Namespace, SynthesisError};
 use ark_std::borrow::Borrow;
-use sonobe_primitives::commitments::CommitmentDefGadget;
+use sonobe_primitives::{circuits::linkage::CF, commitments::CommitmentDefGadget};
 
 use super::{IncomingWitness, RunningWitness};
 
@@ -24,11 +24,11 @@ pub struct RunningWitnessVar<CM: CommitmentDefGadget> {
     pub r_w: CM::RandomnessVar,
 }
 
-impl<CM: CommitmentDefGadget> AllocVar<RunningWitness<CM::Widget>, CM::ConstraintField>
+impl<CM: CommitmentDefGadget> AllocVar<RunningWitness<CM::Widget>, CF<CM>>
     for RunningWitnessVar<CM>
 {
     fn new_variable<T: Borrow<RunningWitness<CM::Widget>>>(
-        cs: impl Into<Namespace<CM::ConstraintField>>,
+        cs: impl Into<Namespace<CF<CM>>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
         mode: AllocationMode,
     ) -> Result<Self, SynthesisError> {
@@ -44,10 +44,10 @@ impl<CM: CommitmentDefGadget> AllocVar<RunningWitness<CM::Widget>, CM::Constrain
     }
 }
 
-impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for RunningWitnessVar<CM> {
+impl<CM: CommitmentDefGadget> GR1CSVar<CF<CM>> for RunningWitnessVar<CM> {
     type Value = RunningWitness<CM::Widget>;
 
-    fn cs(&self) -> ConstraintSystemRef<CM::ConstraintField> {
+    fn cs(&self) -> ConstraintSystemRef<CF<CM>> {
         self.e
             .cs()
             .or(self.r_e.cs())
@@ -75,11 +75,11 @@ pub struct IncomingWitnessVar<CM: CommitmentDefGadget> {
     pub r_w: CM::RandomnessVar,
 }
 
-impl<CM: CommitmentDefGadget> AllocVar<IncomingWitness<CM::Widget>, CM::ConstraintField>
+impl<CM: CommitmentDefGadget> AllocVar<IncomingWitness<CM::Widget>, CF<CM>>
     for IncomingWitnessVar<CM>
 {
     fn new_variable<T: Borrow<IncomingWitness<CM::Widget>>>(
-        cs: impl Into<Namespace<CM::ConstraintField>>,
+        cs: impl Into<Namespace<CF<CM>>>,
         f: impl FnOnce() -> Result<T, SynthesisError>,
         mode: AllocationMode,
     ) -> Result<Self, SynthesisError> {
@@ -93,10 +93,10 @@ impl<CM: CommitmentDefGadget> AllocVar<IncomingWitness<CM::Widget>, CM::Constrai
     }
 }
 
-impl<CM: CommitmentDefGadget> GR1CSVar<CM::ConstraintField> for IncomingWitnessVar<CM> {
+impl<CM: CommitmentDefGadget> GR1CSVar<CF<CM>> for IncomingWitnessVar<CM> {
     type Value = IncomingWitness<CM::Widget>;
 
-    fn cs(&self) -> ConstraintSystemRef<CM::ConstraintField> {
+    fn cs(&self) -> ConstraintSystemRef<CF<CM>> {
         self.w.cs().or(self.r_w.cs())
     }
 

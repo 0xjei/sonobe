@@ -40,7 +40,7 @@ use crate::{
             matrix::{MatrixGadget, SparseMatrixVar},
         },
     },
-    circuits::linkage::HasValue,
+    circuits::linkage::{HasConstraintField, HasValue},
     transcripts::AbsorbableVar,
 };
 
@@ -205,6 +205,12 @@ impl<F: SonobeField, const ALIGNED: bool> GR1CSVar<F> for LimbedVar<F, (), ALIGN
     fn value(&self) -> Result<Self::Value, SynthesisError> {
         self.limbs.value().map(compose)
     }
+}
+
+impl<Base: SonobeField, Target: SonobeField, const ALIGNED: bool> HasConstraintField
+    for LimbedVar<Base, Target, ALIGNED>
+{
+    type ConstraintField = Base;
 }
 
 impl<Base: SonobeField, Target: SonobeField, const ALIGNED: bool> HasValue

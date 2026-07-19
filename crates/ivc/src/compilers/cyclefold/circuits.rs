@@ -14,9 +14,9 @@ use sonobe_fs::{
     GroupBasedFoldingSchemePrimary, GroupBasedFoldingSchemeSecondary,
 };
 use sonobe_primitives::{
+    algebra::group::{HasGroup, SF},
     arithmetizations::ArithConfig,
     circuits::{FCircuit, WitnessToPublic},
-    commitments::CommitmentDef,
     traits::{Dummy, SonobeCurve},
     transcripts::{TranscriptVar, recording::RecordingTranscriptVar},
 };
@@ -70,19 +70,15 @@ where
             1,
             1,
             Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
-            CM: CommitmentDef<
-                Commitment: SonobeCurve<BaseField = <FS2::CM as CommitmentDef>::Scalar>,
-            >,
+            CM: HasGroup<Group: SonobeCurve<BaseField = SF<FS2::CM>>>,
         >,
     FS2: GroupBasedFoldingSchemeSecondary<
             1,
             1,
             Gadget: FoldingSchemeFullVerifierGadget<1, 1, VerifierKey = ()>,
-            CM: CommitmentDef<
-                Commitment: SonobeCurve<BaseField = <FS1::CM as CommitmentDef>::Scalar>,
-            >,
+            CM: HasGroup<Group: SonobeCurve<BaseField = SF<FS1::CM>>>,
         >,
-    FC: FCircuit<Field = <FS1::CM as CommitmentDef>::Scalar>,
+    FC: FCircuit<Field = FS1::TranscriptField>,
     T: TranscriptVar<ConstraintField = FC::Field>,
 {
     /// [`AugmentedCircuit::compute_next_state`] invokes the step circuit on the
@@ -207,19 +203,15 @@ where
             1,
             1,
             Gadget: FoldingSchemePartialVerifierGadget<1, 1, VerifierKey = ()>,
-            CM: CommitmentDef<
-                Commitment: SonobeCurve<BaseField = <FS2::CM as CommitmentDef>::Scalar>,
-            >,
+            CM: HasGroup<Group: SonobeCurve<BaseField = SF<FS2::CM>>>,
         >,
     FS2: GroupBasedFoldingSchemeSecondary<
             1,
             1,
             Gadget: FoldingSchemeFullVerifierGadget<1, 1, VerifierKey = ()>,
-            CM: CommitmentDef<
-                Commitment: SonobeCurve<BaseField = <FS1::CM as CommitmentDef>::Scalar>,
-            >,
+            CM: HasGroup<Group: SonobeCurve<BaseField = SF<FS1::CM>>>,
         >,
-    FC: FCircuit<Field = <FS1::CM as CommitmentDef>::Scalar>,
+    FC: FCircuit<Field = FS1::TranscriptField>,
     T: TranscriptVar<ConstraintField = FC::Field>,
 {
     fn generate_constraints(

@@ -15,11 +15,11 @@ use thiserror::Error;
 use crate::{
     algebra::{
         field::{TwoStageFieldVar, emulated::EmulatedFieldVar},
-        group::emulated::EmulatedAffineVar,
+        group::{BF, HasGroup, SF, emulated::EmulatedAffineVar},
         ops::bits::FromBitsGadget,
     },
     circuits::linkage::{Canonical, CircuitRepr, HasGadget, HasWidget, Var},
-    traits::{CF1, CF2, SonobeCurve, SonobeField},
+    traits::SonobeField,
     transcripts::{Absorbable, AbsorbableVar},
 };
 
@@ -127,11 +127,9 @@ pub trait CommitmentOps: CommitmentDef {
 
 /// [`CommitmentDefGadget`] specifies the in-circuit associated types for a
 /// commitment scheme gadget.
-pub trait CommitmentDefGadget: Clone + HasWidget<Widget: CommitmentDef> {
-    /// [`CommitmentDefGadget::ConstraintField`] is the field over which the
-    /// circuit running the commitment scheme is defined.
-    type ConstraintField: SonobeField;
-
+pub trait CommitmentDefGadget:
+    Clone + HasWidget<Widget: CommitmentDef, ConstraintField: SonobeField>
+{
     /// [`CommitmentDefGadget::KeyVar`] is the in-circuit variable type for the
     /// commitment key.
     type KeyVar: AllocVar<<Self::Widget as CommitmentDef>::Key, Self::ConstraintField>;
@@ -179,23 +177,45 @@ impl CircuitRepr for FieldFriendly {}
 /// [`GroupBasedCommitment`] is a variant of commitment schemes built on groups
 /// (elliptic curves).
 pub trait GroupBasedCommitment:
-    CommitmentDef<Commitment: SonobeCurve, Scalar = CF1<<Self as CommitmentDef>::Commitment>>
-    + CommitmentOps
+    HasGroup
+    + CommitmentOps<Commitment = Self::Group, Scalar = SF<Self>>
     + HasGadget<
         GroupFriendly,
         Gadget: CommitmentOpsGadget<
-            ConstraintField = CF2<Self::Commitment>,
-            ScalarVar = EmulatedFieldVar<CF2<Self::Commitment>, Self::Scalar>,
-            CommitmentVar = Var<Self::Commitment, Canonical>,
+            ConstraintField = BF<Self>,
+            ScalarVar = EmulatedFieldVar<BF<Self>, SF<Self>>,
+            CommitmentVar = Var<Self::Group, Canonical>,
         >,
     > + HasGadget<
         FieldFriendly,
         Gadget: CommitmentDefGadget<
-            ConstraintField = Self::Scalar,
-            ScalarVar = FpVar<Self::Scalar>,
-            CommitmentVar = EmulatedAffineVar<Self::Scalar, Self::Commitment>,
+            ConstraintField = SF<Self>,
+            ScalarVar = FpVar<SF<Self>>,
+            CommitmentVar = EmulatedAffineVar<SF<Self>, Self::Commitment>,
         >,
     >
+{
+}
+
+impl<
+    T: HasGroup
+        + CommitmentOps<Commitment = Self::Group, Scalar = SF<Self>>
+        + HasGadget<
+            GroupFriendly,
+            Gadget: CommitmentOpsGadget<
+                ConstraintField = BF<Self>,
+                ScalarVar = EmulatedFieldVar<BF<Self>, SF<Self>>,
+                CommitmentVar = Var<Self::Group, Canonical>,
+            >,
+        > + HasGadget<
+            FieldFriendly,
+            Gadget: CommitmentDefGadget<
+                ConstraintField = SF<Self>,
+                ScalarVar = FpVar<SF<Self>>,
+                CommitmentVar = EmulatedAffineVar<SF<Self>, Self::Commitment>,
+            >,
+        >,
+> GroupBasedCommitment for T
 {
 }
 
