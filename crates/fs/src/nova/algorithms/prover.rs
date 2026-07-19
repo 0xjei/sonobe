@@ -55,7 +55,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemePro
     #[allow(non_snake_case)]
     fn prove(
         pk: &NovaKey<Self::Arith, CM>,
-        transcript: &mut impl Transcript<TF>,
+        transcript: &mut impl Transcript<Field = TF>,
         Ws: &[impl Borrow<Self::RW>; 1],
         Us: &[impl Borrow<Self::RU>; 1],
         ws: &[impl Borrow<Self::IW>; 1],
@@ -104,7 +104,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemePro
     #[allow(non_snake_case)]
     fn prove(
         pk: &NovaKey<Self::Arith, CM>,
-        transcript: &mut impl Transcript<TF>,
+        transcript: &mut impl Transcript<Field = TF>,
         [W1, W2]: &[impl Borrow<Self::RW>; 2],
         [U1, U2]: &[impl Borrow<Self::RU>; 2],
         _: &[impl Borrow<Self::IW>; 0],

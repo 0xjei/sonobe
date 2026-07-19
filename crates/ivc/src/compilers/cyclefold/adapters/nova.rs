@@ -16,11 +16,14 @@ use sonobe_primitives::{
         group::emulated::EmulatedAffineVar,
         ops::bits::{FromBits, ToBitsGadgetExt},
     },
-    circuits::WitnessToPublic,
+    circuits::{
+        WitnessToPublic,
+        linkage::{Canonical, Var},
+    },
     commitments::GroupBasedCommitment,
     traits::{CF1, CF2, SonobeCurve},
     transcripts::{
-        Transcript, TranscriptGadget,
+        Transcript, TranscriptVar,
         replay::{ReplayTranscript, ReplayTranscriptVar},
     },
 };
@@ -53,7 +56,7 @@ impl<C: SonobeCurve, const CHALLENGE_BITS: usize> CycleFoldCircuit<CF2<C>>
         let rho = FpVar::new_input(cs.clone(), || Ok(CF2::<C>::from_bits_le(&self.r[..])))?;
         let rho_bits = rho.to_n_bits_le(CHALLENGE_BITS)?;
 
-        let points = Vec::<C::Var>::new_witness(cs.clone(), || Ok(&self.points[..]))?;
+        let points = Vec::<Var<C, Canonical>>::new_witness(cs.clone(), || Ok(&self.points[..]))?;
         points.mark_as_public()?;
 
         (points[1].scalar_mul_le(rho_bits.iter())? + &points[0]).mark_as_public()

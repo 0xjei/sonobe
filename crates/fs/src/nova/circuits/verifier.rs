@@ -5,7 +5,7 @@ use ark_relations::gr1cs::SynthesisError;
 use sonobe_primitives::{
     algebra::ops::bits::FromBitsGadget,
     commitments::{CommitmentDef, CommitmentDefGadget, GroupBasedCommitment},
-    transcripts::TranscriptGadget,
+    transcripts::TranscriptVar,
 };
 
 use crate::{
@@ -19,7 +19,7 @@ where
     #[allow(non_snake_case)]
     fn verify_hinted(
         _vk: &Self::VerifierKey,
-        transcript: &mut impl TranscriptGadget<CM::ConstraintField>,
+        transcript: &mut impl TranscriptVar<ConstraintField = CM::ConstraintField>,
         [U]: [&Self::RU; 1],
         [u]: [&Self::IU; 1],
         proof: &Self::Proof<1, 1>,
@@ -60,7 +60,7 @@ where
     #[allow(non_snake_case)]
     fn verify_hinted(
         _vk: &Self::VerifierKey,
-        transcript: &mut impl TranscriptGadget<CM::ConstraintField>,
+        transcript: &mut impl TranscriptVar<ConstraintField = CM::ConstraintField>,
         [U1, U2]: [&Self::RU; 2],
         _: [&Self::IU; 0],
         proof: &Self::Proof<2, 0>,
@@ -111,7 +111,7 @@ where
     #[allow(non_snake_case)]
     fn verify(
         _vk: &Self::VerifierKey,
-        transcript: &mut impl TranscriptGadget<CM::ConstraintField>,
+        transcript: &mut impl TranscriptVar<ConstraintField = CM::ConstraintField>,
         [U]: [&Self::RU; 1],
         [u]: [&Self::IU; 1],
         proof: &Self::Proof<1, 1>,

@@ -18,7 +18,7 @@ use sonobe_primitives::{
     circuits::{FCircuit, WitnessToPublic},
     commitments::CommitmentDef,
     traits::{Dummy, SonobeCurve},
-    transcripts::{TranscriptGadget, recording::RecordingTranscriptVar},
+    transcripts::{TranscriptVar, recording::RecordingTranscriptVar},
 };
 
 use crate::compilers::cyclefold::FoldingSchemeCycleFoldExt;
@@ -30,7 +30,7 @@ pub struct AugmentedCircuit<
     FS1: GroupBasedFoldingSchemePrimary<1, 1>,
     FS2: GroupBasedFoldingSchemeSecondary<1, 1>,
     FC: FCircuit,
-    T: TranscriptGadget<FC::Field>,
+    T: TranscriptVar<ConstraintField = FC::Field>,
 > {
     _fs: PhantomData<(FS1, FS2)>,
     hash_config: &'a T::Config,
@@ -44,7 +44,7 @@ where
     FS1: GroupBasedFoldingSchemePrimary<1, 1>,
     FS2: GroupBasedFoldingSchemeSecondary<1, 1>,
     FC: FCircuit,
-    T: TranscriptGadget<FC::Field>,
+    T: TranscriptVar<ConstraintField = FC::Field>,
 {
     /// [`AugmentedCircuit::new`] creates an instance of the augmented circuit
     /// for the given step circuit.
@@ -83,7 +83,7 @@ where
             >,
         >,
     FC: FCircuit<Field = <FS1::CM as CommitmentDef>::Scalar>,
-    T: TranscriptGadget<FC::Field>,
+    T: TranscriptVar<ConstraintField = FC::Field>,
 {
     /// [`AugmentedCircuit::compute_next_state`] invokes the step circuit on the
     /// current state and external inputs to compute the next state and external
@@ -220,7 +220,7 @@ where
             >,
         >,
     FC: FCircuit<Field = <FS1::CM as CommitmentDef>::Scalar>,
-    T: TranscriptGadget<FC::Field>,
+    T: TranscriptVar<ConstraintField = FC::Field>,
 {
     fn generate_constraints(
         self,

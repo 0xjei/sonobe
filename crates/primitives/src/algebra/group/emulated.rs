@@ -23,6 +23,7 @@ use ark_std::borrow::Borrow;
 
 use crate::{
     algebra::{field::emulated::EmulatedFieldVar, group::SonobeCurve},
+    circuits::linkage::HasValue,
     traits::SonobeField,
     transcripts::AbsorbableVar,
 };
@@ -61,6 +62,10 @@ impl<Base: SonobeField, Target: SonobeCurve> AllocVar<Target, Base>
             Ok(Self { x, y })
         })
     }
+}
+
+impl<Base: SonobeField, Target: SonobeCurve> HasValue for EmulatedAffineVar<Base, Target> {
+    type Value = Target;
 }
 
 impl<Base: SonobeField, Target: SonobeCurve> GR1CSVar<Base> for EmulatedAffineVar<Base, Target> {

@@ -2,7 +2,8 @@
 //! mathematical structures.
 
 use sonobe_primitives::{
-    commitments::{CommitmentDef, GroupBasedCommitment},
+    circuits::linkage::{CircuitRepr, Gadget, HasGadget},
+    commitments::{CommitmentDef, FieldFriendly, GroupBasedCommitment, GroupFriendly},
     traits::CF2,
 };
 
@@ -11,6 +12,13 @@ use crate::{
     FoldingSchemePartialVerifierGadget,
 };
 
+pub enum Primary {}
+
+pub enum Secondary {}
+
+impl CircuitRepr for Primary {}
+impl CircuitRepr for Secondary {}
+
 /// [`GroupBasedFoldingSchemePrimaryDef`] defines a folding scheme based on
 /// groups (elliptic curves), whose transcript field is the scalar field of its
 /// group-based commitment scheme.
@@ -18,11 +26,8 @@ pub trait GroupBasedFoldingSchemePrimaryDef:
     FoldingSchemeDef<
         CM: GroupBasedCommitment,
         TranscriptField = <<Self as FoldingSchemeDef>::CM as CommitmentDef>::Scalar,
-    >
+    > + HasGadget<Primary, Gadget: FoldingSchemeDefGadget<CM = Gadget<Self::CM, FieldFriendly>>>
 {
-    /// [`GroupBasedFoldingSchemePrimaryDef::Gadget`] is the in-circuit gadget
-    /// that defines the folding scheme.
-    type Gadget: FoldingSchemeDefGadget<Widget = Self, CM = <Self::CM as GroupBasedCommitment>::Gadget2>;
 }
 
 /// [`GroupBasedFoldingSchemePrimary`] is a convenience trait that combines the
@@ -46,11 +51,8 @@ pub trait GroupBasedFoldingSchemeSecondaryDef:
     FoldingSchemeDef<
         CM: GroupBasedCommitment,
         TranscriptField = CF2<<<Self as FoldingSchemeDef>::CM as CommitmentDef>::Commitment>,
-    >
+    > + HasGadget<Secondary, Gadget: FoldingSchemeDefGadget<CM = Gadget<Self::CM, GroupFriendly>>>
 {
-    /// [`GroupBasedFoldingSchemeSecondaryDef::Gadget`] is the in-circuit gadget
-    /// that defines the folding scheme.
-    type Gadget: FoldingSchemeDefGadget<Widget = Self, CM = <Self::CM as GroupBasedCommitment>::Gadget1>;
 }
 
 /// [`GroupBasedFoldingSchemeSecondary`] is a convenience trait that combines

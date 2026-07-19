@@ -7,7 +7,10 @@ use ark_r1cs_std::boolean::Boolean;
 use ark_std::marker::PhantomData;
 use sonobe_primitives::{
     arithmetizations::r1cs::R1CS,
-    commitments::{CommitmentDef, CommitmentDefGadget, GroupBasedCommitment},
+    circuits::linkage::{Gadget, HasGadget, HasWidget},
+    commitments::{
+        CommitmentDef, CommitmentDefGadget, FieldFriendly, GroupBasedCommitment, GroupFriendly,
+    },
     traits::{CF2, SonobeField},
 };
 
@@ -20,7 +23,9 @@ use self::{
 };
 use crate::{
     FoldingSchemeDef, FoldingSchemeDefGadget, GroupBasedFoldingSchemePrimaryDef,
-    GroupBasedFoldingSchemeSecondaryDef, nova::keys::NovaKey,
+    GroupBasedFoldingSchemeSecondaryDef,
+    definitions::variants::{Primary, Secondary},
+    nova::keys::NovaKey,
 };
 
 pub mod algorithms;
@@ -72,13 +77,18 @@ pub struct AbstractNovaGadget<CM, const CHALLENGE_BITS: usize = 128> {
     _vc: PhantomData<CM>,
 }
 
+impl<CM, const CHALLENGE_BITS: usize> HasWidget for AbstractNovaGadget<CM, CHALLENGE_BITS>
+where
+    CM: CommitmentDefGadget<Widget: GroupBasedCommitment>,
+{
+    type Widget = AbstractNova<CM::Widget, CM::ConstraintField, CHALLENGE_BITS>;
+}
+
 impl<CM, const CHALLENGE_BITS: usize> FoldingSchemeDefGadget
     for AbstractNovaGadget<CM, CHALLENGE_BITS>
 where
     CM: CommitmentDefGadget<Widget: GroupBasedCommitment>,
 {
-    type Widget = AbstractNova<CM::Widget, CM::ConstraintField, CHALLENGE_BITS>;
-
     type CM = CM;
     type RU = RUVar<CM>;
     type IU = IUVar<CM>;
@@ -87,16 +97,26 @@ where
     type Proof<const M: usize, const N: usize> = CM::CommitmentVar;
 }
 
+impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> HasGadget<Primary>
+    for AbstractNova<CM, CM::Scalar, CHALLENGE_BITS>
+{
+    type Gadget = AbstractNovaGadget<Gadget<CM, FieldFriendly>, CHALLENGE_BITS>;
+}
+
 impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> GroupBasedFoldingSchemePrimaryDef
     for AbstractNova<CM, CM::Scalar, CHALLENGE_BITS>
 {
-    type Gadget = AbstractNovaGadget<CM::Gadget2, CHALLENGE_BITS>;
+}
+
+impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> HasGadget<Secondary>
+    for AbstractNova<CM, CF2<CM::Commitment>, CHALLENGE_BITS>
+{
+    type Gadget = AbstractNovaGadget<Gadget<CM, GroupFriendly>, CHALLENGE_BITS>;
 }
 
 impl<CM: GroupBasedCommitment, const CHALLENGE_BITS: usize> GroupBasedFoldingSchemeSecondaryDef
     for AbstractNova<CM, CF2<CM::Commitment>, CHALLENGE_BITS>
 {
-    type Gadget = AbstractNovaGadget<CM::Gadget1, CHALLENGE_BITS>;
 }
 
 #[cfg(test)]

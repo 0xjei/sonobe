@@ -14,11 +14,11 @@ use thiserror::Error;
 
 use crate::{
     algebra::{
-        Val,
         field::{TwoStageFieldVar, emulated::EmulatedFieldVar},
         group::emulated::EmulatedAffineVar,
         ops::bits::FromBitsGadget,
     },
+    circuits::linkage::{Canonical, CircuitRepr, HasGadget, HasWidget, Var},
     traits::{CF1, CF2, SonobeCurve, SonobeField},
     transcripts::{Absorbable, AbsorbableVar},
 };
@@ -127,7 +127,7 @@ pub trait CommitmentOps: CommitmentDef {
 
 /// [`CommitmentDefGadget`] specifies the in-circuit associated types for a
 /// commitment scheme gadget.
-pub trait CommitmentDefGadget: Clone {
+pub trait CommitmentDefGadget: Clone + HasWidget<Widget: CommitmentDef> {
     /// [`CommitmentDefGadget::ConstraintField`] is the field over which the
     /// circuit running the commitment scheme is defined.
     type ConstraintField: SonobeField;
@@ -154,15 +154,11 @@ pub trait CommitmentDefGadget: Clone {
     /// for the randomness used in the commitment.
     type RandomnessVar: AllocVar<<Self::Widget as CommitmentDef>::Randomness, Self::ConstraintField>
         + GR1CSVar<Self::ConstraintField, Value = <Self::Widget as CommitmentDef>::Randomness>;
-
-    /// [`CommitmentDefGadget::Widget`] points to the out-of-circuit commitment
-    /// scheme widget.
-    type Widget: CommitmentDef;
 }
 
 /// [`CommitmentOpsGadget`] defines algorithms (majorly the opening algorithm)
 /// for commitment schemes in-circuit.
-pub trait CommitmentOpsGadget: CommitmentDefGadget<Widget: CommitmentOps> {
+pub trait CommitmentOpsGadget: CommitmentDefGadget + HasWidget<Widget: CommitmentOps> {
     /// [`CommitmentOpsGadget::open`] defines the commitment opening gadget
     /// that matches its out-of-circuit widget [`CommitmentOps::open`].
     fn open(
@@ -173,29 +169,34 @@ pub trait CommitmentOpsGadget: CommitmentDefGadget<Widget: CommitmentOps> {
     ) -> Result<(), SynthesisError>;
 }
 
+pub enum GroupFriendly {}
+
+pub enum FieldFriendly {}
+
+impl CircuitRepr for GroupFriendly {}
+impl CircuitRepr for FieldFriendly {}
+
 /// [`GroupBasedCommitment`] is a variant of commitment schemes built on groups
 /// (elliptic curves).
 pub trait GroupBasedCommitment:
     CommitmentDef<Commitment: SonobeCurve, Scalar = CF1<<Self as CommitmentDef>::Commitment>>
     + CommitmentOps
-{
-    /// [`GroupBasedCommitment::Gadget1`] points to the in-circuit gadget for
-    /// the group-based commitment scheme over the curve's base field.
-    type Gadget1: CommitmentOpsGadget
-        + CommitmentDefGadget<
+    + HasGadget<
+        GroupFriendly,
+        Gadget: CommitmentOpsGadget<
             ConstraintField = CF2<Self::Commitment>,
             ScalarVar = EmulatedFieldVar<CF2<Self::Commitment>, Self::Scalar>,
-            CommitmentVar = <Self::Commitment as Val>::Var,
-            Widget = Self,
-        >;
-    /// [`GroupBasedCommitment::Gadget2`] points to the in-circuit gadget for
-    /// the group-based commitment scheme over the curve's scalar field.
-    type Gadget2: CommitmentDefGadget<
+            CommitmentVar = Var<Self::Commitment, Canonical>,
+        >,
+    > + HasGadget<
+        FieldFriendly,
+        Gadget: CommitmentDefGadget<
             ConstraintField = Self::Scalar,
             ScalarVar = FpVar<Self::Scalar>,
             CommitmentVar = EmulatedAffineVar<Self::Scalar, Self::Commitment>,
-            Widget = Self,
-        >;
+        >,
+    >
+{
 }
 
 #[cfg(test)]

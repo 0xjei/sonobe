@@ -13,7 +13,7 @@ pub mod witnesses;
 use ark_r1cs_std::{GR1CSVar, alloc::AllocVar};
 use sonobe_primitives::{
     arithmetizations::{Arith, ArithConfig},
-    circuits::AssignmentsOwned,
+    circuits::{AssignmentsOwned, linkage::HasWidget},
     commitments::{CommitmentDef, CommitmentDefGadget},
     relations::{Relation, WitnessInstanceSampler},
     traits::{Dummy, SonobeField},
@@ -97,11 +97,7 @@ pub trait FoldingSchemeDef {
 
 /// [`FoldingSchemeDefGadget`] specifies the in-circuit associated types for a
 /// folding scheme gadget.
-pub trait FoldingSchemeDefGadget {
-    /// [`FoldingSchemeDefGadget::Widget`] points to the out-of-circuit folding
-    /// scheme widget.
-    type Widget: FoldingSchemeDef;
-
+pub trait FoldingSchemeDefGadget: HasWidget<Widget: FoldingSchemeDef> {
     /// [`FoldingSchemeDefGadget::CM`] is the commitment scheme gadget.
     type CM: CommitmentDefGadget<Widget = <Self::Widget as FoldingSchemeDef>::CM>;
     /// [`FoldingSchemeDefGadget::RU`] is the type of in-circuit running

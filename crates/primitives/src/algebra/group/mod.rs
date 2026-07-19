@@ -14,8 +14,11 @@ use ark_r1cs_std::{
 use ark_relations::gr1cs::SynthesisError;
 
 use crate::{
-    algebra::{Val, field::SonobeField, group::emulated::EmulatedAffineVar},
-    circuits::WitnessToPublic,
+    algebra::{field::SonobeField, group::emulated::EmulatedAffineVar},
+    circuits::{
+        WitnessToPublic,
+        linkage::{Canonical, Emulated, HasValue, HasVar},
+    },
     traits::{Dummy, Inputize, InputizeEmulated},
     transcripts::{Absorbable, AbsorbableVar},
 };
@@ -34,10 +37,10 @@ pub trait SonobeCurve:
     + Absorbable
     + Inputize<Self::BaseField>
     + InputizeEmulated<Self::ScalarField>
-    + Val<
+    + HasVar<
+        Canonical,
         Var: CurveVar<Self, Self::BaseField> + AbsorbableVar<Self::BaseField> + WitnessToPublic,
-        EmulatedVar<Self::ScalarField> = EmulatedAffineVar<Self::ScalarField, Self>,
-    >
+    > + HasVar<Emulated<Self::ScalarField>, Var = EmulatedAffineVar<Self::ScalarField, Self>>
 {
 }
 
@@ -46,11 +49,20 @@ impl<P: SWCurveConfig<ScalarField: SonobeField, BaseField: SonobeField>> SonobeC
 {
 }
 
-impl<P: SWCurveConfig<ScalarField: SonobeField, BaseField: SonobeField>> Val for Projective<P> {
-    type PreferredConstraintField = P::BaseField;
-    type Var = ProjectiveVar<P, FpVar<P::BaseField>>;
+impl<P: SWCurveConfig<BaseField: PrimeField>> HasValue for ProjectiveVar<P, FpVar<P::BaseField>> {
+    type Value = Projective<P>;
+}
 
-    type EmulatedVar<F: SonobeField> = EmulatedAffineVar<F, Self>;
+impl<P: SWCurveConfig<ScalarField: SonobeField, BaseField: SonobeField>> HasVar<Canonical>
+    for Projective<P>
+{
+    type Var = ProjectiveVar<P, FpVar<P::BaseField>>;
+}
+
+impl<P: SWCurveConfig<ScalarField: SonobeField, BaseField: SonobeField>, F: SonobeField>
+    HasVar<Emulated<F>> for Projective<P>
+{
+    type Var = EmulatedAffineVar<F, Self>;
 }
 
 impl<T, C: SonobeCurve> Dummy<T> for C {

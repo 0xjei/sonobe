@@ -33,7 +33,7 @@ use sonobe_primitives::{
     relations::WitnessInstanceSampler,
     traits::{CF1, CF2, Dummy, SonobeCurve},
     transcripts::{
-        Transcript, TranscriptGadget,
+        Transcript, TranscriptVar,
         recording::RecordingTranscript,
         replay::{ReplayTranscript, ReplayTranscriptVar},
     },
@@ -163,8 +163,11 @@ where
                 Commitment: SonobeCurve<BaseField = <FS1::CM as CommitmentDef>::Scalar>,
             >,
         >,
-    T: Transcript<CF1<<FS1::CM as CommitmentDef>::Commitment>, Config: CanonicalSerialize>,
-    T::Gadget: TranscriptGadget<CF1<<FS1::CM as CommitmentDef>::Commitment>, Config = T::Config>,
+    T: Transcript<
+            Field = CF1<<FS1::CM as CommitmentDef>::Commitment>,
+            Config: CanonicalSerialize,
+            Var: TranscriptVar<Config = T::Config>,
+        >,
 {
     type Field = <FS1::CM as CommitmentDef>::Scalar;
 
@@ -221,7 +224,7 @@ where
         loop {
             let new_arith1 = {
                 let cs = ArithExtractor::new();
-                cs.execute_synthesizer(AugmentedCircuit::<FS1, FS2, FC, T::Gadget>::new(
+                cs.execute_synthesizer(AugmentedCircuit::<FS1, FS2, FC, T::Var>::new(
                     &hash_config,
                     &arith1_config,
                     arith2_config,
@@ -325,7 +328,7 @@ where
 
         let cs = AssignmentsExtractor::new();
         let (next_state, external_outputs) = cs.execute_fn(|cs| {
-            let augmented_circuit = AugmentedCircuit::<FS1, FS2, FC, T::Gadget>::new(
+            let augmented_circuit = AugmentedCircuit::<FS1, FS2, FC, T::Var>::new(
                 hash_config,
                 arith1_config,
                 arith2_config,

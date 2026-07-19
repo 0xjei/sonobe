@@ -18,7 +18,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemeVer
     #[allow(non_snake_case)]
     fn verify(
         _vk: &(),
-        transcript: &mut impl Transcript<TF>,
+        transcript: &mut impl Transcript<Field = TF>,
         Us: &[impl Borrow<Self::RU>; 1],
         us: &[impl Borrow<Self::IU>; 1],
         cm_t: &Self::Proof<1, 1>,
@@ -46,7 +46,7 @@ impl<CM: GroupBasedCommitment, TF: SonobeField, const B: usize> FoldingSchemeVer
     #[allow(non_snake_case)]
     fn verify(
         _vk: &(),
-        transcript: &mut impl Transcript<TF>,
+        transcript: &mut impl Transcript<Field = TF>,
         [U1, U2]: &[impl Borrow<Self::RU>; 2],
         _: &[impl Borrow<Self::IU>; 0],
         cm_t: &Self::Proof<2, 0>,
