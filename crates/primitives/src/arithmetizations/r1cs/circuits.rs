@@ -70,11 +70,11 @@ where
     [FVar]: VectorGadget<FVar>,
     for<'a> &'a FVar: Mul<&'a FVar, Output = FVar>,
 {
-    /// [`R1CSMatricesVar::evaluate_at`] is the in-circuit version of
-    /// [`R1CS::evaluate_at`] that evaluates the R1CS variable at a given vector
-    /// of assignments `z`.
+    /// [`R1CSMatricesVar::evaluate_r1cs`] is the in-circuit version of
+    /// [`R1CS::evaluate_r1cs`] that evaluates the R1CS variable at a given
+    /// vector of assignments `z`.
     #[allow(non_snake_case)]
-    pub fn evaluate_at(
+    pub fn evaluate_r1cs(
         &self,
         z: Assignments<FVar, impl AsRef<[FVar]>>,
     ) -> Result<Vec<FVar>, SynthesisError> {
@@ -101,7 +101,7 @@ where
     type Evaluation = Vec<FVar>;
 
     fn eval_relation(&self, w: &WVar, u: &UVar) -> Result<Self::Evaluation, SynthesisError> {
-        self.evaluate_at((FVar::one(), u.as_ref(), w.as_ref()).into())
+        self.evaluate_r1cs((FVar::one(), u.as_ref(), w.as_ref()).into())
     }
 
     fn check_evaluation(_w: &WVar, _u: &UVar, e: Self::Evaluation) -> Result<(), SynthesisError> {

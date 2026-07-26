@@ -444,7 +444,8 @@ impl<F: SonobeField, Cfg, const LHS_ALIGNED: bool> LimbedVar<F, Cfg, LHS_ALIGNED
     /// the limbs.
     ///
     /// Here we implement the `O(n)` approach described in Section IV.B.1 of
-    /// xJsnark's [paper] for non-constant operands.
+    /// xJsnark's [paper](https://akosba.github.io/papers/xjsnark.pdf) for
+    /// non-constant operands.
     pub fn mul_unaligned<const RHS_ALIGNED: bool>(
         &self,
         other: &LimbedVar<F, Cfg, RHS_ALIGNED>,
@@ -538,9 +539,9 @@ impl<F: SonobeField, Cfg, const LHS_ALIGNED: bool> LimbedVar<F, Cfg, LHS_ALIGNED
     /// [`LimbedVar::enforce_equal_unaligned`] enforces the equality between
     /// `self` and `other` that are not necessarily aligned.
     ///
-    /// Adapted from https://github.com/akosba/jsnark/blob/0955389d0aae986ceb25affc72edf37a59109250/JsnarkCircuitBuilder/src/circuit/auxiliary/LongElement.java#L562-L798
-    /// Similar implementations can also be found in https://github.com/alex-ozdemir/bellman-bignat/blob/0585b9d90154603a244cba0ac80b9aafe1d57470/src/mp/bignat.rs#L566-L661
-    /// and https://github.com/arkworks-rs/r1cs-std/blob/4020fbc22625621baa8125ede87abaeac3c1ca26/src/fields/emulated_fp/reduce.rs#L201-L323
+    /// Adapted from <https://github.com/akosba/jsnark/blob/0955389d0aae986ceb25affc72edf37a59109250/JsnarkCircuitBuilder/src/circuit/auxiliary/LongElement.java#L562-L798>
+    /// Similar implementations can also be found in <https://github.com/alex-ozdemir/bellman-bignat/blob/0585b9d90154603a244cba0ac80b9aafe1d57470/src/mp/bignat.rs#L566-L661>
+    /// and <https://github.com/arkworks-rs/r1cs-std/blob/4020fbc22625621baa8125ede87abaeac3c1ca26/src/fields/emulated_fp/reduce.rs#L201-L323>
     pub fn enforce_equal_unaligned<const RHS_ALIGNED: bool>(
         &self,
         other: &LimbedVar<F, Cfg, RHS_ALIGNED>,

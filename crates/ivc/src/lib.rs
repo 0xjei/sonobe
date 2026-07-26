@@ -5,6 +5,15 @@
 //! This crate provides the [`IVC`] trait, which describes the common
 //! interface for all IVC constructions, and [compilers] that turn a folding
 //! scheme into a full IVC scheme.
+//!
+//! # Example
+//!
+//! Proving a long hash chain with folding-based IVC. Each step folds one fresh
+//! execution of a user-defined step circuit into a single proof, whose size and
+//! verification cost do not grow with the number of steps.
+//!
+//! You can run this example with `cargo run --release --example hash_chain`.
+#![doc = concat!("```no_run\n", include_str!("../examples/hash_chain.rs"), "```")]
 
 use ark_ff::PrimeField;
 use ark_relations::gr1cs::SynthesisError;
@@ -16,7 +25,7 @@ use thiserror::Error;
 
 pub mod compilers;
 
-/// [`Error`] enumerates possible errors during the IVC operations.
+/// [`enum@Error`] enumerates possible errors during the IVC operations.
 #[derive(Debug, Error)]
 pub enum Error {
     /// [`Error::ArithError`] indicates an error from the underlying constraint
@@ -138,10 +147,18 @@ pub trait IVC {
 pub struct IVCStatefulProver<'a, FC: FCircuit<Field = I::Field>, I: IVC> {
     pk: &'a I::ProverKey<FC>,
     step_circuit: &'a FC,
-    i: usize,
-    initial_state: FC::State,
-    current_state: FC::State,
-    current_proof: I::Proof<FC>,
+    /// [`IVCStatefulProver::i`] is the number of steps proved so far.
+    pub i: usize,
+    /// [`IVCStatefulProver::initial_state`] is the initial state of iterative
+    /// step circuit executions.
+    pub initial_state: FC::State,
+    /// [`IVCStatefulProver::current_state`] is the current state of iterative
+    /// step circuit executions, reached after [`Self::i`] steps.
+    pub current_state: FC::State,
+    /// [`IVCStatefulProver::current_proof`] is the current proof attesting that
+    /// [`Self::current_state`] is indeed derived from [`Self::initial_state`]
+    /// after executing the step circuit iteratively for [`Self::i`] steps.
+    pub current_proof: I::Proof<FC>,
 }
 
 impl<'a, FC: FCircuit<Field = I::Field>, I: IVC> IVCStatefulProver<'a, FC, I> {

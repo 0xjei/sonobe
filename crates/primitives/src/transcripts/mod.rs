@@ -177,7 +177,7 @@ pub trait TranscriptGadget<F: PrimeField>: Clone {
     }
 
     /// [`TranscriptGadget::add`] absorbs a message `input` that can be any type
-    /// implementing the [`AbsorbableGadget`] trait into the transcript / sponge
+    /// implementing the [`AbsorbableVar`] trait into the transcript / sponge
     /// variable.
     fn add<A: AbsorbableVar<F>>(&mut self, input: &A) -> Result<&mut Self, SynthesisError>;
 

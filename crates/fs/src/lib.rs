@@ -9,10 +9,6 @@
 //! Concrete constructions of the following folding schemes are then implemented
 //! as submodules:
 //! - [`Nova`](nova)
-//! - [`HyperNova`](hypernova)
-//! - [`Mova`](mova)
-//! - [`Ova`](ova)
-//! - [`ProtoGalaxy`](protogalaxy)
 //!
 //! Each scheme module mirrors the same directory layout:
 //! - `algorithms/`: Implementations for the following algorithms:
@@ -24,6 +20,15 @@
 //! - `instances/`: Instance types.
 //! - `keys/`: Key types.
 //! - `witnesses/`: Witness types.
+//!
+//! # Example
+//!
+//! Aggregating independent claims about solutions to an equation into a single
+//! accumulator.
+//!
+//! This example is also runnable with
+//! `cargo run --release --example aggregate_solutions`.
+#![doc = concat!("```\n", include_str!("../examples/aggregate_solutions.rs"), "```")]
 
 pub mod definitions;
 pub mod nova;

@@ -1072,8 +1072,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
+name = "sonobe"
+version = "0.1.0-alpha.1"
+dependencies = [
+ "sonobe-fs",
+ "sonobe-ivc",
+ "sonobe-primitives",
+]
+
+[[package]]
 name = "sonobe-fs"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "ark-bn254",
  "ark-crypto-primitives",
@@ -1096,7 +1105,7 @@ dependencies = [
 
 [[package]]
 name = "sonobe-ivc"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "ark-bn254",
  "ark-crypto-primitives",
@@ -1118,7 +1127,7 @@ dependencies = [
 
 [[package]]
 name = "sonobe-primitives"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "ark-bn254",
  "ark-crypto-primitives",

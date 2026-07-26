@@ -1,9 +1,10 @@
 [package]
 name = "sonobe-ivc"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Traits and implementations of Incremental Verifiable Computation (IVC) for the Sonobe library, featuring generic folding-to-IVC compilers"
 
 [dependencies]
 ark-crypto-primitives = { workspace = true, features = ["constraints", "sponge", "crh"] }

@@ -6,7 +6,7 @@ use sonobe_primitives::{
 };
 use thiserror::Error;
 
-/// [`Error`] enumerates possible errors during folding scheme operations.
+/// [`enum@Error`] enumerates possible errors during folding scheme operations.
 #[derive(Debug, Error)]
 pub enum Error {
     /// [`Error::ArithError`] indicates an error from the underlying constraint

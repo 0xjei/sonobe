@@ -3,10 +3,12 @@ members = [
     "crates/primitives",
     "crates/fs",
     "crates/ivc",
+    "crates/sonobe",
 ]
 resolver = "2"
 
 [workspace.package]
+version = "0.1.0-alpha.1"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/privacy-scaling-explorations/sonobe/"
@@ -41,6 +43,6 @@ ark-pallas = { version = "0.6.0", default-features = false }
 ark-vesta = { version = "0.6.0", default-features = false }
 
 # Local crates
-sonobe-primitives = { path = "crates/primitives", default-features = false }
-sonobe-fs = { path = "crates/fs", default-features = false }
-sonobe-ivc = { path = "crates/ivc", default-features = false }
+sonobe-primitives = { path = "crates/primitives", version = "0.1.0-alpha.1", default-features = false }
+sonobe-fs = { path = "crates/fs", version = "0.1.0-alpha.1", default-features = false }
+sonobe-ivc = { path = "crates/ivc", version = "0.1.0-alpha.1", default-features = false }

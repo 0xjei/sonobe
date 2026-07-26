@@ -26,7 +26,7 @@ use crate::{
 pub mod pedersen;
 // TODO: add back other commitment schemes
 
-/// [`Error`] enumerates possible errors during commitment operations.
+/// [`enum@Error`] enumerates possible errors during commitment operations.
 #[derive(Debug, Error)]
 pub enum Error {
     /// [`Error::MessageTooLong`] indicates that the message being committed to

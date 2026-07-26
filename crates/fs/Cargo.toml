@@ -1,9 +1,10 @@
 [package]
 name = "sonobe-fs"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "Traits and implementations of folding schemes for the Sonobe library"
 
 [dependencies]
 ark-crypto-primitives = { workspace = true, features = ["constraints", "sponge", "crh"] }

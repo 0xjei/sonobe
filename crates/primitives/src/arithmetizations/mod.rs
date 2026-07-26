@@ -16,7 +16,7 @@ use crate::relations::{Relation, RelationGadget};
 pub mod ccs;
 pub mod r1cs;
 
-/// [`Error`] enumerates possible errors during arithmetization operations.
+/// [`enum@Error`] enumerates possible errors during arithmetization operations.
 #[derive(Error, Debug)]
 pub enum Error {
     /// [`Error::MalformedAssignments`] indicates that the provided assignments
