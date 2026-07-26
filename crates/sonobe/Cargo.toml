@@ -1,0 +1,20 @@
+[package]
+name = "sonobe"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "The umbrella crate for the Sonobe folding/accumulation schemes library, re-exporting the sonobe-primitives, sonobe-fs, and sonobe-ivc crates"
+
+[dependencies]
+sonobe-primitives = { workspace = true }
+sonobe-fs = { workspace = true }
+sonobe-ivc = { workspace = true }
+
+[features]
+default = []
+parallel = [
+    "sonobe-primitives/parallel",
+    "sonobe-fs/parallel",
+    "sonobe-ivc/parallel",
+]

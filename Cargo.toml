@@ -1,91 +1,48 @@
 [workspace]
 members = [
-    "folding-schemes",
-    "solidity-verifiers",
-    "cli",
-    "experimental-frontends",
+    "crates/primitives",
+    "crates/fs",
+    "crates/ivc",
+    "crates/sonobe",
 ]
 resolver = "2"
 
-
-[patch.crates-io]
-# Update ark-groth16 to latest git version
-ark-groth16 = { git = "https://github.com/arkworks-rs/groth16", rev = "b3b4a15" }
-
-# Required dependencies for latest ark-groth16
-ark-ff = { git = "https://github.com/arkworks-rs/algebra" }
-ark-ec = { git = "https://github.com/arkworks-rs/algebra" }
-ark-serialize = { git = "https://github.com/arkworks-rs/algebra" }
-ark-poly = { git = "https://github.com/arkworks-rs/algebra" }
-ark-relations = { git = "https://github.com/arkworks-rs/snark" }
-ark-snark = { git = "https://github.com/arkworks-rs/snark" }
-ark-crypto-primitives = { git = "https://github.com/flyingnobita/crypto-primitives", rev = "f559264" }
-ark-r1cs-std = { git = "https://github.com/flyingnobita/r1cs-std_yelhousni", rev = "b4bab0c" }         # "perf/sw-updated" branch
-ark-std = { git = "https://github.com/arkworks-rs/std" }
-ark-poly-commit = { git = "https://github.com/arkworks-rs/poly-commit" }
-
-
-# Curve crates also need git versions
-ark-bn254 = { git = "https://github.com/arkworks-rs/algebra" }
-ark-grumpkin = { git = "https://github.com/arkworks-rs/algebra" }
-ark-pallas = { git = "https://github.com/arkworks-rs/algebra" }
-ark-vesta = { git = "https://github.com/arkworks-rs/algebra" }
-ark-mnt4-298 = { git = "https://github.com/arkworks-rs/algebra" }
-ark-mnt6-298 = { git = "https://github.com/arkworks-rs/algebra" }
-
-[patch."https://github.com/arkworks-rs/circom-compat"]
-ark-circom = { git = "https://github.com/dmpierre/circom-compat", rev = "0dfd773c" }
-
 [workspace.package]
-edition = "2021"
+version = "0.1.0-alpha.1"
+edition = "2024"
 license = "MIT"
 repository = "https://github.com/privacy-scaling-explorations/sonobe/"
+rust-version = "1.85.1"
 
 [workspace.dependencies]
-acvm = { git = "https://github.com/winderica/noir", rev = "fc9e99", default-features = false } # "arkworks-next" branch
-askama = { version = "0.12.0", default-features = false }
-clap = { version = "4.4" }
-clap-verbosity-flag = { version = "2.1" }
-criterion = { version = "0.5" }
-env_logger = { version = "0.10" }
-getrandom = { version = "0.2" }
-log = { version = "0.4" }
-noname = { git = "https://github.com/dmpierre/noname", rev = "c34f17" }
+itertools = { version = "0.14.0" }
 num-bigint = { version = "0.4.3" }
 num-integer = { version = "0.1" }
-pprof = { version = "0.13" }
-serde = { version = "^1.0.0" }
-serde_json = { version = "^1.0.0" }
+num-traits = { version = "0.2" }
 sha3 = { version = "0.10" }
-rand = { version = "0.8.5" }
 rayon = { version = "1" }
-revm = { version = "19.5.0", default-features = false }
-rust-crypto = { version = "0.2" }
-thiserror = { version = "1.0" }
-tokio = "1.44.1"
-wasmer = { version = "6.1.0-rc.2", default-features = false }
+thiserror = { version = "2.0.16" }
+wasm-bindgen-test = { version = "0.3" }
 
 # Arkworks family
-ark-bn254 = { version = "^0.5.0", default-features = false }
-ark-circom = { git = "https://github.com/arkworks-rs/circom-compat", default-features = false }
-ark-crypto-primitives = { version = "^0.5.0", default-features = false }
-ark-ec = { version = "^0.5.0", default-features = false }
-ark-ff = { version = "^0.5.0", default-features = false }
-ark-groth16 = { version = "^0.5.0" }
-ark-grumpkin = { version = "^0.5.0", default-features = false }
-ark-mnt4-298 = { version = "^0.5.0" }
-ark-mnt6-298 = { version = "^0.5.0" }
-ark-pallas = { version = "^0.5.0" }
-ark-poly = { version = "^0.5.0", default-features = false }
-ark-poly-commit = { version = "^0.5.0" }
-ark-r1cs-std = { version = "^0.5.0", default-features = false }
-ark-relations = { version = "^0.5.0", default-features = false }
-ark-serialize = { version = "^0.5.0" }
-ark-snark = { version = "^0.5.0", default-features = false }
-ark-std = { version = "^0.5.0", default-features = false }
-ark-vesta = { version = "^0.5.0" }
+ark-crypto-primitives = { version = "0.6.0", default-features = false }
+ark-ec = { version = "0.6.0", default-features = false }
+ark-ff = { version = "0.6.0", default-features = false }
+ark-groth16 = { version = "0.6.0", default-features = false }
+ark-poly = { version = "0.6.0", default-features = false }
+ark-r1cs-std = { version = "0.6.0", default-features = false }
+ark-relations = { version = "0.6.0", default-features = false }
+ark-serialize = { version = "0.6.0", default-features = false }
+ark-snark = { version = "0.6.0", default-features = false }
+ark-std = { version = "0.6.0", default-features = false }
+
+# Ark curves
+ark-bn254 = { version = "0.6.0", default-features = false }
+ark-grumpkin = { version = "0.6.0", default-features = false }
+ark-pallas = { version = "0.6.0", default-features = false }
+ark-vesta = { version = "0.6.0", default-features = false }
 
 # Local crates
-experimental-frontends = { path = "experimental-frontends" }
-folding-schemes = { path = "folding-schemes" }
-solidity-verifiers = { path = "solidity-verifiers" }
+sonobe-primitives = { path = "crates/primitives", version = "0.1.0-alpha.1", default-features = false }
+sonobe-fs = { path = "crates/fs", version = "0.1.0-alpha.1", default-features = false }
+sonobe-ivc = { path = "crates/ivc", version = "0.1.0-alpha.1", default-features = false }
